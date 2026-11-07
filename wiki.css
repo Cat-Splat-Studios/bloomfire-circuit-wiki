@@ -1,0 +1,257 @@
+/* Bloomfire Wiki — shared stylesheet. Every page in Docs/Wiki links this file; extend here, never per
+   page. Tools/Documentation/structure_wiki.py builds the site.
+
+   THE LOOK IS THE GAME'S. The reading pages are the journal binder (ExpeditionView and the lodge's
+   Circuit menus) and the home page's header is the waybook leaf on the lodge desk (WaybookPage.uss).
+   The colours were drawn from the game; nothing keeps them in step with it, and nothing needs to.
+
+     DuelUi Ink, TextColor, Raised, Danger            --ground --text --raised --danger
+     DuelUi.MenuColour Inset, Line, Edge, Rule,       --inset --line --edge --rule --note --berry
+       NoteGarden, MarkBerry, AccentHighContrast      --gold
+     the shipping pack's Theme (media.json)           --accent (Accent) --growth (Growth)
+                                                       --quiet (Quiet) --paper (Paper)
+     WaybookPage.uss :root garden palette             --leaf-ink --leaf-rule
+     sampled from the rehearsal captures, where a     --page (the binder page) --active (a chosen
+       menu's ground is composited over the world       tile) --chosen (the chosen tab) --mana (the
+                                                         cost gem) --leaf --leaf-edge --desk
+     the wiki's own                                   --rest, --link, --code, --sage and --desk-deep:
+                                                         tints of the above for cards, links, code,
+                                                         diagram arrows and shade, plus the few
+                                                         literals below (code comments, translucent
+                                                         tints of a token)
+
+   --leaf-soft is the waybook's ink-soft darkened until running text on the leaf reads at 4.8:1 (the
+   game's is 2.9:1, fine for a title page, not a paragraph); --leaf-mark is its accent darkened for the
+   decorative entry marks only (2.5:1), never for text. The game draws in Liberation Sans; Arimo and
+   Arial are metric-compatible stand-ins, so no font file ships. */
+
+:root {
+  --ground: #0a171c; --page: #0d1c26; --rest: #11242e; --raised: #1c3840; --active: #1c4953;
+  --inset: #061214; --line: rgba(51, 87, 92, .7); --edge: #547070; --rule: rgba(77, 107, 110, .7);
+  --text: #f5eedc; --quiet: #a5b6ab; --accent: #ddb777; --growth: #94d9b2; --chosen: #497358;
+  --danger: #e98174; --gold: #ffd966; --mana: #58c4b2; --link: #7dd3c0; --berry: #f5b0cf; --note: #132921;
+  --paper: #f4eddd; --code: #e9ddbf; --sage: #7e928a;
+  --leaf: #a8a880; --leaf-edge: #576451; --leaf-ink: #1a2621; --leaf-soft: #2e3a33;
+  --leaf-rule: rgba(60, 82, 70, .34); --leaf-mark: #3f6b4c; --desk: #61442c; --desk-deep: #3f2c1d;
+  --sans: "Liberation Sans", Arimo, Arial, Helvetica, sans-serif;
+  --mono: "Cascadia Mono", "Liberation Mono", Consolas, monospace;
+  color-scheme: dark;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { background: var(--page); color: var(--text); font: 16px/1.62 var(--sans); }
+a { color: var(--link); text-decoration: underline; text-decoration-color: rgba(125, 211, 192, .3); text-underline-offset: 3px; }
+a:hover { text-decoration-color: currentColor; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }   /* the game's focus ring */
+h1, h2, h3, h4 { text-wrap: balance; }
+code { font-family: var(--mono); font-size: .86em; background: var(--inset); border: 1px solid var(--line); border-radius: 5px; padding: .08em .35em; color: var(--code); overflow-wrap: anywhere; }
+pre { background: var(--inset); border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 8px; padding: 14px 16px; overflow-x: auto; margin: 14px 0; }
+pre code { background: none; border: none; padding: 0; color: var(--paper); font-size: .84em; line-height: 1.55; }
+.k { color: var(--berry); } .t { color: var(--link); } .s { color: var(--growth); } .c { color: #6f8582; } .a { color: var(--accent); }
+
+/* wiki-wide navigation — identical on every page; .on marks the current page the way the binder
+   marks its chosen tab: a green fill over a mint underline */
+nav.wiki { position: sticky; top: 0; z-index: 20; background: rgba(10, 23, 28, .97); border-bottom: 1px solid var(--line); padding: 0 16px; display: flex; gap: 2px; justify-content: center; flex-wrap: wrap; font-size: .86rem; }
+nav.wiki a { color: var(--quiet); padding: 10px 11px; border-bottom: 3px solid transparent; text-decoration: none; }
+nav.wiki a:hover { color: var(--text); }
+nav.wiki a.on { color: var(--text); background: var(--chosen); border-bottom-color: var(--growth); }
+nav.wiki a.home { color: var(--accent); font-weight: 700; }
+nav.wiki a.home.on { color: var(--text); }   /* bronze on the chosen fill reads at 2.9:1 */
+
+/* a page's title band, as the binder draws it: the title, a quiet line under it, then a rule
+   (index.html uses header.hero instead) */
+header.page { max-width: 1080px; margin: 0 auto; padding: 40px 24px 18px; }
+header.page h1 { font-size: 2.1rem; line-height: 1.2; }
+header.page h1 .flame { color: var(--accent); }
+header.page p.tag { color: var(--quiet); font-size: 1.02rem; max-width: 780px; margin-top: 8px; padding-bottom: 18px; border-bottom: 1px solid var(--rule); }
+
+/* index only: the waybook leaf lying on the lodge desk, as the title page draws it */
+header.hero { background: linear-gradient(160deg, var(--desk) 0%, var(--desk-deep) 100%); border-bottom: 1px solid var(--desk-deep); padding: 56px 16px 60px; }
+.leaf { max-width: 760px; margin: 0 auto; background: var(--leaf); color: var(--leaf-ink); border-bottom: 8px solid var(--leaf-edge); border-radius: 2px; padding: 44px 52px 34px; box-shadow: 0 18px 42px rgba(0, 0, 0, .35); }
+.leaf .inscription { font-size: 2.3rem; font-weight: 700; font-style: italic; line-height: 1.15; }
+.hero h1 { font-size: 1.75rem; letter-spacing: .02em; margin-top: 4px; }
+.hero h1 .flame { color: inherit; }
+.hero p.tag { color: var(--leaf-soft); font-size: 1.02rem; margin-top: 6px; padding-bottom: 18px; border-bottom: 2px solid var(--leaf-rule); }
+.hero .pillrow { margin-top: 10px; display: grid; }
+.leaf code { background: rgba(26, 38, 33, .07); border-color: var(--leaf-rule); color: var(--leaf-ink); }
+.leaf .pill { background: none; border: none; border-bottom: 1px solid rgba(60, 82, 70, .18); border-radius: 0; color: var(--leaf-soft); padding: 9px 0 9px 26px; font-size: .95rem; position: relative; }
+.leaf .pill::before { content: "›"; position: absolute; left: 6px; color: var(--leaf-mark); font-weight: 700; }
+.leaf .pill b { color: var(--leaf-ink); }
+.pill { border: 1px solid var(--line); background: var(--rest); color: var(--quiet); border-radius: 999px; padding: 6px 16px; font-size: .85rem; }
+.pill b { color: var(--text); font-weight: 700; }
+
+main { max-width: 1080px; margin: 0 auto; padding: 24px; }
+section { margin: 52px 0; }
+h2 { font-size: 1.6rem; margin-bottom: 6px; padding-bottom: 8px; border-bottom: 1px solid var(--rule); }
+h2 .num { display: inline-block; vertical-align: .2em; margin-right: 12px; color: var(--accent); background: var(--inset); border: 1px solid var(--line); border-radius: 999px; font-size: .95rem; line-height: 1.5; padding: 0 10px; }   /* the deck list's cost chip */
+h3 { margin: 26px 0 8px; font-size: 1.15rem; color: var(--accent); }
+h4 { font-size: 1rem; }
+p { margin: 10px 0; } p.dim { color: var(--quiet); }
+ul, ol { margin: 10px 0 10px 24px; } li { margin: 4px 0; }
+li::marker { color: var(--accent); }
+.lead { color: var(--quiet); font-size: 1.02rem; margin-bottom: 18px; }
+
+/* cards are the binder's card tiles: the chosen tile lifts to ControlActive under a bronze edge */
+.grid { display: grid; gap: 14px; margin: 18px 0; }
+.grid > * { min-width: 0; }
+.grid.c2 { grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr)); }
+.grid.c3 { grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); }
+.card { background: var(--rest); border: 1px solid var(--line); border-radius: 10px; padding: 18px 20px; }
+.card h4 { margin-bottom: 6px; } .card p { color: var(--quiet); font-size: .92rem; margin: 4px 0; }
+.card.accent-ember { border-top: 3px solid var(--accent); } .card.accent-gold { border-top: 3px solid var(--gold); }
+.card.accent-cyan { border-top: 3px solid var(--mana); } .card.accent-green { border-top: 3px solid var(--growth); }
+.card.accent-red { border-top: 3px solid var(--danger); } .card.accent-violet { border-top: 3px solid var(--berry); }
+a.card { display: block; color: var(--text); text-decoration: none; }
+a.card:hover { background: var(--active); border-color: var(--accent); }
+
+table { border-collapse: collapse; width: 100%; margin: 14px 0; font-size: .92rem; }
+th, td { border: 1px solid var(--line); padding: 8px 12px; text-align: left; vertical-align: top; }
+th { background: var(--raised); color: var(--accent); font-weight: 700; }
+td code { white-space: nowrap; }
+.scrollx { overflow-x: auto; }
+
+/* notes are the waybook's note: a garden ground under a living-colour mark */
+.note { border-left: 3px solid var(--growth); background: var(--note); border-radius: 0 8px 8px 0; padding: 12px 16px; margin: 14px 0; font-size: .94rem; }
+.warn { border-left-color: var(--accent); background: rgba(221, 183, 119, .08); }
+.rule { border-left-color: var(--danger); background: rgba(233, 129, 116, .08); }
+
+/* real screenshots of the real tools */
+figure.shot { margin: 18px 0; }
+figure.shot img { width: 100%; display: block; border: 1px solid var(--line); border-radius: 10px; }
+figure.shot figcaption { color: var(--quiet); font-size: .86rem; margin-top: 8px; padding-left: 4px; }
+figure.shot figcaption b { color: var(--text); }
+.shotgrid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr)); margin: 18px 0; }
+.shotgrid figure.shot { margin: 0; }
+figure.shot.pending { border: 1px dashed var(--line); border-radius: 10px; background: var(--rest); padding: 14px 16px; }
+figure.shot.pending figcaption { margin-top: 0; }
+
+/* a menu path or a key, drawn like the binder's controller-glyph keys */
+.kbd { font-family: var(--sans); font-weight: 700; background: var(--rest); border: 1px solid var(--edge); border-bottom-width: 2px; border-radius: 6px; padding: 1px 7px; font-size: .82em; color: var(--text); white-space: nowrap; }
+
+/* recipe steps, numbered in cost chips */
+ol.steps { counter-reset: step; margin-left: 0; list-style: none; }
+ol.steps > li { counter-increment: step; position: relative; padding: 8px 0 8px 46px; margin: 0; }
+ol.steps > li::before { content: counter(step); position: absolute; left: 0; top: 8px; width: 30px; height: 30px; border-radius: 50%; background: var(--inset); border: 1px solid var(--accent); color: var(--accent); font-weight: 700; display: flex; align-items: center; justify-content: center; font-size: .9rem; }
+
+/* "keep this page honest" footer box — every domain page ends with one */
+.honest { border: 1px dashed var(--accent); border-radius: 10px; background: rgba(221, 183, 119, .05); padding: 16px 20px; margin: 44px 0 10px; font-size: .92rem; }
+.honest h4 { color: var(--accent); margin-bottom: 8px; }
+.honest ul { margin-bottom: 0; } .honest li { color: var(--quiet); }
+
+/* prev / next page links, drawn as the binder's buttons */
+.pn { display: flex; justify-content: space-between; gap: 14px; margin: 30px 0 10px; flex-wrap: wrap; }
+.pn a { border: 1px solid var(--line); background: var(--rest); border-radius: 10px; padding: 10px 18px; color: var(--text); font-weight: 700; text-decoration: none; }
+.pn a:hover { background: var(--active); border-color: var(--accent); }
+.pn a span { display: block; color: var(--quiet); font-size: .78rem; font-weight: 400; }
+
+/* the leaf's foot line, "TRAVELLER'S LODGE" */
+footer { background: var(--ground); border-top: 1px solid var(--line); margin-top: 60px; padding: 28px 24px 46px; text-align: center; color: var(--quiet); font-size: .85rem; }
+
+/* ------------------------------------------------------------------------------------------
+   THE READING SHAPE — maintaining.html "Page shape" is the contract; these are its building
+   blocks. Every reference page opens with an un-numbered orientation block (so <h2> numbering,
+   which other pages cite, never moves):
+
+     <div class="tldr">      In 60 seconds — five bullets, the page in one screen
+     <div class="prereq">    Before you start — what you need open / installed / already read
+     <div class="router">    I want to… — a task -> link table, only on a page whose job is routing
+                             (the landing page, the guide's chapter map); wiki.js builds every
+                             other page's contents list from its <h2>s
+
+   and states every rule FIRST, with its reason folded away when it takes more than a sentence:
+
+     <details class="why"><summary>Why this rule exists</summary> …what goes wrong without the rule… </details>
+
+   A fold carries the reason, not the incident: the dated story lives in the commit log
+   (maintaining.html, "The page shape").
+   ------------------------------------------------------------------------------------------ */
+.tldr, .prereq, .router { border: 1px solid var(--line); border-radius: 10px; background: var(--rest); padding: 16px 20px; margin: 18px 0; }
+.tldr { border-top: 3px solid var(--accent); }
+.prereq { border-top: 3px solid var(--growth); }
+.router { border-top: 3px solid var(--mana); }
+.tldr h4, .prereq h4, .router h4 { margin-bottom: 6px; font-size: .78rem; letter-spacing: .1em; text-transform: uppercase; }
+.tldr h4 { color: var(--accent); } .prereq h4 { color: var(--growth); } .router h4 { color: var(--mana); }
+.tldr ul, .prereq ul { margin-bottom: 0; }
+.tldr li, .prereq li { margin: 5px 0; }
+.router table { margin-bottom: 0; }
+
+details.why { border-left: 3px solid var(--edge); border-radius: 0 8px 8px 0; background: var(--inset); margin: 10px 0 14px; font-size: .92rem; }
+details.why > summary { cursor: pointer; padding: 8px 14px; color: var(--quiet); list-style-position: inside; user-select: none; }
+details.why > summary:hover { color: var(--text); }
+details.why[open] > summary { color: var(--text); border-bottom: 1px solid var(--line); }
+details.why > *:not(summary) { margin-left: 16px; margin-right: 16px; }
+details.why > p:last-child, details.why > ul:last-child, details.why > table:last-child { margin-bottom: 12px; }
+td details.why { margin: 6px 0 0; }
+
+/* glossary.html — one <dt id="term-…"> per term so any page can deep-link a word */
+dl.glossary { margin: 14px 0; }
+dl.glossary dt { color: var(--accent); font-weight: 700; margin-top: 16px; scroll-margin-top: 70px; }
+dl.glossary dt .aka { color: var(--quiet); font-weight: 400; font-size: .88em; }
+dl.glossary dd { margin: 4px 0 0 0; padding-left: 14px; border-left: 2px solid var(--line); }
+dl.glossary dd .more { color: var(--quiet); font-size: .9em; }
+a.term { text-decoration-style: dotted; text-decoration-color: var(--link); }
+a.term:hover { text-decoration-style: solid; }
+
+/* "On this page" — built by wiki.js from the page's own <h2>s, so it cannot drift */
+.toc { font-size: .86rem; }
+.toc a { color: var(--quiet); display: block; padding: 3px 0; text-decoration: none; }
+.toc a:hover { color: var(--text); }
+.toc .n { color: var(--accent); margin-right: 8px; font-size: .92em; font-weight: 700; }
+details.toc-inline { border: 1px solid var(--line); border-radius: 10px; background: var(--rest); padding: 10px 18px; margin: 18px 0 0; }
+details.toc-inline > summary { cursor: pointer; color: var(--accent); font-weight: 700; }
+details.toc-inline ol { list-style: none; margin: 8px 0 4px; columns: 2; column-gap: 28px; }
+h2, h3, [id] { scroll-margin-top: 64px; }
+
+/* grouped navigation. Narrow screens: the groups dissolve and the bar wraps. */
+nav.wiki .grp { display: contents; }
+nav.wiki .grp-t { display: none; }
+nav.wiki .toc { display: none; }
+
+/* Phones and narrow panes: 16 wrapped links are several rows tall, and a STICKY bar that tall covers
+   the page it is meant to navigate. Let it scroll away. */
+@media (max-width: 900px) { nav.wiki { position: static; } h2, h3, [id] { scroll-margin-top: 12px; } }
+
+/* Wide screens: the nav becomes the binder's spine — a fixed left rail under a stitched seam, with
+   the binder's rings down the edge, five labelled groups, the current page marked and that page's
+   own sections listed beneath it. */
+@media (min-width: 1240px) {
+  body { padding-left: 252px; }
+  nav.wiki { position: fixed; top: 0; left: 0; bottom: 0; width: 252px; display: block; overflow-y: auto; padding: 10px 14px 40px 0; border-bottom: none; border-right: 1px dashed var(--edge); background: var(--ground); font-size: .88rem; }
+  body::before { content: ""; position: fixed; top: 0; bottom: 0; left: 238px; width: 28px; z-index: 21; pointer-events: none;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='104'%3E%3Cellipse cx='14' cy='52' rx='11' ry='4' fill='none' stroke='%23000' stroke-opacity='.55' stroke-width='4'/%3E%3Cellipse cx='14' cy='51' rx='11' ry='4' fill='none' stroke='%23c9a465' stroke-width='2.2'/%3E%3C/svg%3E") 0 30px / 28px 104px repeat-y; }
+  nav.wiki a { display: block; padding: 5px 20px; border-bottom: none; border-left: 3px solid transparent; border-radius: 0 8px 8px 0; }
+  nav.wiki a.home { padding: 12px 20px 10px; font-size: 1rem; }
+  nav.wiki a.on { border-left-color: var(--growth); }
+  nav.wiki .grp { display: block; margin-top: 14px; }
+  nav.wiki .grp-t { display: block; padding: 4px 20px; color: var(--accent); font-size: .72rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+  nav.wiki .toc { display: block; margin: 2px 0 6px; padding: 4px 0; border-left: 3px solid var(--growth); border-radius: 0 0 8px 0; background: var(--inset); }
+  nav.wiki .toc a { padding: 2px 12px 2px 30px; border-left: none; font-size: .8rem; line-height: 1.35; }
+  details.toc-inline { display: none; }
+  h2, h3, [id] { scroll-margin-top: 18px; }
+}
+@media print { nav.wiki, details.toc-inline, body::before { display: none; } body { padding-left: 0; } details.why > *:not(summary) { display: block; } }
+
+/* Mermaid diagrams. wiki.js renders every <pre class="mermaid"> with a theme drawn from the palette
+   above; a wide diagram scrolls inside its frame instead of shrinking to unreadable. */
+.diagram { background: var(--inset); border: 1px solid var(--line); border-radius: 10px; padding: 14px; margin: 16px 0; overflow-x: auto; }
+.diagram pre.mermaid { background: none; border: none; padding: 0; margin: 0; min-width: min-content; color: var(--quiet); font-size: .8rem; }
+.diagram pre.mermaid svg { max-width: none !important; height: auto; }
+.diagram + .caption, p.caption { color: var(--quiet); font-size: .86rem; margin-top: -6px; }
+
+/* findings.html and complexity.html: a finding's priority and a metric's direction at a glance,
+   as the binder's chips */
+.badge { display: inline-block; border-radius: 999px; padding: 1px 10px; font-size: .76rem; font-weight: 700; letter-spacing: .03em; border: 1px solid var(--line); vertical-align: middle; }
+.badge.high { color: var(--danger); border-color: rgba(233, 129, 116, .55); background: rgba(233, 129, 116, .1); }
+.badge.medium { color: var(--accent); border-color: rgba(221, 183, 119, .55); background: rgba(221, 183, 119, .1); }
+.badge.low { color: var(--quiet); border-color: var(--edge); background: var(--inset); }
+.badge.done { color: var(--growth); border-color: rgba(148, 217, 178, .55); background: rgba(148, 217, 178, .1); }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; font-size: .9em; white-space: nowrap; }
+.up { color: var(--danger); } .down { color: var(--growth); }
+.bar { display: inline-block; height: 8px; border-radius: 4px; background: var(--accent); vertical-align: middle; }
+
+/* Phones: long paths and type names in running text break anywhere rather than widen the page. */
+@media (max-width: 600px) {
+  main, header.page { padding-left: 16px; padding-right: 16px; }
+  td code { white-space: normal; }
+  .leaf { padding: 28px 22px 22px; } .leaf .inscription { font-size: 1.8rem; }
+}

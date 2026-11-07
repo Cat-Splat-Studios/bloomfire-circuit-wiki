@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Codebase Tour — Bloomfire Wiki</title>
+<link rel="stylesheet" href="wiki.css">
+<script src="mermaid.min.js" defer></script>
+<script src="wiki.js" defer></script>
+</head>
+<body>
+<nav class="wiki">
+  <a class="home" href="index.html">🔥 Bloomfire Wiki</a>
+  <div class="grp"><span class="grp-t">Start here</span>
+    <a class="on" href="codebase-tour.html">Codebase Tour</a>
+    <a href="glossary.html">Glossary</a>
+  </div>
+  <div class="grp"><span class="grp-t">Game systems</span>
+    <a href="rules.html">Rules Engine</a>
+    <a href="world.html">World &amp; Journal</a>
+    <a href="sessions.html">Hosted Sessions</a>
+    <a href="ui.html">UI &amp; Menus</a>
+    <a href="networking.html">Networking</a>
+    <a href="content.html">Content &amp; Media</a>
+    <a href="saves.html">Saves &amp; Settings</a>
+  </div>
+  <div class="grp"><span class="grp-t">Code health</span>
+    <a href="diagrams.html">Diagrams</a>
+    <a href="complexity.html">Complexity</a>
+    <a href="findings.html">Findings</a>
+  </div>
+  <div class="grp"><span class="grp-t">Ship &amp; maintain</span>
+    <a href="qa.html">QA &amp; Rehearsals</a>
+    <a href="builds.html">Builds &amp; Tools</a>
+    <a href="maintaining.html">Maintaining</a>
+  </div>
+</nav>
+<header class="page"><h1>The Codebase <span class="flame">Tour</span></h1><p class="tag">A guided walk through the repository and its build units: what each folder, assembly and .NET project owns, how the Unity project is laid out, which big classes are split into partial files, and how content reaches a player.</p></header>
+<main>
+
+<div class="tldr">
+  <h4>In 60 seconds</h4>
+  <ul>
+    <li><b>Six source owners.</b> <code>Game</code>, <code>Toolkit</code>, <code>Content</code>, <code>Tools</code>, <code>Docs</code> and <code>Teaching</code> sit at the root. <code>Builds</code> and <code>Temp</code> sit beside them and are ignored by git. See <a href="#map">§01</a>.</li>
+    <li><b>The toolkit is a Unity package with seven runtime assemblies.</b> Every one except <code>CardForge.Content</code> is free of the Unity engine. The game pulls the package in through a <code>file:</code> entry in its package manifest. See <a href="#toolkit">§02</a>.</li>
+    <li><b>The game has no assembly definitions.</b> <code>Assets/Runtime</code>, <code>Assets/Runtime/Exploration</code> and <code>Assets/Tests</code> all compile into <code>Assembly-CSharp</code>, and only <code>Assets/Editor</code> goes elsewhere. QA code stays out of shipping players through <code>#if</code> guards, not through assemblies. See <a href="#assembly">§04</a>.</li>
+    <li><b>Four big classes are split by concern.</b> <code>IsometricSlice</code>, <code>ExpeditionView</code>, <code>ExpeditionApp</code> and <code>CircuitSliceChecks</code> are each split into many <code>Type.Concern.cs</code> partial files, and the suffix tells you the concern. See <a href="#partials">§06</a>.</li>
+    <li><b>Names are kept for compatibility.</b> One namespace spans four assemblies, and the "Expedition" and "Isometric" names survive from earlier products. Read <a href="#names">§07</a> before you go looking for a type by its namespace.</li>
+  </ul>
+</div>
+
+<div class="prereq">
+  <h4>Before you start</h4>
+  <ul>
+    <li>You do not need Unity for this page. It describes files on <code>main</code> only.</li>
+    <li>Keep the <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CODE_ARCHITECTURE_GUIDE.md#source-map">source map</a> open beside this page. It gives each layer's path and responsibility in one table, and this tour does not copy it.</li>
+    <li>For the three layers and one player action drawn end to end, see <a href="index.html#layers">the home page §01</a> and <a href="index.html#action">§02</a>. If a term is new to you, look it up in <a href="glossary.html">the glossary</a>.</li>
+  </ul>
+</div>
+
+<section id="map">
+  <h2><span class="num">01</span>The map</h2>
+  <p class="lead">Each top-level folder, what it owns, and the first file to open in it. Ownership itself is set out in <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/MAINTAINING.md#ownership">MAINTAINING, Ownership</a>. This table is the reading view of it.</p>
+  <div class="scrollx"><table>
+    <tr><th>Path</th><th>What it owns</th><th>Open first</th></tr>
+    <tr><td><code>Game/EmberGrove/</code></td><td>The Unity project. It holds the one scene, presentation, input, audio, the Circuit world, saves, the build script and the Unity rehearsals. Open this folder in Unity, not the repository root.</td><td><code>Assets/Runtime/Exploration/IsometricSlice.cs</code></td></tr>
+    <tr><td><code>Toolkit/Packages/com.catsplat.cardforge/</code></td><td>CardForge 0.7.0, the reusable Unity package. It holds the pure combat, adventure, lesson, navigation and progression rules, pack loading, and multiplayer. Its own guides are in <code>Documentation~/</code>.</td><td><code>README.md</code>, <code>Runtime/Core/CombatRules.cs</code></td></tr>
+    <tr><td><code>Toolkit/Tests/</code></td><td>One file, <code>ExpeditionCoreChecks.cs</code>. The Performance and LegacyProgression checks compile it in.</td><td><code>ExpeditionCoreChecks.cs</code></td></tr>
+    <tr><td><code>Content/</code></td><td>The canonical authored data and media. <code>EmberGroveDefault/</code> is the content pack, <code>Circuit/</code> holds the adventure's sidecar files and recorded guide lines, and <code>Exploration/sector.json</code> is the start-up sector. Builds copy all of it into the game, and the copy is never the source (<a href="#content">§08</a>).</td><td><code>EmberGroveDefault/manifest.json</code></td></tr>
+    <tr><td><code>Tools/</code></td><td>Everything that runs outside Unity: the check runner, the .NET check projects, CardForge Content Studio, the relay and trusted service, packaging, the documentation exporter, the score and audio scripts (<a href="#tools">§05</a>).</td><td><code>README.md</code>, <code>Run-Checks.ps1</code></td></tr>
+    <tr><td><code>Docs/</code></td><td>Writing. <code>Guides/</code> holds current procedures and rules, and <code>Design/</code> holds the game design document and card design. <code>Release/ROADMAP.md</code> is the one backlog, with status and decisions, and <code>Concepts/</code> holds art and audio provenance records.</td><td><code>README.md</code></td></tr>
+    <tr><td><code>Teaching/</code></td><td>How to recover older projects from tags, the historical content the LegacyProgression suite compiles against (<code>LegacyResources/</code>), and one corrected legacy assembly manifest (<code>LegacyEditor/</code>). It holds no current code.</td><td><code>README.md</code></td></tr>
+    <tr><td><code>README.md</code>, <code>AGENTS.md</code></td><td>The README holds current scope and the downloads. <code>AGENTS.md</code> holds the standing contribution rules, including reducing file bloat and keeping one source of truth per subject.</td><td><code>AGENTS.md</code></td></tr>
+    <tr><td><code>Builds/</code>, <code>Temp/</code></td><td>Ignored by git. They hold players, packages, generated documentation, check logs and scratch work. <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/MAINTAINING.md#local-output-retention">Local output retention</a> says what to keep where.</td><td>—</td></tr>
+  </table></div>
+  <div class="note"><b>Files you will see that git does not track.</b> These are generated <code>.csproj</code> and <code>.sln</code> files (only <code>.csproj</code> files under <code>Tools/</code> and <code>Toolkit/</code> may be tracked, and today only the <code>Tools/</code> ones are), the Unity folders <code>Library</code>, <code>Temp</code>, <code>Logs</code> and <code>UserSettings</code> under <code>Game/EmberGrove</code>, and the staged <code>Assets/StreamingAssets/Content</code>, <code>Circuit</code> and <code>Exploration</code> folders. All of them are listed in <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/.gitignore"><code>.gitignore</code></a>.</div>
+</section>
+
+<section id="toolkit">
+  <h2><span class="num">02</span>The toolkit and its assemblies</h2>
+  <p class="lead">The package compiles into seven runtime assemblies, one editor assembly and two sample assemblies. Each runtime assembly lists the others it uses in its <code>.asmdef</code>. The game's <code>Assembly-CSharp</code> sees them all because they are auto-referenced.</p>
+  <div class="scrollx"><table>
+    <tr><th>Assembly (<code>.asmdef</code> name)</th><th>Folder</th><th>References</th><th>Namespace</th><th>What it owns</th></tr>
+    <tr><td><code>CardForge.Functional</code></td><td><code>Runtime/Functional</code></td><td>—</td><td><code>EmberGrove</code></td><td><code>Result&lt;T&gt;</code> (with <code>Ok</code>, <code>Fail</code>, <code>Map</code>, <code>Bind</code> and <code>Match</code>) and <code>RuleError</code>, all in <code>Result.cs</code></td></tr>
+    <tr><td><code>EmberGrove.Expedition</code></td><td><code>Runtime/Core</code></td><td>Functional</td><td><code>EmberGrove.Expedition</code>, <code>CardForge.Lessons</code></td><td>The combat contracts (<code>CombatContracts.cs</code>: card, state, command and event types, <code>Catalog</code>, <code>CardQuery</code>), the reducer <code>CombatRules</code>, <code>CombatAi</code> and <code>BoardOccupancy</code>. Lessons sit in <code>LessonContracts.cs</code> and <code>LessonRules.cs</code>.</td></tr>
+    <tr><td><code>EmberGrove.Expedition.Progression</code></td><td><code>Runtime/Progression</code></td><td>Expedition</td><td><code>EmberGrove.Expedition</code></td><td>The game uses <code>ContentPack</code>, <code>EncounterDefinition</code> and <code>DeckPresetDefinition</code> (<code>ExpeditionRun.cs</code>). Also here are the toolkit's campaign rules, which no game code calls: <code>RunRules</code>, <code>CampaignRules</code>, <code>ProfileRules</code> and <code>StoryRules</code>, with their own <code>RunResult</code> and <code>WorldResult</code>. <code>CombatProgressFacts</code> feeds <code>ExpeditionAuthority</code>.</td></tr>
+    <tr><td><code>CardForge.Circuit</code></td><td><code>Runtime/Circuit</code></td><td>Functional, Expedition</td><td><code>CardForge.Circuit</code></td><td>The adventure. <code>CircuitDefinition.cs</code> holds the definitions and the saved state types, ending in <code>CircuitState</code>. <code>CircuitRules</code> is split over three files (<a href="#partials">§06</a>).</td></tr>
+    <tr><td><code>CardForge.Exploration</code></td><td><code>Runtime/Exploration</code></td><td>Functional</td><td><code>CardForge.Exploration</code></td><td><code>SectorDefinition</code>, <code>LobbyDefinition</code>, <code>LandmarkDefinition</code>, <code>GridPoint</code>, <code>SectorNavigation</code> (<code>Validate</code>, <code>FindPath</code>) and <code>LandmarkRules</code></td></tr>
+    <tr><td><code>CardForge.Content</code></td><td><code>Runtime/Content</code></td><td>Functional, Circuit, Expedition, Progression</td><td><code>EmberGrove.Expedition</code></td><td><code>ContentPackFiles</code> (the manifest and media schema, and the pack loader that produces <code>LoadedContentPack</code>), <code>ExpeditionContent.Parse</code> and <code>WorldContent.Parse</code>. This is the one runtime assembly that may use <code>UnityEngine</code>.</td></tr>
+    <tr><td><code>EmberGrove.Expedition.Networking</code></td><td><code>Runtime/Networking</code></td><td>Functional, Expedition, Progression</td><td><code>EmberGrove.Expedition.Networking</code></td><td><code>NetworkContracts.cs</code> (<code>ExpeditionProtocol</code>, the <code>Wire*</code> types, <code>ExpeditionWireCodec</code>, <code>ExpeditionProjection</code>, <code>ExpeditionSnapshot</code>), <code>ExpeditionAuthority.cs</code> (with <code>ExpeditionFingerprint</code>) and <code>ExpeditionNetworkSession.cs</code> (with its TCP and WebSocket links). <code>link.xml</code> keeps the serializer's code through IL2CPP stripping.</td></tr>
+    <tr><td><code>CardForge.Linker.Editor</code></td><td><code>Editor</code></td><td>—</td><td><code>CardForge.Editor</code></td><td><code>CardForgeLinkerProcessor</code>, which adds <code>Runtime/Networking/link.xml</code> to player builds, because Unity does not find a package's <code>link.xml</code> on its own. Editor only.</td></tr>
+    <tr><td><code>CardForge.Samples</code>, <code>CardForge.Samples.Editor</code></td><td><code>Samples~/MinimalTactics</code></td><td>Functional, Expedition, Progression, Networking; the editor one references Samples and Linker.Editor</td><td><code>CardForge.Samples</code>, <code>CardForge.Samples.Editor</code></td><td>Art-free examples of tactics, progression and network views. Unity skips folders whose names end in <code>~</code>, so these compile only in a project that imports the sample.</td></tr>
+  </table></div>
+  <div class="note rule"><b>Every runtime assembly except <code>CardForge.Content</code> sets <code>noEngineReferences</code>.</b> Combat, adventure, lesson, navigation, progression and networking rules therefore cannot touch Unity types, which is what lets the .NET tools compile them unchanged (<a href="#tools">§05</a>). <code>CardForge.Content</code> uses <code>JsonUtility</code>, <code>UnityWebRequest</code> and the <code>Application</code> paths. The relay and Content Studio compile its files with <code>CARDFORGE_HEADLESS</code>, which leaves out its Unity file loaders. The other tools that compile its parsers use the <code>UnityEngine</code> stand-ins instead (<a href="#tools">§05</a>).</div>
+  <details class="why"><summary>Why each assembly lists its references explicitly</summary>
+    <p><code>AGENTS.md</code> requires an assembly to reference directly every assembly whose types it uses, and never to rely on an indirect reference. The example it gives is <code>EmberGrove.Result&lt;T&gt;</code> from <code>CardForge.Functional</code>. The retired root project broke exactly this way, and <code>Teaching/LegacyEditor/EmberGrove.Networking.asmdef</code> is kept as the corrected manifest (<a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Teaching/README.md#legacy-editor-assembly-correction">Teaching, Legacy editor assembly correction</a>).</p>
+  </details>
+  <p class="dim">The file-by-file table for the package is in the toolkit's <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Toolkit/Packages/com.catsplat.cardforge/Documentation~/ARCHITECTURE.md#file-responsibilities">ARCHITECTURE, File responsibilities</a>. What the package promises a consumer is in the <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Toolkit/Packages/com.catsplat.cardforge/README.md#package-boundary">package boundary</a>. The class diagrams are on <a href="diagrams.html">Diagrams</a>.</p>
+</section>
+
+<section id="project">
+  <h2><span class="num">03</span>Inside the Unity project</h2>
+  <p class="lead"><code>Game/EmberGrove</code> is an ordinary Unity project with one scene in its build list. Code sits in four folders under <code>Assets/</code> (<a href="#assembly">§04</a>). The rest is art, assets loaded by name, and settings.</p>
+  <div class="scrollx"><table>
+    <tr><th>Path under <code>Game/EmberGrove/</code></th><th>What it is</th></tr>
+    <tr><td><code>Assets/Scenes/CircuitJourney.unity</code></td><td>The only scene in <code>ProjectSettings/EditorBuildSettings.asset</code>. It holds one <code>IsometricSlice</code> and one <code>IsometricSectorVisuals</code>, the authored district and room components (<code>AuthoredCircuitDistrict</code>, <code>AuthoredCircuitRoom</code>), and prefab instances such as the lodge waybook. The hosted battle is not in the scene. <code>IsometricCombatBridge</code>, <code>ExpeditionApp</code> and <code>ExpeditionView</code> are added with <code>AddComponent</code> when a session starts.</td></tr>
+    <tr><td><code>Assets/Runtime/</code>, <code>Assets/Runtime/Exploration/</code></td><td>Game code that ships (<a href="#assembly">§04</a>).</td></tr>
+    <tr><td><code>Assets/Editor/</code></td><td>The build script and the Current Card Workshop window (<a href="#assembly">§04</a>).</td></tr>
+    <tr><td><code>Assets/Tests/</code></td><td>Unity rehearsals and the editor save check. <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Game/EmberGrove/Assets/Tests/README.md">Its README</a> lists every entry point.</td></tr>
+    <tr><td><code>Assets/ExplorationPrototype/</code></td><td>The world's art, despite the name. It holds the district and room prefabs (<code>ClubDistrict</code>, <code>ClubRoomTable</code>, <code>ClubRoomCounter</code>, <code>ClubRoomVisit</code> and more), <code>LodgeWaybook.prefab</code>, <code>LivingTable.prefab</code>, the character models under <code>Characters/</code>, materials, and the world's render pipeline assets.</td></tr>
+    <tr><td><code>Assets/Resources/</code></td><td>Assets the code loads by name. <code>DuelAudio/</code> holds the battle sound effects and <code>DuelArt/</code> the arena backdrop. <code>InputGlyphs/</code> holds the controller and keyboard hint sprites, and <code>Expedition/ExpeditionTheme.asset</code> is the battle theme. <code>UI/</code> holds the UI Toolkit waybook page: <code>WaybookPage.uxml</code>, <code>WaybookPage.uss</code>, its panel assets and <code>BloomfireTheme.tss</code>.</td></tr>
+    <tr><td><code>Assets/Settings/</code>, <code>Assets/TextMesh Pro/</code>, loose URP assets</td><td>The render pipeline assets, the TextMesh Pro essentials, and URP's global settings and default volume.</td></tr>
+    <tr><td><code>Assets/StreamingAssets/</code></td><td>Only the folder's <code>.meta</code> is tracked; its <code>Content</code>, <code>Circuit</code> and <code>Exploration</code> folders are ignored by git. They hold the copies of <code>Content/</code> that every build and the <span class="kbd">Stage content for editor</span> menu write (<a href="#content">§08</a>).</td></tr>
+    <tr><td><code>Packages/manifest.json</code></td><td>Pulls in <code>com.catsplat.cardforge</code> from <code>file:../../../Toolkit/Packages/com.catsplat.cardforge</code>, plus the Input System, URP, uGUI and the built-in modules (UI Toolkit among them). This is why you clone the whole repository, not just the project.</td></tr>
+    <tr><td><code>ProjectSettings/</code></td><td>Unity settings. <code>ProjectVersion.txt</code> pins 6000.5.5f1. <code>ProjectSettings.asset</code> holds the editor's <code>productName</code>, which every player build overrides (see <a href="#names">§07</a>).</td></tr>
+  </table></div>
+</section>
+
+<section id="assembly">
+  <h2><span class="num">04</span>How Assembly-CSharp is laid out</h2>
+  <p class="lead">The game has no <code>.asmdef</code>, so Unity's default rules apply. Everything under <code>Assets/</code> compiles into <code>Assembly-CSharp</code>, except a folder named <code>Editor</code>, which compiles into <code>Assembly-CSharp-Editor</code>. That includes the tests. Whether code reaches a player depends on compiler guards, not on which folder it is in.</p>
+  <div class="scrollx"><table>
+    <tr><th>Folder</th><th>Assembly</th><th>Namespace</th><th>What lives there</th><th>In a shipping player?</th></tr>
+    <tr><td><code>Assets/Runtime/</code></td><td><code>Assembly-CSharp</code></td><td>Mostly <code>EmberGrove.Expedition</code>. Also <code>EmberGrove</code> (<code>DuelUi</code>), <code>EmberGrove.Audio</code> (<code>GameAudioDirector</code>) and <code>EmberGrove.Playtesting</code> (<code>PlaytestSessionService</code>)</td><td>The hosted session: <code>ExpeditionApp*.cs</code> and <code>ExpeditionView*.cs</code>. Around them sit the services they share: <code>DuelUi</code> (the code-built uGUI factory), <code>ExpeditionTheme</code>, <code>ExpeditionFocusMotion</code>, <code>CardArtworkCache</code>, <code>PlayerSettings</code>, <code>PracticeNarration</code>, <code>WorldTableContext</code>, <code>WorldTablePresentation</code>, <code>GameAudioDirector</code> and <code>PlaytestSessionService</code>.</td><td>yes</td></tr>
+    <tr><td><code>Assets/Runtime/Exploration/</code></td><td><code>Assembly-CSharp</code></td><td><code>EmberGrove.Exploration</code></td><td>The Circuit world: <code>IsometricSlice*.cs</code>, <code>IsometricSectorVisuals*.cs</code>, <code>IsometricCombatBridge</code>, <code>CircuitPersistence</code> (with <code>CircuitSave</code>), <code>CircuitWorldLayout</code>, <code>AuthoredCircuitDistrict</code>, <code>AuthoredCircuitRoom</code>, <code>LodgeWaybookBinding</code>, and the <code>Traveller*</code> picture, motion and frame types.</td><td>yes</td></tr>
+    <tr><td><code>Assets/Editor/</code></td><td><code>Assembly-CSharp-Editor</code></td><td><code>EmberGrove.Editor</code></td><td><code>IsometricSliceBuild</code>: the <span class="kbd">Bloomfire Circuit</span> menu (scene and room tools, content staging, Windows and macOS builds, the Android prerequisite check), the Android build entries that run in batch mode, and the private QA build guard, with <code>AndroidNetworkQaLinker</code> beside it in the same file. Also <code>CurrentCardWorkshop</code>, opened from <span class="kbd">CardForge ▸ Current Card Workshop</span>.</td><td>no, editor only</td></tr>
+    <tr><td><code>Assets/Tests/</code></td><td><code>Assembly-CSharp</code></td><td><code>EmberGrove.Exploration</code></td><td><code>CircuitPersistenceVerification</code>, the save check that runs in an editor batch. <code>Tools/CircuitPersistenceChecks</code> also compiles it.</td><td>no (guarded)</td></tr>
+    <tr><td><code>Assets/Tests/Runtime/</code></td><td><code>Assembly-CSharp</code></td><td><code>EmberGrove.Exploration</code> (<code>CircuitSliceChecks</code>), <code>EmberGrove.Expedition</code> (<code>ExpeditionHarness</code>)</td><td>The rehearsals that drive a real player (<a href="qa.html">QA &amp; Rehearsals</a>)</td><td>only in QA players</td></tr>
+  </table></div>
+
+  <h3>The guards that keep QA code out of players</h3>
+  <div class="scrollx"><table>
+    <tr><th>Code</th><th>Compiled only when</th><th>Who defines it</th></tr>
+    <tr><td><code>Tests/Runtime/CircuitSliceChecks*.cs</code></td><td><code>UNITY_EDITOR || CIRCUIT_QA</code></td><td><code>IsometricSliceBuild</code> adds <code>CIRCUIT_QA</code> to a rehearsal build (<span class="kbd">Build Windows rehearsal</span>)</td></tr>
+    <tr><td><code>Tests/Runtime/ExpeditionHarness*.cs</code></td><td><code>UNITY_EDITOR || EMBERGROVE_QA</code></td><td>A rehearsal build also gets <code>EMBERGROVE_QA</code> when Unity is started with <code>-expedition-network-qa</code></td></tr>
+    <tr><td><code>Tests/CircuitPersistenceVerification.cs</code></td><td><code>UNITY_EDITOR || CIRCUIT_PERSISTENCE_PORTABLE</code></td><td>Only <code>Tools/CircuitPersistenceChecks</code> defines the portable symbol</td></tr>
+    <tr><td>Hooks inside runtime code, such as <code>CircuitSliceChecks.Install(this)</code> at the end of <code>IsometricSlice.Start</code></td><td><code>UNITY_EDITOR || CIRCUIT_QA</code>, or <code>UNITY_EDITOR || EMBERGROVE_QA</code> where the hook reaches <code>ExpeditionHarness</code></td><td>Same as the first two rows</td></tr>
+    <tr><td><code>Tests/Runtime/PrivateRelayQaSettings.generated.cs</code>, ignored by git</td><td><code>EMBERGROVE_QA &amp;&amp; EMBERGROVE_PRIVATE_RELAY_QA &amp;&amp; !UNITY_EDITOR</code></td><td>Generated by the build only for an opted-in private network QA pair (<code>Tools/Build-PrivateNetworkPair.ps1</code>). It never enters git.</td></tr>
+  </table></div>
+  <div class="note warn"><b>The guards are the only thing keeping QA code out of a player.</b> Moving a harness into an <code>Editor</code> folder would take it out of the QA players that need it, and putting it under an <code>.asmdef</code> would cut it off from the <code>internal</code> members it checks. The <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Game/EmberGrove/Assets/Tests/README.md">Tests README</a> sets this rule. <code>Tools/Validate-CircuitPlayer.ps1</code> inspects the assemblies of a built player, and the <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/MAINTAINING.md#internal-preview-candidate">candidate workflow</a> requires that inspection. Where runtime code reaches into QA code is listed on <a href="findings.html">Findings</a>.</div>
+</section>
+
+<section id="tools">
+  <h2><span class="num">05</span>The tools and what they compile</h2>
+  <p class="lead">No .NET project under <code>Tools/</code> references a toolkit assembly. Each one compiles the toolkit's <code>.cs</code> files by path, and a few compile game files too. A tool therefore runs the same source the game ships, and the toolkit's assembly boundaries are not enforced inside it.</p>
+  <div class="scrollx"><table>
+    <tr><th>Project</th><th>Suite</th><th>Toolkit files compiled in (<code>Runtime/…</code>)</th><th>Other files</th></tr>
+    <tr><td><code>CircuitChecks/CircuitChecks.csproj</code></td><td><code>Circuit</code></td><td><code>Functional/Result.cs</code>, <code>Core/*</code>, <code>Circuit/*</code></td><td>—</td></tr>
+    <tr><td><code>CircuitContentChecks/…</code>, <code>LessonChecks/…</code></td><td><code>Content</code>, <code>Lessons</code></td><td><code>Functional/*</code>, <code>Core/*</code>, <code>Progression/*</code>, <code>Content/ExpeditionContent.cs</code>, <code>Content/WorldContent.cs</code></td><td><code>Tools/ContentStudio/UnityBoundary.cs</code></td></tr>
+    <tr><td><code>CircuitFieldSetupChecks/…</code></td><td><code>FieldSetup</code></td><td>Same as Content</td><td><code>UnityBoundary.cs</code> and <code>Temp/CircuitFieldSetupChecks/ActualSetup.cs</code>, which the folder's <code>Run-Checks.ps1</code> cuts out of <code>ExpeditionApp.Session.cs</code> by counting braces around <code>FairMatchSetup</code></td></tr>
+    <tr><td><code>CircuitPersistenceChecks/…</code></td><td><code>Persistence</code></td><td><code>Functional/Result.cs</code>, <code>Core/*</code>, <code>Circuit/*</code></td><td><code>Game/…/Runtime/Exploration/CircuitPersistence.cs</code> and <code>Game/…/Tests/CircuitPersistenceVerification.cs</code>, built with <code>CIRCUIT_PERSISTENCE_PORTABLE</code></td></tr>
+    <tr><td><code>CircuitWorldChecks/…</code></td><td><code>World</code></td><td><code>Functional/Result.cs</code>, <code>Core/*</code>, <code>Circuit/*</code>, <code>Exploration/*</code></td><td><code>Game/…/Runtime/Exploration/CircuitWorldLayout.cs</code></td></tr>
+    <tr><td><code>ExplorationChecks/…</code></td><td><code>Exploration</code></td><td><code>Functional/Result.cs</code>, <code>Exploration/*</code></td><td>—</td></tr>
+    <tr><td><code>ExpeditionNetworkChecks/…</code></td><td><code>Network</code>, <code>Sockets</code></td><td><code>Networking/ExpeditionNetworkSession.cs</code></td><td>A project reference to the relay, which brings in the rest</td></tr>
+    <tr><td><code>ExpeditionPerformance/WorldFactChecks.csproj</code></td><td><code>WorldFacts</code></td><td><code>Functional/Result.cs</code>, <code>Core/*</code>, <code>Progression/*</code>, the two content parsers, <code>Networking/*</code></td><td><code>UnityBoundaryStub.cs</code></td></tr>
+    <tr><td><code>ExpeditionPerformance/ExpeditionPerformance.csproj</code></td><td><code>Performance</code></td><td><code>Functional/Result.cs</code>, <code>$(CoreSource)</code> (by default <code>Core</code>), <code>Progression/*</code>, the two content parsers</td><td><code>Toolkit/Tests/ExpeditionCoreChecks.cs</code>, <code>UnityBoundaryStub.cs</code></td></tr>
+    <tr><td><code>ExpeditionRelay/ExpeditionRelay.csproj</code> (ASP.NET Core, <code>CARDFORGE_HEADLESS</code>)</td><td>none of its own; <code>Network</code> and <code>Sockets</code> build it</td><td><code>Functional/Result.cs</code>, <code>Core/*</code>, <code>Exploration/SectorDefinition.cs</code>, <code>Exploration/SectorNavigation.cs</code>, <code>Progression/*</code>, <code>Networking/ExpeditionAuthority.cs</code>, <code>Networking/NetworkContracts.cs</code>, <code>Content/ExpeditionContent.cs</code></td><td>Its own <code>Program.cs</code>, <code>RelayApplication.cs</code> (<code>/health</code>, <code>/relay</code>), <code>RelayRuntime.cs</code> and <code>TrustedMatchApplication.cs</code> (the <code>--authority</code> service)</td></tr>
+    <tr><td><code>ExpeditionRelay/Launcher/EmberGroveRelay.csproj</code> (WinForms)</td><td><code>RelayLauncher</code> (tests an already-published copy)</td><td>—</td><td>A project reference to the relay</td></tr>
+    <tr><td><code>ContentStudio/ContentStudio.csproj</code> (<code>CARDFORGE_HEADLESS</code>)</td><td><code>Studio</code></td><td><code>Functional/*</code>, <code>Core/*</code>, <code>Progression/*</code>, <code>Circuit/*</code>, all three <code>Content/*.cs</code></td><td><code>Program.cs</code>, <code>UnityBoundary.cs</code>, <code>web/</code>. With <code>-p:StudioDesktop=true</code> it also builds <code>DesktopHost.cs</code> with WinForms and WebView2</td></tr>
+    <tr><td><code>Temp/ExpeditionProgressionChecks/Checks.csproj</code>, written by <code>Tools/Expedition/check_progression.py</code></td><td><code>LegacyProgression</code></td><td><code>Functional/Result.cs</code>, <code>Core/*</code>, <code>Progression/*</code>, the two content parsers</td><td><code>Toolkit/Tests/ExpeditionCoreChecks.cs</code>, <code>Tools/Expedition/*Checks.cs</code>, and a stub it writes itself</td></tr>
+  </table></div>
+  <p>The suite names are the keys in <code>Tools/Run-Checks.ps1</code>. Its default <code>Portable</code> group runs <code>Repository</code>, <code>Circuit</code>, <code>Content</code>, <code>FieldSetup</code>, <code>World</code>, <code>Persistence</code>, <code>Exploration</code>, <code>Lessons</code>, <code>Network</code>, <code>WorldFacts</code>, <code>DialogueModel</code> and <code>LessonModel</code>. The last two are Node checks of <code>Tools/CircuitStudio</code>. Prerequisites and coverage for every suite are in the <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Tools/README.md">tools README</a>.</p>
+  <p><b>The <code>UnityEngine</code> stand-ins.</b> <code>Tools/ContentStudio/UnityBoundary.cs</code>, <code>Tools/ExpeditionPerformance/UnityBoundaryStub.cs</code> and the stub that <code>check_progression.py</code> writes each declare a small <code>UnityEngine</code> namespace (<code>TextAsset</code>, <code>Resources</code>, <code>JsonUtility</code> over System.Text.Json). With them, the content parsers compile without Unity.</p>
+  <p><b>The tools that are not .NET projects.</b> <code>Run-Checks.ps1</code> runs the suites, and <code>check_repository.py</code> is the <code>Repository</code> suite. <code>CircuitStudio/</code> is a browser workshop for dialogue branches (<code>index.html</code>) and lessons (<code>lessons.html</code>). <code>Documentation/</code> holds <code>export_wiki.py</code>, the older offline reference and the Studio handbook. <code>Score/</code> and <code>Audio/</code> produce and check music and sound. <code>Package-Isometric.ps1</code> and <code>Package-Toolkit.ps1</code> package the game candidate and the toolkit. <code>Validate-CircuitPlayer.ps1</code> inspects a built player, and <code>Build-PrivateNetworkPair.ps1</code> builds the private relay QA pair. How builds and checks fit together is on <a href="builds.html">Builds &amp; Tools</a>.</p>
+</section>
+
+<section id="partials">
+  <h2><span class="num">06</span>The big partial classes</h2>
+  <p class="lead">Six classes in the game and one in the toolkit are split into partial files. The game's files are named <code>Type.Concern.cs</code>, and each suffix names one concern. Read the suffix before the file. How large each one is, and how complex, is on <a href="complexity.html">Complexity</a>.</p>
+
+  <h3><code>IsometricSlice</code>: the Circuit world (19 files, <code>Runtime/Exploration</code>)</h3>
+  <p>A single MonoBehaviour in <code>EmberGrove.Exploration</code>. It is the Unity adapter for the adventure, and its summary reads "Unity locomotion/presentation adapter for the Circuit world". Its state is the <code>CircuitState</code> in the field <code>circuit</code>. <a href="world.html">World &amp; Journal</a> follows it in detail.</p>
+  <div class="scrollx"><table>
+    <tr><th>File</th><th>What it covers</th></tr>
+    <tr><td><code>IsometricSlice.cs</code></td><td><code>Start</code> (the boot order), <code>Update</code> and <code>LateUpdate</code>, input-kind tracking, walking (<code>ReadMove</code>, <code>GroundClick</code>, <code>FollowPath</code>), <code>RefreshNearby</code> and <code>Interact</code>, the camera, the modal, and app focus, pause and quit</td></tr>
+    <tr><td><code>.Circuit</code></td><td>The adventure adapter. <code>LoadCircuit</code> reads the sidecars and the pack and builds the <code>CircuitDefinition</code>. It also holds <code>RestoreCircuit</code>, <code>SaveCircuit</code> and <code>CaptureCircuitSave</code>, <code>ApplyCircuit</code>, <code>ShowCircuit</code> with the <code>CircuitPage</code> enum and its back stack, <code>CircuitInteract</code>, tasks, events and episodes, <code>PlayCircuitDuel</code> and <code>CommitFinishedCircuitDuel</code></td></tr>
+    <tr><td><code>.CircuitUi</code></td><td>Draws the journal windows: card, dialogue, episode, event, library and conversation pages, the small launcher, Your decks and the shared fitted frame</td></tr>
+    <tr><td><code>.DeckBuilder</code></td><td>The one card screen: the grid, the deck rows, search and filters, the letter board, swap and Undo, and saved-deck rename, copy and delete</td></tr>
+    <tr><td><code>.Hud</code></td><td><code>BuildHud</code>, the HUD canvas, the prompt and the adventure HUD, goal pictures, <code>DrawModal</code> and modal navigation, and the encounter-loading overlay</td></tr>
+    <tr><td><code>.Learning</code></td><td>Match preparations (<code>ChooseCircuitPreparation</code>, <code>ConfigureCircuitMatch</code>) and <code>ValidateJourney</code> for <code>journey.json</code></td></tr>
+    <tr><td><code>.Lessons</code></td><td>The lesson library window, reading sheets, lesson invitations, <code>RunAuthoredLesson</code> and <code>PrepareLessonLibrary</code></td></tr>
+    <tr><td><code>.Onboarding</code></td><td>The club opening and welcome, the club-name editor with its letter keys, and the first practice (<code>RunPracticeTutorial</code>, <code>PlayCircuitPractice</code>, <code>DrawPracticeNext</code>)</td></tr>
+    <tr><td><code>.Preferences</code></td><td><code>LoadWorldPreferences</code>, <code>ApplyWorldPreferences</code> and <code>SetWorldReducedMotion</code></td></tr>
+    <tr><td><code>.Presentation</code></td><td>Presentation values that come from content, the wayfinder line, and <code>ValidatePresentation</code></td></tr>
+    <tr><td><code>.Progress</code></td><td>Quitting, and saving before quitting (<code>OpenQuit</code>, <code>ConfirmQuit</code>, <code>SaveAndQuit</code>)</td></tr>
+    <tr><td><code>.Settings</code></td><td>Opening Settings from the title or the world (<code>OpenTitleSettings</code>, <code>ShowWorldSettings</code>)</td></tr>
+    <tr><td><code>.Table</code></td><td>The camera into and out of a match at a table (<code>BeginWorldTableSessionView</code>, <code>EndWorldTableSessionView</code>), the opening world shot, and staging characters at the table</td></tr>
+    <tr><td><code>.Title</code></td><td>The title entries (<code>OrdinaryTitleChoices</code>, <code>DrawCircuitTitle</code>), the startup-error panel, the title camera, <code>ContinueFromTitle</code> and <code>ReturnToTitle</code></td></tr>
+    <tr><td><code>.Versus</code></td><td>The table lobby (<code>OpenTableLobby</code>, <code>TickTableLobby</code>, <code>PlayLobbyMatch</code>) and opening Versus (<code>OpenVersusFromTitle</code>, <code>ShowWorldVersus</code>)</td></tr>
+    <tr><td><code>.Waybook</code></td><td>The adventure book: task views, the route web, local paging (<code>CycleCircuitPage</code>), page controls and input hints</td></tr>
+    <tr><td><code>.WaybookMenu</code></td><td>The written title menu, a world-space UI Toolkit panel laid across the lodge waybook (<code>DrawWaybookTitle</code>, <code>EnsureWaybookPanel</code>, <code>NavigateWaybook</code>), plus the probes the rehearsals use (<code>ProbeWaybookControl</code>, <code>FocusWaybookControl</code>, <code>ActivateWaybookControl</code>)</td></tr>
+    <tr><td><code>.World</code></td><td>The Circuit side of the world: gates, landmark marks, story visits and restoring the traveller (<code>UpdateCircuitWorld</code>, <code>MarkCircuitLandmarks</code>, <code>GoStoryVisit</code>, <code>RestoreWorldTraveller</code>)</td></tr>
+    <tr><td><code>.Audio</code></td><td>The adventure's music, recorded voice lines and spoken guide (<code>InitializeCircuitMusic</code>, <code>LoadCircuitVoice</code>, <code>PresentCircuitVoice</code>)</td></tr>
+  </table></div>
+
+  <h3><code>ExpeditionView</code>: the hosted session's screens (23 files, <code>Runtime</code>)</h3>
+  <p>21 files are named <code>ExpeditionView*.cs</code>, and two more parts live in files named for other types (see the note below). The class is built from uGUI controls through <code>DuelUi</code>. Its main file describes it as "An event consumer and command composer. Legality, targeting and outcomes stay in the core." <a href="ui.html">UI &amp; Menus</a> covers it.</p>
+  <div class="scrollx"><table>
+    <tr><th>File</th><th>What it covers</th></tr>
+    <tr><td><code>ExpeditionView.cs</code></td><td><code>Initialize</code>, <code>Render</code>, the flat battle board (<code>Battle</code>, lanes, slots, hand and heroes), card tiles and window rendering</td></tr>
+    <tr><td><code>.Navigation</code></td><td>The single router for focus, submit and cancel, so that one press cannot activate two rebuilt screens. It also holds the controller keyboard</td></tr>
+    <tr><td><code>.Input</code></td><td>Pointer gestures (drag to target, click, hold to inspect). <code>TryCommand</code> hands the chosen command to <code>ExpeditionApp.Submit</code></td></tr>
+    <tr><td><code>.BattlePresentation</code></td><td>Battle guidance cues, the card preview, the target-preview ribbon (<code>TryTargetPreview*</code>) and the arena</td></tr>
+    <tr><td><code>.Motion</code></td><td><code>AnimateCommand</code> and <code>AnimateEvents</code>, deployment landings and impact feedback</td></tr>
+    <tr><td><code>.WorldTable</code></td><td>The board drawn on the living table when a match is played at a venue (<code>PrepareWorldTable</code>, <code>RefreshLivingTable</code>, <code>ProjectTable</code>)</td></tr>
+    <tr><td><code>.Glyphs</code></td><td>The hint strip for controller and keyboard, <code>ResolveControllerGlyphFamily</code> and <code>FaceGlyphLabel</code></td></tr>
+    <tr><td><code>.Journey</code>, <code>.PortraitJourney</code></td><td>Pause, the battle result, help, feedback, the leave and retire confirmations and Help me play (<code>MoveHelp*</code>), with their portrait-layout versions</td></tr>
+    <tr><td><code>.Layout</code></td><td>Fitting the composition to the screen and the portrait battle layout</td></tr>
+    <tr><td><code>.Settings</code>, <code>.SettingsNavigation</code></td><td>The Settings screen (rows, sliders, display resolution and confirmation) and focus movement between its tabs and rows</td></tr>
+    <tr><td><code>.Connection</code></td><td>The network menus: LAN, relay, named rooms and the waiting room, and deck selection</td></tr>
+    <tr><td><code>.Practice</code></td><td>Practice and lesson presentation: prompts, pictograms, target glow and the celebration</td></tr>
+    <tr><td><code>.WorldMenus</code>, <code>.WorldCardTile</code>, <code>.World</code></td><td>Hosted menus styled as waybook pages, the card library and Versus home, the wide collection tile, and <code>WorldPanel</code></td></tr>
+    <tr><td><code>.Shell</code>, <code>.Transitions</code></td><td>The window header with Back, the End Turn confirmation, entrance and modal presentation, and notices</td></tr>
+    <tr><td><code>.Cosmetics</code>, <code>.Media</code></td><td>Card back and draw-pile style, and <code>ApplyExternalTheme</code> from the pack's media</td></tr>
+  </table></div>
+
+  <h3><code>ExpeditionApp</code>: the hosted session's coordinator (10 files, <code>Runtime</code>)</h3>
+  <p>A MonoBehaviour that loads the pack, owns the <code>CombatState</code> and runs one session. <a href="sessions.html">Hosted Sessions</a> covers it.</p>
+  <div class="scrollx"><table>
+    <tr><th>File</th><th>What it covers</th></tr>
+    <tr><td><code>ExpeditionApp.cs</code></td><td><code>Awake</code> and <code>Start</code>. <code>Start</code> loads the pack, creates the <code>Catalog</code>, adds <code>GameAudioDirector</code>, prepares the table and adds <code>ExpeditionView</code>. The file also holds <code>Update</code> with the rival's turn, selection, <code>Submit</code>, <code>ResolveLocal</code>, <code>Present</code>, pause, help and concede</td></tr>
+    <tr><td><code>.Session</code></td><td><code>HostedSessionKind</code>, the <code>Configure*</code> entry points (<code>ConfigureEncounter</code>, <code>ConfigureDeck</code>, <code>ConfigureFriendlyEpisode</code>, <code>ConfigureSettingsSession</code>), <code>PrepareTable</code>, <code>FinishSession</code>, and the static <code>FairMatchSetup.CreateFairMatch</code></td></tr>
+    <tr><td><code>.Network</code></td><td>The LAN, relay, named-room and trusted entry points (<code>HostLan</code>, <code>JoinRelay</code>, <code>HostNamedRelay</code>, <code>QuickmatchTrusted</code>, <code>JoinTrusted</code>, <code>ReconnectTrusted</code>), deck selection, <code>PollNetwork</code>, <code>QueueNetworkSnapshot</code>, <code>PresentNetwork</code> and <code>AttachLobbyMatch</code></td></tr>
+    <tr><td><code>.Settings</code></td><td>Reading and writing <code>PlayerSettings</code> in PlayerPrefs (<code>ReadPreferences</code>, <code>SavePreferences</code>, <code>PreferenceKey</code>), and previewing, confirming and reverting the display</td></tr>
+    <tr><td><code>.Practice</code>, <code>.Lessons</code></td><td>The <code>practice.json</code> tutorial (<code>ConfigurePracticeTutorial</code>) and authored lessons (<code>ConfigureAuthoredLesson</code>), each deciding which command the learner may make next</td></tr>
+    <tr><td><code>.Queries</code></td><td>The cached legal actions and selection commands, and move help (<code>PlaySuggestedMove</code>, <code>PlayOneAssistedMove</code>, <code>PlayMyTurn</code>)</td></tr>
+    <tr><td><code>.Media</code></td><td>Media and music (<code>InitializeMedia</code>, <code>ChangeMusic</code>, <code>TickMedia</code>)</td></tr>
+    <tr><td><code>.WorldMenu</code></td><td>The Versus menu session (<code>ConfigureWorldMenuSession</code>, <code>OpenWorldCards</code>, <code>HandleWorldMenuBack</code>)</td></tr>
+    <tr><td><code>WorldTableContext.cs</code></td><td>Mainly the <code>WorldTableContext</code> class. It also adds <code>ConfigureWorldTable</code> and the <code>WorldTable</code> property to <code>ExpeditionApp</code></td></tr>
+  </table></div>
+
+  <h3>The other split classes</h3>
+  <div class="scrollx"><table>
+    <tr><th>Class</th><th>Files</th><th>How it is split</th></tr>
+    <tr><td><code>IsometricSectorVisuals</code> (world art)</td><td>6, <code>Runtime/Exploration</code></td><td><code>.cs</code> builds the procedural world and the traveller. Its summary says "the sector's tile data remains the navigation authority". <code>.Authored</code> binds and validates the authored venues, rooms and districts. <code>.Models</code> holds the characters and their animation, <code>.Civic</code> the club tables, the lodge kiosk and the workshop, <code>.Venues</code> the venue builder by kind, and <code>.Meshes</code> the mesh helpers</td></tr>
+    <tr><td><code>CircuitSliceChecks</code> (the Circuit rehearsal)</td><td>10, <code>Tests/Runtime</code></td><td><code>.cs</code> holds <code>Install</code>, the runner (<code>Guarded</code>, <code>Rehearse</code>) and the shared helpers such as <code>Check</code>. Then one file per area: <code>.WorldTable</code> (it also holds the editor batch entries), <code>.BattlePolish</code>, <code>.Lessons</code>, <code>.Story</code>, <code>.Versus</code>, <code>.Artwork</code>, <code>.DeckBuilder</code>, <code>.Saves</code> (lifecycle and the testing save) and <code>.MenuRules</code></td></tr>
+    <tr><td><code>ExpeditionHarness</code> (the network rehearsal)</td><td>2, <code>Tests/Runtime</code></td><td><code>.cs</code> installs itself with <code>[RuntimeInitializeOnLoadMethod]</code>, and <code>.Network</code> holds the transport rehearsals</td></tr>
+    <tr><td><code>CircuitRules</code> (toolkit, static)</td><td>3, <code>Runtime/Circuit</code></td><td><code>CircuitRules.cs</code> holds the transitions (<code>Start</code>, <code>BeginDuel</code>, <code>ResolveDuel</code>, rewards, decks, events, visits, tasks). <code>CircuitValidation.cs</code> holds <code>Validate</code>, <code>ValidateDefinition</code>, <code>ValidateDialogue</code> and <code>Recover</code>. <code>CircuitGraph.cs</code> generates the district graph and holds <code>Location</code> and <code>PreviewDistrict</code></td></tr>
+  </table></div>
+  <div class="note warn"><b>Three parts live in files named for another type.</b> <code>ExpeditionView</code> has a part in <code>ExpeditionApp.Session.cs</code> (<code>ReleaseSessionSprites</code>) and another in <code>ExpeditionTheme.cs</code> (the theme and artwork fields). <code>ExpeditionApp</code> has a part in <code>WorldTableContext.cs</code>. <code>ExpeditionApp.Session.cs</code> also holds the static <code>FairMatchSetup</code>, which the FieldSetup suite extracts as text. If a search by file name misses a member, look in these files. Two large types are not split at all: <code>IsometricSliceBuild</code> is one static class in one file with nested helper types, and <code>ExpeditionNetworkSession</code> shares one file with its link classes.</div>
+</section>
+
+<section id="names">
+  <h2><span class="num">07</span>Names that do not match</h2>
+  <p class="lead">Several names were frozen on purpose, because saves, preferences, the network fingerprint or a published package depend on them. The <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CODE_ARCHITECTURE_GUIDE.md#product-names">product-name table</a> says which name is owned by what. This table covers what that means when you look for code.</p>
+  <div class="scrollx"><table>
+    <tr><th>You see</th><th>Where</th><th>What it really is</th></tr>
+    <tr><td>Namespace <code>EmberGrove</code></td><td><code>Result.cs</code>; <code>DuelUi.cs</code></td><td>The assembly <code>CardForge.Functional</code> has <code>rootNamespace</code> <code>EmberGrove</code>, so <code>Result&lt;T&gt;</code> is <code>EmberGrove.Result&lt;T&gt;</code>. The game's <code>DuelUi</code> uses the same namespace.</td></tr>
+    <tr><td>Namespace <code>EmberGrove.Expedition</code></td><td>Four assemblies</td><td><code>EmberGrove.Expedition</code> (combat), <code>EmberGrove.Expedition.Progression</code>, <code>CardForge.Content</code>, and the game's <code>Assembly-CSharp</code> (<code>ExpeditionApp</code>, <code>ExpeditionView</code>, <code>PlayerSettings</code> and more). The namespace does not tell you the assembly.</td></tr>
+    <tr><td>Namespace <code>CardForge.Lessons</code></td><td><code>Runtime/Core/LessonContracts.cs</code>, <code>LessonRules.cs</code></td><td>It lives in the assembly <code>EmberGrove.Expedition</code>, not in a lessons assembly of its own.</td></tr>
+    <tr><td><code>CardForge.Exploration</code> and <code>EmberGrove.Exploration</code></td><td>Toolkit <code>Runtime/Exploration</code>; game <code>Runtime/Exploration</code> and <code>Tests</code></td><td>The first is the pure navigation library. The second is the game's Circuit world, and it also covers <code>CircuitSliceChecks</code> and <code>CircuitPersistenceVerification</code>.</td></tr>
+    <tr><td><code>Expedition*</code></td><td><code>ExpeditionApp</code>, <code>ExpeditionView</code>, <code>expedition-content.json</code>, <code>ExpeditionProtocol</code>, <code>ExpeditionHarness</code>, <code>-expedition-*</code> options</td><td>The retired standalone mode. The name now belongs to the hosted battle, the combat pack and the wire protocol. <code>ExpeditionProtocol.RulesVersion</code> is an input to the network fingerprint, so it cannot change casually.</td></tr>
+    <tr><td><code>Isometric*</code></td><td><code>IsometricSlice</code>, <code>IsometricSectorVisuals</code>, <code>IsometricCombatBridge</code>, <code>IsometricSliceBuild</code>, <code>Tools/Package-Isometric.ps1</code></td><td>The Circuit world, its art, its bridge to the hosted battle, its build and its packager. They are kept on purpose. The <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Release/ROADMAP.md#cleanup-milestone">cleanup milestone</a> records why.</td></tr>
+    <tr><td><code>CircuitSliceChecks</code>, <code>Tools/CircuitFieldSetupChecks</code></td><td><code>Tests/Runtime</code>; <code>Tools</code></td><td>The Circuit rehearsal (not unit tests) and the fair-setup suite.</td></tr>
+    <tr><td><code>Assets/ExplorationPrototype</code></td><td><code>Game/EmberGrove/Assets</code></td><td>The shipping world's art, not a prototype.</td></tr>
+    <tr><td><code>EmberGrove</code> as a code identity</td><td>The project folder, the pack <code>Content/EmberGroveDefault</code> (Id <code>embergrove</code>), <code>EmberGrove.*</code> preference keys, <code>EMBERGROVE_QA</code>, <code>EmberGrove.ContentStudio.exe</code>, <code>EmberGroveRelay.exe</code></td><td>Kept for compatibility. The game's title is Bloomfire, and <code>IsometricSliceBuild</code> names every player build "Bloomfire Circuit" ("Bloomfire Circuit QA" for the Android rehearsal).</td></tr>
+    <tr><td>"Ember &amp; Grove"</td><td><code>productName</code> in <code>ProjectSettings/ProjectSettings.asset</code>; the default pack's titles</td><td>The former product name, now only the editor's identity. Whether to rename it is listed among the <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Release/ROADMAP.md#open-owner-decisions">open owner decisions</a>.</td></tr>
+    <tr><td><code>Teaching/LegacyEditor/EmberGrove.Networking.asmdef</code></td><td><code>Teaching</code></td><td>Not compiled by anything here. It references <code>EmberGrove.Core</code>, which this repository does not have. It is the corrected manifest for recovering the retired root project.</td></tr>
+  </table></div>
+  <p class="dim">Types declared in files named for something else: <code>CircuitSave</code> is in <code>CircuitPersistence.cs</code>, <code>ExpeditionFingerprint</code> in <code>ExpeditionAuthority.cs</code>, and <code>ContentPack</code> and <code>EncounterDefinition</code> in <code>Progression/ExpeditionRun.cs</code>. <code>ExpeditionWireCodec</code>, <code>ExpeditionProjection</code> and <code>ExpeditionSnapshot</code> are in <code>NetworkContracts.cs</code>, and the manifest and media types are in <code>ContentPackFiles.cs</code>.</p>
+</section>
+
+<section id="content">
+  <h2><span class="num">08</span>Where content lives and how it reaches a player</h2>
+  <p class="lead">Authored data lives in <code>Content/</code> and nowhere else. The build copies it into the ignored <code>StreamingAssets</code>, and the game reads it from there at run time. Models, animations, materials and levels are different: they stay in the Unity project as assets.</p>
+  <div class="scrollx"><table>
+    <tr><th>Source</th><th>Holds</th><th>Read at run time by</th></tr>
+    <tr><td><code>Content/EmberGroveDefault/</code></td><td>The content pack. <code>manifest.json</code> names the combat document (<code>expedition-content.json</code>), the world document (<code>world-content.json</code>), the media catalog (<code>media.json</code>) and the Circuit dialogue (<code>circuit-dialogue.json</code>). Cards, portraits, music and voice files are in <code>media/</code>.</td><td><code>ContentPackFiles.Load</code>, called from <code>IsometricSlice.LoadCircuit</code> and again from each <code>ExpeditionApp.Start</code></td></tr>
+    <tr><td><code>Content/Circuit/</code></td><td>The adventure's sidecar files, <code>card-guide.json</code>, <code>locations.json</code>, <code>journey.json</code>, <code>practice.json</code> and <code>lessons.json</code>, plus <code>Voice/</code> with the recorded practice guide</td><td><code>IsometricSlice.LoadCircuit</code> through <code>CircuitText</code>. Practice and lessons are also handed to the hosted session</td></tr>
+    <tr><td><code>Content/Exploration/sector.json</code></td><td>The start-up sector. It must pass <code>SectorNavigation.Validate</code>, and the Circuit then builds its own districts from <code>locations.json</code></td><td><code>IsometricSlice.Start</code> (<code>StartReadSector</code>)</td></tr>
+    <tr><td><code>Game/EmberGrove/Assets/</code></td><td>Unity-owned assets: prefabs, models, materials, the scene, and the <code>Resources/</code> files loaded by name (<a href="#project">§03</a>)</td><td>Unity</td></tr>
+  </table></div>
+  <div class="diagram"><pre class="mermaid">
+flowchart TD
+  studio["CardForge Content Studio&lt;br/&gt;Tools/ContentStudio"]:::tools
+  pack["Content/EmberGroveDefault&lt;br/&gt;manifest, combat, world, media, dialogue"]:::src
+  side["Content/Circuit&lt;br/&gt;sidecars and Voice/"]:::src
+  sector["Content/Exploration/sector.json"]:::src
+  stage["IsometricSliceBuild&lt;br/&gt;StageEncounterContent, StageCircuit, StageSector"]:::editor
+  saPack["StreamingAssets/Content"]:::staged
+  saSide["StreamingAssets/Circuit"]:::staged
+  saSector["StreamingAssets/Exploration"]:::staged
+  other["-content-pack folder&lt;br/&gt;or persistentDataPath/ContentOverride"]:::plain
+  root["ContentPackFiles.DefaultRoot"]:::kit
+  load["ContentPackFiles.Load&lt;br/&gt;LoadedContentPack"]:::kit
+  slice["IsometricSlice&lt;br/&gt;Start and LoadCircuit"]:::game
+  app["ExpeditionApp.Start"]:::game
+  studio -->|export, integrated by a maintainer| pack
+  pack --> stage
+  side --> stage
+  sector --> stage
+  stage --> saPack
+  stage --> saSide
+  stage --> saSector
+  saPack --> root
+  other -->|when present| root
+  root --> load
+  load --> slice
+  load --> app
+  saSide -->|CircuitText| slice
+  saSector -->|StartReadSector| slice
+  classDef src stroke:#e9ddbf
+  classDef staged stroke:#7e928a,stroke-dasharray:4 3
+  classDef plain stroke:#7e928a
+  classDef kit stroke:#ddb777
+  classDef game stroke:#58c4b2
+  classDef editor stroke:#f5b0cf
+  classDef tools stroke:#94d9b2
+</pre></div>
+  <p class="caption">Box borders: cream for authored source in <code>Content/</code>, pink for the editor build script, dashed grey for the ignored staged copies, bronze for the toolkit, teal for the game, mint for the tools. Staging runs on every <code>Build</code> and from <span class="kbd">Bloomfire Circuit ▸ Stage content for editor</span>, and each stage validates before it copies. <code>DefaultRoot</code> prefers <code>-content-pack</code>, then a <code>ContentOverride</code> folder that has a <code>manifest.json</code>, then the staged <code>StreamingAssets/Content</code>. A <code>-circuit-verify</code> run always reads the staged pack. Drawn from <code>IsometricSliceBuild.cs</code>, <code>ContentPackFiles.cs</code> and <code>IsometricSlice.Circuit.cs</code>.</p>
+  <ol class="steps">
+    <li><b>Authoring.</b> Designers edit a working copy of the pack in CardForge Content Studio, and a maintainer brings the export into <code>Content/</code> (<a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/MAINTAINING.md#receive-a-creator-delivery">Receive a creator delivery</a>). Lessons can also be edited in <code>Tools/CircuitStudio/lessons.html</code>, and dialogue branches simulated in its <code>index.html</code>.</li>
+    <li><b>Staging.</b> <code>StageEncounterContent</code> parses and validates the manifest, combat, world, media and dialogue, checks that every media file exists, and then copies the pack. <code>StageCircuit</code> validates <code>lessons.json</code> against the real catalog and copies the sidecars and voice files. <code>StageSector</code> validates and copies <code>sector.json</code>.</li>
+    <li><b>Loading.</b> <code>ContentPackFiles.Load</code> reads the manifest and its documents, with a size limit on each JSON file, and validates them. It hashes the combat JSON into <code>ActiveCombatHash</code> and returns a <code>LoadedContentPack</code>. <code>IsometricSlice.LoadCircuit</code> then builds the <code>CircuitDefinition</code> from the sidecars and the pack, and checks every rival deck.</li>
+    <li><b>Again for every session.</b> Each hosted <code>ExpeditionApp</code> loads the pack itself in <code>Start</code>, from the root it was given, and builds its own <code>Catalog</code>.</li>
+  </ol>
+  <p class="dim">The pack format is defined in <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Tools/ContentStudio/PACK_CONTRACT.md">PACK_CONTRACT.md</a>, and the designer workflow in the <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/TOOLKIT_AUTHORING_GUIDE.md#pack-documents">authoring guide</a>. The loading boundary is described in <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CODE_ARCHITECTURE_GUIDE.md#external-content-and-media">External content and media</a>. <a href="content.html">Content &amp; Media</a> goes further into media, art leases and audio.</p>
+</section>
+
+<section id="reading">
+  <h2><span class="num">09</span>A reading order</h2>
+  <p class="lead">One way into the code for a programmer who knows Unity and C#. Each step leaves you able to read the next one.</p>
+  <ol class="steps">
+    <li><b>The rule shape.</b> Read <code>Toolkit/…/Runtime/Functional/Result.cs</code>, then <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CODE_ARCHITECTURE_GUIDE.md#functional-composition-and-the-small-monad">Functional composition and the small monad</a>. Everything else returns a <code>Result&lt;T&gt;</code>.</li>
+    <li><b>One match.</b> Read <code>Runtime/Core/CombatContracts.cs</code> for the types, then <code>CombatRules.NewMatch</code>, <code>LegalCommands</code> and <code>Resolve</code> in <code>CombatRules.cs</code>. See <a href="rules.html">Rules Engine</a>.</li>
+    <li><b>The adventure's rules.</b> Read <code>Runtime/Circuit/CircuitDefinition.cs</code> from <code>CircuitProfile</code> down to <code>CircuitState</code>, then the <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Toolkit/Packages/com.catsplat.cardforge/Runtime/Circuit/README.md#core-transitions">Circuit rules README</a>.</li>
+    <li><b>The world that uses them.</b> In <code>Game/EmberGrove/Assets/Runtime/Exploration</code>, read <code>IsometricSlice.cs</code> (<code>Start</code>), then in <code>IsometricSlice.Circuit.cs</code> read <code>LoadCircuit</code>, <code>ApplyCircuit</code> and <code>PlayCircuitDuel</code>. See <a href="world.html">World &amp; Journal</a>.</li>
+    <li><b>The battle it hosts.</b> Read <code>IsometricCombatBridge.cs</code>, then <code>ExpeditionApp.cs</code> and <code>ExpeditionApp.Session.cs</code>. See <a href="sessions.html">Hosted Sessions</a>.</li>
+    <li><b>The screens.</b> Read <code>ExpeditionView.cs</code> and <code>ExpeditionView.Navigation.cs</code>, then <code>IsometricSlice.WaybookMenu.cs</code> for the title page. See <a href="ui.html">UI &amp; Menus</a>.</li>
+    <li><b>The network.</b> Read <code>Runtime/Networking/NetworkContracts.cs</code>, <code>ExpeditionAuthority.cs</code> and then <code>ExpeditionNetworkSession.cs</code>. See <a href="networking.html">Networking</a>.</li>
+    <li><b>How it is checked.</b> Read the <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Game/EmberGrove/Assets/Tests/README.md">Tests README</a> and the <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Tools/README.md">tools README</a>, then <a href="qa.html">QA &amp; Rehearsals</a> and <a href="builds.html">Builds &amp; Tools</a>.</li>
+    <li><b>What to fix.</b> Read <a href="findings.html">Findings</a>, with <a href="complexity.html">Complexity</a> and <a href="diagrams.html">Diagrams</a> beside it.</li>
+  </ol>
+</section>
+
+<div class="honest">
+  <h4>Keep this page honest</h4>
+  <ul>
+    <li><code>Toolkit/Packages/com.catsplat.cardforge/**/*.asmdef</code>: the assembly table in §02, including every <code>references</code>, <code>rootNamespace</code> and <code>noEngineReferences</code> entry.</li>
+    <li><code>Game/EmberGrove/Packages/manifest.json</code>, <code>ProjectSettings/EditorBuildSettings.asset</code> and <code>ProjectSettings/ProjectVersion.txt</code>: §03.</li>
+    <li>The <code>#if</code> lines at the top of <code>Game/EmberGrove/Assets/Tests/**/*.cs</code>, and the define lists in <code>BuildScriptingDefines</code> (<code>IsometricSliceBuild.cs</code>): the guard table in §04.</li>
+    <li>Every <code>Tools/**/*.csproj</code>, <code>Tools/Run-Checks.ps1</code>, <code>Tools/CircuitFieldSetupChecks/Run-Checks.ps1</code> and <code>Tools/Expedition/check_progression.py</code>: §05.</li>
+    <li>The partial file lists in §06 come from <code>partial class</code> declarations in <code>Game/EmberGrove/Assets/**</code> and <code>Runtime/Circuit/*.cs</code>. Adding, renaming or merging a partial file means changing its row here.</li>
+    <li><code>IsometricSliceBuild.cs</code> (<code>StageEncounterContent</code>, <code>StageCircuit</code>, <code>StageSector</code>, <code>CircuitSidecars</code>), <code>ContentPackFiles.cs</code> (<code>DefaultRoot</code>, <code>Load</code>) and <code>IsometricSlice.Circuit.cs</code> (<code>LoadCircuit</code>, <code>CircuitContentRoot</code>): §08 and its diagram.</li>
+  </ul>
+</div>
+
+</main>
+<footer>Bloomfire Wiki · page source <code>Docs/Wiki/codebase-tour.html</code>, built by <code>Tools/Documentation/structure_wiki.py</code> · Found a mistake? Fix it in the same commit as the code that made it one.</footer>
+</body>
+</html>

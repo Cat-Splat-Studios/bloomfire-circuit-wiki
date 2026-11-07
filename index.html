@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bloomfire Wiki</title>
+<link rel="stylesheet" href="wiki.css">
+<script src="mermaid.min.js" defer></script>
+<script src="wiki.js" defer></script>
+</head>
+<body>
+<nav class="wiki">
+  <a class="home on" href="index.html">🔥 Bloomfire Wiki</a>
+  <div class="grp"><span class="grp-t">Start here</span>
+    <a href="codebase-tour.html">Codebase Tour</a>
+    <a href="glossary.html">Glossary</a>
+  </div>
+  <div class="grp"><span class="grp-t">Game systems</span>
+    <a href="rules.html">Rules Engine</a>
+    <a href="world.html">World &amp; Journal</a>
+    <a href="sessions.html">Hosted Sessions</a>
+    <a href="ui.html">UI &amp; Menus</a>
+    <a href="networking.html">Networking</a>
+    <a href="content.html">Content &amp; Media</a>
+    <a href="saves.html">Saves &amp; Settings</a>
+  </div>
+  <div class="grp"><span class="grp-t">Code health</span>
+    <a href="diagrams.html">Diagrams</a>
+    <a href="complexity.html">Complexity</a>
+    <a href="findings.html">Findings</a>
+  </div>
+  <div class="grp"><span class="grp-t">Ship &amp; maintain</span>
+    <a href="qa.html">QA &amp; Rehearsals</a>
+    <a href="builds.html">Builds &amp; Tools</a>
+    <a href="maintaining.html">Maintaining</a>
+  </div>
+</nav>
+<header class="hero"><div class="leaf">
+  <p class="inscription">The structure wiki</p>
+  <h1>Bloomfire <span class="flame">Circuit</span></h1>
+  <p class="tag">How the code is put together on <code>main</code> today: the reusable rules, the Unity game and the tools around them, drawn as diagrams, with the complexity work and the structural problems that are left, so you can choose what to fix next.</p>
+  <div class="pillrow">
+    <span class="pill"><b>Unity 6000.5.5f1</b> · project <code>Game/EmberGrove</code></span>
+    <span class="pill">toolkit <b>CardForge 0.7.0</b> · pure C# rules</span>
+    <span class="pill"><b>one build scene</b> · <code>CircuitJourney.unity</code></span>
+    <span class="pill">read from <b>main</b>, through git</span>
+    <span class="pill">diagrams in <b>Mermaid</b>, offline</span>
+  </div>
+</div></header>
+<main>
+
+<div class="tldr">
+  <h4>In 60 seconds</h4>
+  <ul>
+    <li><b>What this wiki is.</b> A map of the current code structure, for the owner and future maintainers. It explains how the pieces connect, draws them, reports the complexity work and lists the structural problems that remain. It describes what is built. Plans, status and decisions live in the <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Release/ROADMAP.md">roadmap</a>, never here.</li>
+    <li><b>Three layers.</b> The CardForge toolkit holds the rules as plain C#. Only its content loader uses the Unity engine, plus one editor-only build hook. The Unity project <code>Game/EmberGrove</code> turns those rules into a world, menus, matches and saves. <code>Tools/</code> compiles the same toolkit source files into .NET checks, the Content Studio and the relay. See <a href="#layers">§01</a>.</li>
+    <li><b>One way to change state.</b> A rule function returns a <code>Result&lt;T&gt;</code>, and the game keeps the new state only when it succeeds. The adventure does this in <code>IsometricSlice.ApplyCircuit</code>. A local match calls <code>CombatRules.Resolve</code> from <code>ExpeditionApp</code>. A networked match resolves inside <code>ExpeditionAuthority.Receive</code>. See <a href="#action">§02</a>.</li>
+    <li><b>Which document answers what.</b> This wiki covers structure. <code>Docs/Guides</code> covers procedures and rules. <code>Docs/Release/ROADMAP.md</code> holds priorities, status and decisions. <code>README.md</code> holds current scope, and <code>AGENTS.md</code> the contribution rules. Pages here link to those files and do not copy them.</li>
+    <li><b>Where to go next.</b> If you are new to the code, read the <a href="codebase-tour.html">Codebase Tour</a> and then the <a href="glossary.html">Glossary</a>. If you are choosing a fix, read <a href="findings.html">Findings</a> and then <a href="complexity.html">Complexity</a>. If you have one task in mind, use the <a href="#reference">§04</a> reference card.</li>
+  </ul>
+</div>
+
+<div class="prereq">
+  <h4>Before you start</h4>
+  <ul>
+    <li>You do not need Unity running to read any page here. Every claim is about files on <code>main</code>.</li>
+    <li>To press Play as you read, use Unity <b>6000.5.5f1</b>, open the folder <code>Game/EmberGrove</code> (not the repository root) and open <code>Assets/Scenes/CircuitJourney.unity</code>. The <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/README.md">README</a> and the <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/MAINTAINING.md#set-up-once">one-time setup</a> cover the rest.</li>
+    <li>The <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CODE_ARCHITECTURE_GUIDE.md#source-map">developer guide's source map</a> owns the code boundaries, and its <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CODE_ARCHITECTURE_GUIDE.md#product-names">product-name table</a> explains why one game carries several names. This wiki links to both rather than copying them.</li>
+    <li>If you meet a word you do not know, look it up in <a href="glossary.html">the glossary</a>.</li>
+    <li>This site is published from the private <code>CardGame</code> repository (<a href="maintaining.html#publishing">how</a>). Links to source files open that repository, so they work only for people with access to it.</li>
+  </ul>
+</div>
+
+<div class="router">
+  <h4>I want to…</h4>
+  <div class="scrollx"><table>
+    <tr><th>You are…</th><th>Start at</th></tr>
+    <tr><td>Meeting this code for the first time</td><td><a href="codebase-tour.html">Codebase Tour</a>, then <a href="glossary.html">Glossary</a></td></tr>
+    <tr><td>Deciding what to fix next</td><td><a href="findings.html">Findings</a>, then <a href="complexity.html">Complexity</a> and <a href="diagrams.html">Diagrams</a></td></tr>
+    <tr><td>Following one player action through the code</td><td><a href="#action">§02 How a player action travels</a>, then <a href="rules.html">Rules Engine</a></td></tr>
+    <tr><td>Looking for where a system lives</td><td><a href="#pages">§03 The wiki</a>: one card per page, grouped the way the nav is</td></tr>
+    <tr><td>Doing one concrete task</td><td><a href="#reference">§04 Reference card</a>: the task, where to do it, and the page that explains it</td></tr>
+    <tr><td>Changing this wiki</td><td><a href="maintaining.html">Maintaining</a></td></tr>
+  </table></div>
+</div>
+
+<section id="layers">
+  <h2><span class="num">01</span>Three layers</h2>
+  <p class="lead">All code sits in one of three places, and the dependencies point one way. The game and the tools use the toolkit. The toolkit references neither of them.</p>
+  <div class="grid c3">
+    <div class="card accent-ember">
+      <h4>Toolkit rules</h4>
+      <p><code>Toolkit/Packages/com.catsplat.cardforge</code>, a Unity package with seven runtime assemblies. It holds the combat reducer <code>CombatRules</code>, the adventure rules <code>CircuitRules</code>, the lesson checks <code>LessonRules</code>, navigation in <code>SectorNavigation</code>, pack loading in <code>ContentPackFiles</code>, and multiplayer in <code>ExpeditionAuthority</code> and <code>ExpeditionNetworkSession</code>.</p>
+      <p>Every runtime assembly except <code>CardForge.Content</code> sets <code>noEngineReferences</code>.</p>
+    </div>
+    <div class="card accent-cyan">
+      <h4>Unity game</h4>
+      <p><code>Game/EmberGrove</code> has no assembly definitions, so its code compiles into <code>Assembly-CSharp</code>, with an editor assembly for <code>Assets/Editor</code>. Two parts do the work. <code>IsometricSlice</code> owns the world, the Waybook, the journal and the save. <code>ExpeditionApp</code> and <code>ExpeditionView</code> host one session: a duel, a practice, a lesson, Versus or Settings.</p>
+      <p><code>IsometricCombatBridge</code> joins those two parts.</p>
+    </div>
+    <div class="card accent-green">
+      <h4>Tools</h4>
+      <p><code>Tools/</code> holds .NET 10 projects that compile toolkit source files (and a few game files) by path, rather than referencing assemblies. They are the check suites, CardForge Content Studio, and the relay with its trusted service.</p>
+      <p><code>Tools/Run-Checks.ps1</code> runs the checks.</p>
+    </div>
+  </div>
+  <div class="scrollx"><table>
+    <tr><th>Layer</th><th>Builds into</th><th>May use</th><th>Tour</th></tr>
+    <tr><td>Toolkit</td><td>Seven runtime assembly definitions, one editor assembly (<code>CardForge.Linker.Editor</code>) and two sample assemblies that compile only when a project imports the sample</td><td>Only the toolkit assemblies its <code>.asmdef</code> lists. Among the runtime assemblies, only <code>CardForge.Content</code> uses <code>UnityEngine</code></td><td><a href="codebase-tour.html#toolkit">Codebase Tour §02</a></td></tr>
+    <tr><td>Game</td><td><code>Assembly-CSharp</code> (Runtime, Runtime/Exploration, Tests) and <code>Assembly-CSharp-Editor</code> (Editor)</td><td>Every toolkit runtime assembly (they are auto-referenced), Input System, URP, uGUI and UI Toolkit</td><td><a href="codebase-tour.html#assembly">Codebase Tour §04</a></td></tr>
+    <tr><td>Tools</td><td>Separate .NET projects, plus PowerShell, Python and Node scripts</td><td>Toolkit and game <code>.cs</code> files compiled in directly, with small <code>UnityEngine</code> stand-ins in place of the engine</td><td><a href="codebase-tour.html#tools">Codebase Tour §05</a></td></tr>
+  </table></div>
+  <p class="dim">The toolkit and tools are explained in the <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Toolkit/Packages/com.catsplat.cardforge/README.md#package-boundary">package boundary</a> and the <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Tools/README.md">tools README</a>. Who owns which folder is listed in <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/MAINTAINING.md#ownership">MAINTAINING, Ownership</a>.</p>
+</section>
+
+<section id="action">
+  <h2><span class="num">02</span>How a player action travels</h2>
+  <p class="lead">A press in the world and a press in a match take different routes, but both end the same way. A pure function in the toolkit decides, and the game keeps the result only when that function succeeded.</p>
+  <div class="diagram"><pre class="mermaid">
+flowchart TD
+  input(["Player input"]):::plain
+  slice["IsometricSlice&lt;br/&gt;world, Waybook, journal"]:::game
+  view["ExpeditionView&lt;br/&gt;Navigation, Input"]:::game
+  circuit["CircuitRules.*&lt;br/&gt;Result#lt;CircuitState#gt;"]:::kit
+  save["SaveCircuit&lt;br/&gt;CircuitPersistence.Save"]:::game
+  bridge["IsometricCombatBridge.Play"]:::game
+  app["ExpeditionApp.Submit"]:::game
+  combat["CombatRules.Resolve&lt;br/&gt;Result#lt;CombatResolution#gt;"]:::kit
+  session["ExpeditionNetworkSession.Submit"]:::kit
+  trusted["TrustedMatchApplication&lt;br/&gt;relay run with --authority"]:::tools
+  auth["ExpeditionAuthority.Receive"]:::kit
+  present["ExpeditionApp.Present or PresentNetwork&lt;br/&gt;ExpeditionView.Render"]:::game
+  input -->|walk, choose| slice
+  input -->|in a match| view
+  slice -->|ApplyCircuit| circuit
+  circuit -->|success: keep, then save| save
+  slice -->|PlayCircuitDuel| bridge
+  bridge -->|hosts a session| app
+  view --> app
+  app -->|local| combat
+  app -->|networked| session
+  session -->|LAN or relay: host seat| auth
+  session -->|trusted HTTP| trusted
+  trusted --> auth
+  auth --> combat
+  combat -->|local: new state and events| present
+  auth -.->|WireView per seat| present
+  classDef game stroke:#58c4b2
+  classDef kit stroke:#ddb777
+  classDef tools stroke:#94d9b2
+  classDef plain stroke:#7e928a
+</pre></div>
+  <p class="caption">Hand-drawn from <code>IsometricSlice.Circuit.cs</code> (<code>ApplyCircuit</code>, <code>PlayCircuitDuel</code>), <code>ExpeditionApp.cs</code> (<code>Submit</code>, <code>ResolveLocal</code>, <code>Present</code>), <code>ExpeditionApp.Network.cs</code> (<code>PresentNetwork</code>), <code>ExpeditionNetworkSession.cs</code> (<code>Submit</code>, <code>ProcessCommand</code>) and <code>ExpeditionAuthority.cs</code> (<code>Receive</code>). Box borders give the layer: teal for the Unity game, bronze for the toolkit, mint for the tools. The dashed edge is the view the authority sends back to each seat.</p>
+  <ol class="steps">
+    <li><b>In the world.</b> Walking, the Waybook and the journal pages belong to <code>IsometricSlice</code>. A choice that changes progress calls one <code>CircuitRules</code> transition, such as <code>BeginDuel</code>, <code>ResolveDuel</code> or <code>ChooseReward</code>, and passes the <code>Result&lt;CircuitState&gt;</code> to <code>ApplyCircuit</code>. On failure, <code>ApplyCircuit</code> shows the <code>RuleError</code> message. On success it replaces the state and saves. When the caller asks it to require a save and the save fails, it puts the previous state back.</li>
+    <li><b>Into a match.</b> <code>PlayCircuitDuel</code> records a pending duel with a receipt. <code>IsometricCombatBridge.Play</code> then creates a "Hosted session" object and adds an <code>ExpeditionApp</code> configured for that table. Practice, lessons, Versus and Settings use the same bridge, with a different <code>HostedSessionKind</code>.</li>
+    <li><b>In the match.</b> <code>ExpeditionView</code> turns pointer, keyboard and pad input into selections and commands, and each <code>CombatCommand</code> reaches <code>ExpeditionApp.Submit</code>. A local match resolves it with <code>CombatRules.Resolve</code> and animates the result. A networked match sends it through <code>ExpeditionNetworkSession</code>, and the side that holds the full match resolves it in <code>ExpeditionAuthority.Receive</code>. That side is the host for LAN and relay games, and <code>TrustedMatchApplication</code> for the trusted service.</li>
+    <li><b>Back to the world.</b> The finished outcome goes back into <code>CircuitRules.ResolveDuel</code> with the same receipt, through <code>ApplyCircuit</code>, so a repeated callback cannot grant a reward twice.</li>
+  </ol>
+  <div class="note"><b>Owned elsewhere.</b> The step-by-step command contract is in <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CODE_ARCHITECTURE_GUIDE.md#one-accepted-command">One accepted command</a>. The adventure transitions and receipts are in the <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Toolkit/Packages/com.catsplat.cardforge/Runtime/Circuit/README.md#outcomes-and-receipts">Circuit rules README</a>. Who may resolve a networked command is in <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/NETWORKING.md#current-authority-boundaries">Networking, Current authority boundaries</a>. The wiki pages that follow each route are <a href="rules.html">Rules Engine</a>, <a href="world.html">World &amp; Journal</a>, <a href="sessions.html">Hosted Sessions</a> and <a href="networking.html">Networking</a>.</div>
+</section>
+
+<section id="pages">
+  <h2><span class="num">03</span>The wiki</h2>
+  <p class="lead">One card per page, in the same groups and order as the nav, each titled with its nav label. A card you find here can be found again in the nav.</p>
+
+  <h3>Start here</h3>
+  <div class="grid c2">
+    <a class="card accent-ember" href="codebase-tour.html"><h4>Codebase Tour</h4><p>A walk through the repository and its build units. It covers every top-level folder and every assembly and .NET project, how <code>Assembly-CSharp</code> is laid out, which big classes are split into partial files, the names that do not match, and how content reaches a player.</p></a>
+    <a class="card accent-cyan" href="glossary.html"><h4>Glossary</h4><p>The words you meet in the code and the guides, such as Circuit, Waybook, lodge, district, venue, hosted session, receipt, rehearsal and trusted service. Each one has a one-line definition, its main type or file, and the page that explains it.</p></a>
+  </div>
+
+  <h3>Game systems</h3>
+  <div class="grid c3">
+    <a class="card accent-gold" href="rules.html"><h4>Rules Engine</h4><p>The toolkit's pure rules: the combat reducer <code>CombatRules.Resolve</code>, the adventure transitions in <code>CircuitRules</code>, the lessons in <code>LessonRules</code>, and the <code>Result&lt;T&gt;</code> path every change takes.</p></a>
+    <a class="card accent-green" href="world.html"><h4>World &amp; Journal</h4><p><code>IsometricSlice</code> and its partial files: how the world boots, walking, the Waybook title and the journal pages, <code>ApplyCircuit</code>, and a duel from the table to the save.</p></a>
+    <a class="card accent-cyan" href="sessions.html"><h4>Hosted Sessions</h4><p>How <code>IsometricCombatBridge</code> hosts a whole <code>ExpeditionApp</code> for a duel, a practice, a lesson, Versus or Settings, and what each <code>HostedSessionKind</code> changes.</p></a>
+    <a class="card accent-violet" href="ui.html"><h4>UI &amp; Menus</h4><p>The two code-built uGUI menu stacks, the UI Toolkit waybook title page, the input routers, <code>DuelUi</code> with its roles and palettes, and controller glyphs.</p></a>
+    <a class="card accent-ember" href="networking.html"><h4>Networking</h4><p>LAN, relay, named rooms and the trusted service. Covers <code>ExpeditionNetworkSession</code>, <code>ExpeditionAuthority</code> and the per-seat views that hide each player's private cards.</p></a>
+    <a class="card accent-gold" href="content.html"><h4>Content &amp; Media</h4><p>The content pack and the Circuit sidecars, staging into StreamingAssets, <code>ContentPackFiles</code>, CardForge Content Studio, and card art and audio.</p></a>
+    <a class="card accent-green" href="saves.html"><h4>Saves &amp; Settings</h4><p><code>CircuitSave</code> and its recovery in <code>CircuitPersistence</code>, <code>PlayerSettings</code> in PlayerPrefs, and how QA runs keep away from a player's own save.</p></a>
+  </div>
+
+  <h3>Code health</h3>
+  <div class="grid c3">
+    <a class="card accent-violet" href="diagrams.html"><h4>Diagrams</h4><p>Generated by the wiki build from the source on <code>main</code>: class diagrams of the assemblies. The other pages link to it rather than drawing their own class diagrams.</p></a>
+    <a class="card accent-cyan" href="complexity.html"><h4>Complexity</h4><p>How complex each C# member is now and at earlier reference revisions, measured on every wiki build, and the batches that brought every member below 10.</p></a>
+    <a class="card accent-red" href="findings.html"><h4>Findings</h4><p>The structural problems that remain, ranked, with what each fix would take, so you can choose the next one.</p></a>
+  </div>
+
+  <h3>Ship &amp; maintain</h3>
+  <div class="grid c3">
+    <a class="card accent-gold" href="qa.html"><h4>QA &amp; Rehearsals</h4><p><code>CircuitSliceChecks</code> and <code>ExpeditionHarness</code>, QA players, <code>-circuit-verify</code> runs, and how to read a failure.</p></a>
+    <a class="card accent-green" href="builds.html"><h4>Builds &amp; Tools</h4><p>The <code>IsometricSliceBuild</code> menus and staging, the suites in <code>Tools/Run-Checks.ps1</code>, the .NET projects that compile toolkit source, and packaging.</p></a>
+    <a class="card accent-ember" href="maintaining.html"><h4>Maintaining</h4><p>How this wiki is built and checked, the page shape, and what to update when the code changes.</p></a>
+  </div>
+</section>
+
+<section id="reference">
+  <h2><span class="num">04</span>Reference card</h2>
+  <p class="lead">The task you have in mind, where to do it, and the page that explains it. Menu paths are written as <span class="kbd">Menu ▸ Item</span>.</p>
+  <div class="scrollx">
+  <table>
+    <tr><th>I want to…</th><th>Go to</th><th>Page</th></tr>
+
+    <tr><th colspan="3">Read the code</th></tr>
+    <tr><td>See every folder, assembly and .NET project</td><td>The tour, beside the <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CODE_ARCHITECTURE_GUIDE.md#source-map">source map</a></td><td><a href="codebase-tour.html">Codebase Tour</a></td></tr>
+    <tr><td>Change a card rule or an effect</td><td><code>CombatRules.Resolve</code> in <code>Toolkit/…/Runtime/Core/CombatRules.cs</code></td><td><a href="rules.html">Rules Engine</a></td></tr>
+    <tr><td>Add an adventure transition</td><td><code>CircuitRules</code> (<code>CircuitRules.cs</code>, <code>CircuitValidation.cs</code>, <code>CircuitGraph.cs</code>), called from the game through <code>ApplyCircuit</code></td><td><a href="rules.html">Rules Engine</a></td></tr>
+    <tr><td>Follow a duel from the table to the save</td><td><code>PlayCircuitDuel</code> and <code>CommitFinishedCircuitDuel</code> in <code>Runtime/Exploration/IsometricSlice.Circuit.cs</code></td><td><a href="world.html">World &amp; Journal</a></td></tr>
+    <tr><td>Change what a hosted session does</td><td><code>HostedSessionKind</code> in <code>Runtime/ExpeditionApp.Session.cs</code>; <code>IsometricCombatBridge.Begin</code></td><td><a href="sessions.html">Hosted Sessions</a></td></tr>
+    <tr><td>Change how menu focus, submit and Back work</td><td><code>Runtime/ExpeditionView.Navigation.cs</code> for a hosted session; <code>IsometricSlice.WaybookMenu.cs</code> for the title page</td><td><a href="ui.html">UI &amp; Menus</a></td></tr>
+    <tr><td>Change how players connect</td><td><code>ExpeditionNetworkSession</code> in <code>Toolkit/…/Runtime/Networking</code>; the server in <code>Tools/ExpeditionRelay</code></td><td><a href="networking.html">Networking</a></td></tr>
+    <tr><td>Find where progress is saved</td><td><code>CircuitPersistence</code>, writing <code>bloomfire-circuit-v2.json</code> under <code>Application.persistentDataPath</code></td><td><a href="saves.html">Saves &amp; Settings</a></td></tr>
+
+    <tr><th colspan="3">Content</th></tr>
+    <tr><td>Edit cards, dialogue and media without Unity</td><td><code>pwsh -File Tools/ContentStudio/Start-Studio.ps1</code></td><td><a href="content.html">Content &amp; Media</a></td></tr>
+    <tr><td>Copy the authored content into the project before pressing Play</td><td><span class="kbd">Bloomfire Circuit ▸ Stage content for editor</span></td><td><a href="content.html">Content &amp; Media</a></td></tr>
+    <tr><td>Map models and clips to the real card catalog</td><td><span class="kbd">CardForge ▸ Current Card Workshop</span></td><td><a href="content.html">Content &amp; Media</a></td></tr>
+    <tr><td>Run a player against another content pack</td><td>Launch with <code>-content-pack &lt;folder&gt;</code>, or put a pack in <code>persistentDataPath/ContentOverride</code></td><td><a href="content.html">Content &amp; Media</a></td></tr>
+
+    <tr><th colspan="3">Build, check and rehearse</th></tr>
+    <tr><td>Run the maintained checks</td><td><code>pwsh -NoProfile -File Tools/Run-Checks.ps1</code> (<code>-List</code> shows the suites)</td><td><a href="builds.html">Builds &amp; Tools</a></td></tr>
+    <tr><td>Build a Windows player</td><td><span class="kbd">Bloomfire Circuit ▸ Build Windows</span></td><td><a href="builds.html">Builds &amp; Tools</a></td></tr>
+    <tr><td>Build a QA player and rehearse it</td><td><span class="kbd">Bloomfire Circuit ▸ Build Windows rehearsal</span>, then launch it with <code>-circuit-verify &lt;new folder&gt;</code></td><td><a href="qa.html">QA &amp; Rehearsals</a></td></tr>
+    <tr><td>Check the Android toolchain before an APK build</td><td><span class="kbd">Bloomfire Circuit ▸ Check Android development prerequisites</span></td><td><a href="builds.html">Builds &amp; Tools</a></td></tr>
+    <tr><td>Export the older offline reference and the Studio handbook</td><td><code>python Tools/Documentation/export_wiki.py</code></td><td><a href="maintaining.html">Maintaining</a></td></tr>
+
+    <tr><th colspan="3">Code health</th></tr>
+    <tr><td>See the class diagrams</td><td>Generated by the wiki build</td><td><a href="diagrams.html">Diagrams</a></td></tr>
+    <tr><td>See which members are most complex</td><td>The hotspot and largest-class tables</td><td><a href="complexity.html">Complexity</a></td></tr>
+    <tr><td>Choose the next structural fix</td><td>The ranked findings</td><td><a href="findings.html">Findings</a></td></tr>
+    <tr><td>Rebuild and check this wiki</td><td><code>Tools/Documentation/structure_wiki.py</code></td><td><a href="maintaining.html">Maintaining</a></td></tr>
+  </table>
+  </div>
+  <p class="dim">Beyond this wiki, <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/README.md">Docs/README.md</a> finds the guide for a role or a task, and <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Tools/README.md#find-the-right-tool">Tools, Find the right tool</a> lists the entry point for each tool.</p>
+</section>
+
+<div class="honest">
+  <h4>Keep this page honest</h4>
+  <ul>
+    <li><code>Toolkit/Packages/com.catsplat.cardforge/Runtime/*/*.asmdef</code>: the count of runtime assemblies and the <code>noEngineReferences</code> rule in §01.</li>
+    <li><code>Toolkit/Packages/com.catsplat.cardforge/package.json</code>, <code>Game/EmberGrove/ProjectSettings/ProjectVersion.txt</code> and <code>ProjectSettings/EditorBuildSettings.asset</code>: the toolkit version, the Unity version and the build scene in the header.</li>
+    <li><code>Runtime/Exploration/IsometricSlice.Circuit.cs</code> (<code>ApplyCircuit</code>, <code>PlayCircuitDuel</code>, <code>CommitFinishedCircuitDuel</code>), <code>Runtime/Exploration/IsometricCombatBridge.cs</code>, <code>Runtime/ExpeditionApp.cs</code> (<code>Submit</code>, <code>ResolveLocal</code>, <code>Present</code>) and <code>Runtime/ExpeditionApp.Network.cs</code>: the §02 diagram.</li>
+    <li><code>Toolkit/…/Runtime/Networking/ExpeditionNetworkSession.cs</code> (<code>Submit</code>, <code>ProcessCommand</code>), <code>ExpeditionAuthority.cs</code> (<code>Receive</code>) and <code>Tools/ExpeditionRelay/TrustedMatchApplication.cs</code>: the networked branch of §02.</li>
+    <li><code>Game/EmberGrove/Assets/Editor/IsometricSliceBuild.cs</code> and <code>Assets/Editor/CurrentCardWorkshop.cs</code>: every <span class="kbd">Menu ▸ Item</span> in §04 is a <code>[MenuItem]</code> string in one of them.</li>
+    <li>The cards in §03 follow the nav that <code>Tools/Documentation/structure_wiki.py</code> owns. When a page is added or regrouped there, change its card here in the same commit.</li>
+  </ul>
+</div>
+
+</main>
+<footer>Bloomfire Wiki · page source <code>Docs/Wiki/index.html</code>, built by <code>Tools/Documentation/structure_wiki.py</code> · Found a mistake? Fix it in the same commit as the code that made it one.</footer>
+</body>
+</html>

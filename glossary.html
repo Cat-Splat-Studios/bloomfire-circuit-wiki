@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Glossary — Bloomfire Wiki</title>
+<link rel="stylesheet" href="wiki.css">
+<script src="wiki.js" defer></script>
+</head>
+<body>
+<nav class="wiki">
+  <a class="home" href="index.html">🔥 Bloomfire Wiki</a>
+  <div class="grp"><span class="grp-t">Start here</span>
+    <a href="codebase-tour.html">Codebase Tour</a>
+    <a class="on" href="glossary.html">Glossary</a>
+  </div>
+  <div class="grp"><span class="grp-t">Game systems</span>
+    <a href="rules.html">Rules Engine</a>
+    <a href="world.html">World &amp; Journal</a>
+    <a href="sessions.html">Hosted Sessions</a>
+    <a href="ui.html">UI &amp; Menus</a>
+    <a href="networking.html">Networking</a>
+    <a href="content.html">Content &amp; Media</a>
+    <a href="saves.html">Saves &amp; Settings</a>
+  </div>
+  <div class="grp"><span class="grp-t">Code health</span>
+    <a href="diagrams.html">Diagrams</a>
+    <a href="complexity.html">Complexity</a>
+    <a href="findings.html">Findings</a>
+  </div>
+  <div class="grp"><span class="grp-t">Ship &amp; maintain</span>
+    <a href="qa.html">QA &amp; Rehearsals</a>
+    <a href="builds.html">Builds &amp; Tools</a>
+    <a href="maintaining.html">Maintaining</a>
+  </div>
+</nav>
+<header class="page"><h1>The <span class="flame">Glossary</span></h1><p class="tag">The words you meet in the code and the guides. Each has a one-line definition, its main type or file, and the page that explains it.</p></header>
+<main>
+
+<div class="tldr">
+  <h4>In 60 seconds</h4>
+  <ul>
+    <li><b>One entry, three parts.</b> Each entry gives what the word means in this codebase, where it lives in code ("Main:") and where the full story is ("Explained in:").</li>
+    <li><b>Grouped by subject.</b> Names, code, the adventure, matches, learning, networking, content, saves, and QA with documents. If you only have the word, use the <a href="#how">§01</a> A–Z list.</li>
+    <li><b>Names are frozen.</b> Many words survive from earlier products: Expedition, Isometric, EmberGrove. <a href="#names">§02</a> says what each one names today.</li>
+    <li><b>Definitions, not rules.</b> When a word is a rule or a procedure, the entry links the guide that owns it rather than restating it.</li>
+    <li><b>Linking a word.</b> Any page can link a term as <code>glossary.html#term-…</code>, for example <a href="#term-receipt">receipt</a>.</li>
+  </ul>
+</div>
+
+<section id="how">
+  <h2><span class="num">01</span>How to use this page</h2>
+  <p class="lead">Find the word, read the line, and follow "Explained in" if you need the whole mechanism. A word inside a definition that has its own entry is <a class="term" href="#term-circuit">linked like this</a>.</p>
+  <h3>A–Z</h3>
+  <!-- AZ -->
+  <p><b>A</b> &nbsp; <a href="#term-adapter">Adapter</a> &middot; <a href="#term-applycircuit">ApplyCircuit</a> &middot; <a href="#term-asmdef">asmdef</a> &middot; <a href="#term-assembly-csharp">Assembly-CSharp</a> &middot; <a href="#term-authority">Authority</a></p>
+  <p><b>B</b> &nbsp; <a href="#term-batch-entry">Batch entry point</a> &middot; <a href="#term-bloomfire">Bloomfire</a> &middot; <a href="#term-bloomfire-circuit">Bloomfire Circuit</a> &middot; <a href="#term-build-identity">Build identity</a></p>
+  <p><b>C</b> &nbsp; <a href="#term-candidate">Candidate</a> &middot; <a href="#term-card-guide">Card guide</a> &middot; <a href="#term-artwork-cache">CardArtworkCache</a> &middot; <a href="#term-cardforge">CardForge</a> &middot; <a href="#term-headless">CARDFORGE_HEADLESS</a> &middot; <a href="#term-cardgame">CardGame</a> &middot; <a href="#term-cardquery">CardQuery</a> &middot; <a href="#term-catalog">Catalog</a> &middot; <a href="#term-circuit">Circuit</a> &middot; <a href="#term-circuit-dialogue">Circuit dialogue</a> &middot; <a href="#term-qa-defines">CIRCUIT_QA, EMBERGROVE_QA</a> &middot; <a href="#term-circuitdefinition">CircuitDefinition</a> &middot; <a href="#term-circuitpersistence">CircuitPersistence</a> &middot; <a href="#term-circuitrules">CircuitRules</a> &middot; <a href="#term-circuitsave">CircuitSave</a> &middot; <a href="#term-circuitslicechecks">CircuitSliceChecks</a> &middot; <a href="#term-circuitstate">CircuitState</a> &middot; <a href="#term-circuitstudio">CircuitStudio</a> &middot; <a href="#term-club-opening">Club opening</a> &middot; <a href="#term-combat-core">Combat core</a> &middot; <a href="#term-combat-document">Combat document</a> &middot; <a href="#term-combat-hash">Combat hash</a> &middot; <a href="#term-combatai">CombatAi</a> &middot; <a href="#term-combatcommand">CombatCommand</a> &middot; <a href="#term-combatevent">CombatEvent</a> &middot; <a href="#term-resolve">CombatRules.Resolve</a> &middot; <a href="#term-combatstate">CombatState</a> &middot; <a href="#term-content-pack">Content pack</a> &middot; <a href="#term-content-root">Content root</a> &middot; <a href="#term-content-studio">Content Studio</a> &middot; <a href="#term-card-workshop">Current Card Workshop</a></p>
+  <p><b>D</b> &nbsp; <a href="#term-district">District</a> &middot; <a href="#term-outcome">Duel outcome</a> &middot; <a href="#term-duelui">DuelUi</a></p>
+  <p><b>E</b> &nbsp; <a href="#term-ember-and-grove">Ember &amp; Grove</a> &middot; <a href="#term-embergrove">EmberGrove</a> &middot; <a href="#term-episode">Episode</a> &middot; <a href="#term-event">Event</a> &middot; <a href="#term-expedition">Expedition</a> &middot; <a href="#term-expeditionapp">ExpeditionApp</a> &middot; <a href="#term-expeditionharness">ExpeditionHarness</a> &middot; <a href="#term-network-session">ExpeditionNetworkSession</a> &middot; <a href="#term-expeditionview">ExpeditionView</a></p>
+  <p><b>F</b> &nbsp; <a href="#term-fingerprint">Fingerprint</a></p>
+  <p><b>G</b> &nbsp; <a href="#term-guide">Guide</a></p>
+  <p><b>H</b> &nbsp; <a href="#term-hosted-session">Hosted session</a> &middot; <a href="#term-hostedsessionkind">HostedSessionKind</a></p>
+  <p><b>I</b> &nbsp; <a href="#term-isometric">Isometric</a> &middot; <a href="#term-bridge">IsometricCombatBridge</a> &middot; <a href="#term-isometricslice">IsometricSlice</a></p>
+  <p><b>J</b> &nbsp; <a href="#term-journal">Journal</a></p>
+  <p><b>K</b> &nbsp; <a href="#term-honest-box">Keep this page honest</a></p>
+  <p><b>L</b> &nbsp; <a href="#term-lan">LAN</a> &middot; <a href="#term-lesson">Lesson</a> &middot; <a href="#term-link-xml">link.xml</a> &middot; <a href="#term-lodge">Lodge</a></p>
+  <p><b>M</b> &nbsp; <a href="#term-manifest">Manifest</a> &middot; <a href="#term-media-catalog">Media catalog</a> &middot; <a href="#term-menu-palette">Menu palette</a></p>
+  <p><b>N</b> &nbsp; <a href="#term-named-room">Named room</a></p>
+  <p><b>O</b> &nbsp; <a href="#term-offline-reference">Offline reference</a></p>
+  <p><b>P</b> &nbsp; <a href="#term-partial-file">Partial file</a> &middot; <a href="#term-pending-duel">Pending duel</a> &middot; <a href="#term-playersettings">PlayerSettings</a> &middot; <a href="#term-playtest">Playtest report</a> &middot; <a href="#term-practice">Practice</a> &middot; <a href="#term-practice-vs-lesson">Practice vs lesson</a> &middot; <a href="#term-practice-path">PracticePath</a> &middot; <a href="#term-preparation">Preparation</a> &middot; <a href="#term-private-relay-qa">Private relay QA</a> &middot; <a href="#term-profile">Profile</a> &middot; <a href="#term-projection">Projection</a> &middot; <a href="#term-pulse">Pulse, Momentum, terrain</a></p>
+  <p><b>Q</b> &nbsp; <a href="#term-qa-player">QA player</a> &middot; <a href="#term-quickmatch">Quickmatch</a></p>
+  <p><b>R</b> &nbsp; <a href="#term-receipt">Receipt</a> &middot; <a href="#term-rehearsal">Rehearsal</a> &middot; <a href="#term-relay">Relay</a> &middot; <a href="#term-result">Result&lt;T&gt;</a> &middot; <a href="#term-retired-names">Retired names</a> &middot; <a href="#term-roadmap">Roadmap</a> &middot; <a href="#term-room">Room</a> &middot; <a href="#term-ruleerror">RuleError</a> &middot; <a href="#term-run">Run</a> &middot; <a href="#term-runresult">RunResult, WorldResult</a></p>
+  <p><b>S</b> &nbsp; <a href="#term-saved-deck">Saved deck</a> &middot; <a href="#term-seat">Seat</a> &middot; <a href="#term-sector">Sector</a> &middot; <a href="#term-shipping-player">Shipping player</a> &middot; <a href="#term-sidecar">Sidecar</a> &middot; <a href="#term-narration">Spoken guide</a> &middot; <a href="#term-staging">Staging</a> &middot; <a href="#term-suite">Suite</a></p>
+  <p><b>T</b> &nbsp; <a href="#term-table-lobby">Table lobby</a> &middot; <a href="#term-task">Task</a> &middot; <a href="#term-testing-save">Testing save</a> &middot; <a href="#term-toolkit">Toolkit</a> &middot; <a href="#term-tournament">Tournament</a> &middot; <a href="#term-traveller">Traveller</a> &middot; <a href="#term-travellers-circuit">The Travellers' Circuit</a> &middot; <a href="#term-trusted-service">Trusted service</a></p>
+  <p><b>U</b> &nbsp; <a href="#term-unity-stand-in">UnityEngine stand-in</a></p>
+  <p><b>V</b> &nbsp; <a href="#term-venue">Venue</a> &middot; <a href="#term-versus">Versus</a> &middot; <a href="#term-visit">Visit</a></p>
+  <p><b>W</b> &nbsp; <a href="#term-waybook">Waybook</a> &middot; <a href="#term-wire">Wire packet, wire view</a> &middot; <a href="#term-world-document">World document</a> &middot; <a href="#term-world-table">World table</a></p>
+  <!-- /AZ -->
+</section>
+
+<section id="names">
+  <h2><span class="num">02</span>Product and project names</h2>
+  <p class="lead">One game carries several names, because saves, preferences, the network fingerprint and published packages depend on old spellings. The <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CODE_ARCHITECTURE_GUIDE.md#product-names">product-name table</a> owns the full list of frozen identifiers.</p>
+  <dl class="glossary">
+    <dt id="term-bloomfire">Bloomfire</dt>
+    <dd>The game's title. It is also the lane burst when Ember and Thicket terrain meet. Main: the title comes from <code>Content/Circuit/locations.json</code>, and the burst is <code>CombatEventKind.Bloomfire</code> in <code>CombatRules</code>. <span class="more">Explained in: <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CODE_ARCHITECTURE_GUIDE.md#product-names">Product names</a>.</span></dd>
+    <dt id="term-bloomfire-circuit">Bloomfire Circuit <span class="aka">also: Bloomfire Circuit QA</span></dt>
+    <dd>The working product name of every player build. "Bloomfire Circuit QA" is the Android rehearsal build. Main: <code>IsometricSliceBuild</code> sets the name for each build and also names the <span class="kbd">Bloomfire Circuit</span> editor menu. <span class="more">Explained in: <a href="builds.html#entries">Builds &amp; Tools</a>.</span></dd>
+    <dt id="term-travellers-circuit">The Travellers' Circuit</dt>
+    <dd>The adventure, and the subtitle on the title page. Main: the rules are in <code>CardForge.Circuit</code> and the world in <code>Game/EmberGrove/Assets/Runtime/Exploration</code>. The <code>Traveller*</code> types are named after it. <span class="more">Explained in: <a href="world.html">World &amp; Journal</a>.</span></dd>
+    <dt id="term-ember-and-grove">Ember &amp; Grove</dt>
+    <dd>The former product name, now only the editor's identity. Main: <code>productName</code> in <code>ProjectSettings/ProjectSettings.asset</code>, which every build overrides, and the default pack's titles. Do not add new uses. <span class="more">Explained in: <a href="codebase-tour.html#names">Codebase Tour §07</a>.</span></dd>
+    <dt id="term-embergrove">EmberGrove</dt>
+    <dd>The code and data identity, kept for compatibility. Main: the Unity project <code>Game/EmberGrove</code>, the <code>EmberGrove.*</code> namespaces and preference keys, the pack <code>Content/EmberGroveDefault</code> (Id <code>embergrove</code>) and the <code>EMBERGROVE_QA</code> define. <span class="more">Explained in: <a href="codebase-tour.html#names">Codebase Tour §07</a>.</span></dd>
+    <dt id="term-expedition">Expedition</dt>
+    <dd>The retired standalone mode. Its name survives on the hosted battle, the combat pack and the wire protocol. Main: <code>ExpeditionApp</code>, <code>ExpeditionView</code>, <code>expedition-content.json</code>, <code>ExpeditionProtocol</code> and the <code>-expedition-*</code> options. <span class="more">Explained in: <a href="codebase-tour.html#names">Codebase Tour §07</a>.</span></dd>
+    <dt id="term-cardforge">CardForge</dt>
+    <dd>The reusable toolkit and the creator tools. Main: the package <code>com.catsplat.cardforge</code> in <code>Toolkit/Packages</code>, the <code>CardForge.*</code> assemblies, and CardForge Content Studio in <code>Tools/ContentStudio</code>. <span class="more">Explained in: <a href="codebase-tour.html#toolkit">Codebase Tour §02</a>.</span></dd>
+    <dt id="term-isometric">Isometric <span class="aka">also: the slice</span></dt>
+    <dd>A code name for the Circuit world, kept on purpose. Main: <code>IsometricSlice</code> (the world), <code>IsometricSectorVisuals</code> (its art), <code>IsometricCombatBridge</code> (into a match), <code>IsometricSliceBuild</code> (the build) and <code>Tools/Package-Isometric.ps1</code> (the packager). <span class="more">Explained in: <a href="codebase-tour.html#names">Codebase Tour §07</a>.</span></dd>
+    <dt id="term-cardgame">CardGame</dt>
+    <dd>The repository. Main: <code>Cat-Splat-Studios/CardGame</code>. The relay ZIP is still named <code>CardGame-Relay-*.zip</code>. <span class="more">Explained in: <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/BACKUP_AND_RESTORE.md">Backup and restore</a>.</span></dd>
+    <dt id="term-retired-names">Retired names <span class="aka">also: Wildsignal, Lower Reach, SOTestCardGame</span></dt>
+    <dd>Earlier products whose names survive only as frozen identifiers. One example is the Id <code>lower-reach-field-study</code> in <code>Content/Exploration/sector.json</code>. Main: none. <span class="more">Explained in: <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CODE_ARCHITECTURE_GUIDE.md#product-names">Product names</a>.</span></dd>
+  </dl>
+</section>
+
+<section id="code">
+  <h2><span class="num">03</span>Code and build units</h2>
+  <dl class="glossary">
+    <dt id="term-toolkit">Toolkit <span class="aka">also: the package, CardForge package</span></dt>
+    <dd>The Unity package with the pure rules. All its runtime assemblies are free of the engine, except <code>CardForge.Content</code>. Main: <code>Toolkit/Packages/com.catsplat.cardforge/Runtime</code>. <span class="more">Explained in: <a href="codebase-tour.html#toolkit">Codebase Tour §02</a>.</span></dd>
+    <dt id="term-adapter">Adapter</dt>
+    <dd>Code that connects pure rule results to Unity: presentation, input, files and audio. An adapter never decides a rule. Main: <code>IsometricSlice.Circuit.cs</code> adapts <code>CircuitRules</code>, and <code>CardForge.Content</code> is the toolkit's file-loading adapter. <span class="more">Explained in: <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CODE_ARCHITECTURE_GUIDE.md#source-map">Source map</a>.</span></dd>
+    <dt id="term-assembly-csharp">Assembly-CSharp <span class="aka">also: Assembly-CSharp-Editor</span></dt>
+    <dd>The game's one runtime assembly, made by Unity because the game has no <code>.asmdef</code>. It includes <code>Assets/Tests</code>. Main: everything under <code>Game/EmberGrove/Assets</code> except <code>Assets/Editor</code>, which becomes <code>Assembly-CSharp-Editor</code>. <span class="more">Explained in: <a href="codebase-tour.html#assembly">Codebase Tour §04</a>.</span></dd>
+    <dt id="term-asmdef">asmdef <span class="aka">also: noEngineReferences</span></dt>
+    <dd>A Unity assembly definition file. <code>noEngineReferences</code> in one keeps its code from using Unity types. Main: the <code>*.asmdef</code> files in <code>Toolkit/Packages/com.catsplat.cardforge</code>. <span class="more">Explained in: <a href="codebase-tour.html#toolkit">Codebase Tour §02</a>.</span></dd>
+    <dt id="term-partial-file">Partial file</dt>
+    <dd>One file of a C# <code>partial</code> class, named <code>Type.Concern.cs</code>. The suffix is the concern it covers. Main: the <code>IsometricSlice.*</code>, <code>ExpeditionView.*</code> and <code>ExpeditionApp.*</code> files. <span class="more">Explained in: <a href="codebase-tour.html#partials">Codebase Tour §06</a>.</span></dd>
+    <dt id="term-result">Result&lt;T&gt; <span class="aka">also: the small monad</span></dt>
+    <dd>The value every rule returns: either a success value or a <a class="term" href="#term-ruleerror">RuleError</a>. <code>Map</code> transforms a success, <code>Bind</code> chains another step that can fail, and <code>Match</code> picks a handler. Main: the <code>readonly struct</code> <code>EmberGrove.Result&lt;T&gt;</code> in <code>Runtime/Functional/Result.cs</code>. <span class="more">Explained in: <a href="rules.html#functional">Rules Engine</a>, <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CODE_ARCHITECTURE_GUIDE.md#functional-composition-and-the-small-monad">Functional composition</a>.</span></dd>
+    <dt id="term-ruleerror">RuleError</dt>
+    <dd>Why a rule refused: a short <code>Code</code> and a player-readable <code>Message</code>. Main: <code>Runtime/Functional/Result.cs</code>. <span class="more">Explained in: <a href="rules.html#functional">Rules Engine</a>.</span></dd>
+    <dt id="term-runresult">RunResult, WorldResult</dt>
+    <dd>Older result types used by the toolkit's campaign rules, which the game no longer calls. They are separate from <code>Result&lt;T&gt;</code>. Main: <code>Runtime/Progression/ExpeditionRun.cs</code> and <code>WorldProfile.cs</code>. <span class="more">Explained in: <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CODE_ARCHITECTURE_GUIDE.md#run-and-profile-state">Run and profile state</a>.</span></dd>
+    <dt id="term-headless">CARDFORGE_HEADLESS</dt>
+    <dd>A compiler symbol set by the .NET tools. It swaps Unity's JSON for System.Text.Json and leaves out the Unity file loaders. Main: <code>ExpeditionContent.cs</code> and <code>ContentPackFiles.cs</code>; defined in <code>Tools/ExpeditionRelay/ExpeditionRelay.csproj</code> and <code>Tools/ContentStudio/ContentStudio.csproj</code>. <span class="more">Explained in: <a href="codebase-tour.html#tools">Codebase Tour §05</a>.</span></dd>
+    <dt id="term-qa-defines">CIRCUIT_QA, EMBERGROVE_QA</dt>
+    <dd>Compiler symbols that a rehearsal build adds, so the QA harnesses compile into that player and into no other. Main: <code>IsometricSliceBuild.Build</code>, and the <code>#if</code> lines at the top of <code>Assets/Tests/Runtime/*.cs</code>. <span class="more">Explained in: <a href="codebase-tour.html#assembly">Codebase Tour §04</a>, <a href="builds.html#defines">Builds &amp; Tools</a>.</span></dd>
+    <dt id="term-unity-stand-in">UnityEngine stand-in <span class="aka">also: UnityBoundary</span></dt>
+    <dd>A small file that declares <code>TextAsset</code>, <code>Resources</code> and <code>JsonUtility</code> in a fake <code>UnityEngine</code> namespace, so a .NET tool can compile the content parsers. Main: <code>Tools/ContentStudio/UnityBoundary.cs</code> and <code>Tools/ExpeditionPerformance/UnityBoundaryStub.cs</code>. <span class="more">Explained in: <a href="codebase-tour.html#tools">Codebase Tour §05</a>.</span></dd>
+    <dt id="term-link-xml">link.xml</dt>
+    <dd>Tells IL2CPP not to strip the reflective serializer code that the network codec needs. Main: <code>Runtime/Networking/link.xml</code>, which <code>CardForgeLinkerProcessor</code> adds to every player build. <span class="more">Explained in: <a href="codebase-tour.html#toolkit">Codebase Tour §02</a>.</span></dd>
+  </dl>
+</section>
+
+<section id="adventure">
+  <h2><span class="num">04</span>The adventure: Circuit, world and Waybook</h2>
+  <dl class="glossary">
+    <dt id="term-circuit">Circuit <span class="aka">also: the adventure</span></dt>
+    <dd>The solo adventure: walk the club's districts, play tables, collect cards and build decks. Main: <code>CardForge.Circuit</code> (<code>CircuitDefinition</code>, <code>CircuitState</code>, <code>CircuitRules</code>), adapted in the game by <code>IsometricSlice.Circuit.cs</code>. <span class="more">Explained in: <a href="world.html">World &amp; Journal</a>, <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Toolkit/Packages/com.catsplat.cardforge/Runtime/Circuit/README.md">Circuit rules README</a>.</span></dd>
+    <dt id="term-circuitdefinition">CircuitDefinition</dt>
+    <dd>Everything the rules need to know about the authored adventure: cards and tiers, starter presets, opponents, mentors, dialogue and the learning policy. Main: <code>Runtime/Circuit/CircuitDefinition.cs</code>. The game builds one in <code>IsometricSlice.LoadCircuit</code>. <span class="more">Explained in: <a href="rules.html#circuit">Rules Engine</a>.</span></dd>
+    <dt id="term-circuitstate">CircuitState</dt>
+    <dd>A <a class="term" href="#term-profile">profile</a> and <a class="term" href="#term-run">run</a> pair, so that permanent unlocks and a run's reward commit together. Main: <code>CircuitDefinition.cs</code>. The game holds it in the field <code>IsometricSlice.circuit</code>. <span class="more">Explained in: <a href="world.html#rules">World &amp; Journal</a>.</span></dd>
+    <dt id="term-profile">Profile</dt>
+    <dd>What a player keeps forever: the card collection, saved decks, dialogue and event records, and the selected task. Main: <code>CircuitProfile</code>. <span class="more">Explained in: <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Toolkit/Packages/com.catsplat.cardforge/Runtime/Circuit/README.md#state-and-content">State and content</a>.</span></dd>
+    <dt id="term-run">Run <span class="aka">also: day, outing</span></dt>
+    <dd>One seeded day of the adventure. It holds the districts, the active deck, the current location and any pending duel or reward. Main: <code>CircuitRun</code>. <span class="more">Explained in: <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Toolkit/Packages/com.catsplat.cardforge/Runtime/Circuit/README.md#state-and-content">State and content</a>.</span></dd>
+    <dt id="term-circuitrules">CircuitRules</dt>
+    <dd>The static, pure adventure rules. Each transition takes the definition and a state, and returns <code>Result&lt;CircuitState&gt;</code> without changing its input. Main: <code>CircuitRules.cs</code> (transitions), <code>CircuitValidation.cs</code> (<code>Validate</code>, <code>Recover</code>) and <code>CircuitGraph.cs</code> (districts). <span class="more">Explained in: <a href="rules.html#circuit">Rules Engine</a>.</span></dd>
+    <dt id="term-applycircuit">ApplyCircuit</dt>
+    <dd>The one place the game accepts a new <code>CircuitState</code>. On failure it shows the error. On success it replaces the state and saves. If the caller required a save and the save failed, it puts the previous state back. Main: <code>IsometricSlice.ApplyCircuit</code> in <code>IsometricSlice.Circuit.cs</code>. <span class="more">Explained in: <a href="world.html#rules">World &amp; Journal</a>, <a href="index.html#action">home §02</a>.</span></dd>
+    <dt id="term-isometricslice">IsometricSlice</dt>
+    <dd>The MonoBehaviour that runs the Circuit world: boot, walking, the camera, the Waybook, the journal, saving and starting matches. Main: 19 partial files in <code>Runtime/Exploration/IsometricSlice*.cs</code>. <span class="more">Explained in: <a href="world.html">World &amp; Journal</a>, <a href="codebase-tour.html#partials">Codebase Tour §06</a>.</span></dd>
+    <dt id="term-district">District <span class="aka">also: stage</span></dt>
+    <dd>One stretch of the world, numbered by its stage: an arrival, venues and a tournament. Main: <code>CircuitLocation.Stage</code>, generated in <code>CircuitGraph.cs</code>, laid out by <code>CircuitWorldLayout</code>. Reusable district art is in prefabs bound by <code>AuthoredCircuitDistrict</code>. <span class="more">Explained in: <a href="world.html#layout">World &amp; Journal</a>, <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Toolkit/Packages/com.catsplat.cardforge/Runtime/Circuit/README.md#world-and-tournaments">World and tournaments</a>.</span></dd>
+    <dt id="term-venue">Venue <span class="aka">also: location, table</span></dt>
+    <dd>A place inside a district where something happens: a card table, a mentor, a card exchange or a workshop. Main: <code>CircuitLocation</code> and <code>CircuitLocationKind</code> in the rules. The art is built in <code>IsometricSectorVisuals.Venues</code> and <code>.Authored</code>. <span class="more">Explained in: <a href="world.html#visuals">World &amp; Journal</a>.</span></dd>
+    <dt id="term-room">Room <span class="aka">also: room revision</span></dt>
+    <dd>The authored geometry of a venue, kept by a stable Id and revision, so that old saves keep the room they had. Main: <code>CircuitLocation.RoomId</code> and <code>RoomRevision</code>, and the prefab component <code>AuthoredCircuitRoom</code>. <span class="more">Explained in: <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/MAINTAINING.md#supported-circuit-world-layouts">Supported Circuit world layouts</a>.</span></dd>
+    <dt id="term-tournament">Tournament <span class="aka">also: champion</span></dt>
+    <dd>The last location in a district. Its matches end with a champion, and finishing the champion's reward opens the next district. Main: <code>CircuitLocationKind.Tournament</code>, and <code>CircuitOpponent.Champion</code> in the definition. <span class="more">Explained in: <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Toolkit/Packages/com.catsplat.cardforge/Runtime/Circuit/README.md#world-and-tournaments">World and tournaments</a>.</span></dd>
+    <dt id="term-sector">Sector</dt>
+    <dd>A tile grid with a start point and landmarks, the data that navigation runs on. Main: <code>SectorDefinition</code> and <code>SectorNavigation</code> (<code>Validate</code>, <code>FindPath</code>) in <code>CardForge.Exploration</code>. The start-up file is <code>Content/Exploration/sector.json</code>. <span class="more">Explained in: <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Content/Exploration/README.md">Start-up sector file</a>.</span></dd>
+    <dt id="term-traveller">Traveller</dt>
+    <dd>The player's figure walking the world. Main: <code>IsometricSlice.Traveller</code>, created by <code>IsometricSectorVisuals.CreateTraveller</code>. <span class="more">Explained in: <a href="world.html#traveller">World &amp; Journal</a>.</span></dd>
+    <dt id="term-lodge">Lodge</dt>
+    <dd>The club lodge where the game opens. The title camera frames the notebook resting there. Main: <code>LodgeWaybook.prefab</code> and its <code>LodgeWaybookBinding</code>. The title camera is in <code>IsometricSlice.Title.cs</code>. <span class="more">Explained in: <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CIRCUIT_WAYBOOK.md#arriving-at-the-lodge">Arriving at the lodge</a>.</span></dd>
+    <dt id="term-waybook">Waybook</dt>
+    <dd>The book interface. On the title it is a menu written onto the lodge notebook with a world-space UI Toolkit panel. In the adventure it is the task book and its windows. Main: <code>IsometricSlice.WaybookMenu.cs</code> with <code>Resources/UI/WaybookPage.uxml</code>, then <code>IsometricSlice.Waybook.cs</code> and <code>.CircuitUi.cs</code>. <span class="more">Explained in: <a href="ui.html#title">UI &amp; Menus</a>, <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CIRCUIT_WAYBOOK.md">the waybook guide</a>.</span></dd>
+    <dt id="term-journal">Journal <span class="aka">also: Circuit page</span></dt>
+    <dd>The modal windows over the adventure: map, cards, deck, rewards, dialogue, lessons, tasks and more. Each is a value of <code>CircuitPage</code> with a back stack. Main: <code>ShowCircuit</code> in <code>IsometricSlice.Circuit.cs</code> and <code>DrawModal</code> in <code>IsometricSlice.Hud.cs</code>. <span class="more">Explained in: <a href="world.html#journal">World &amp; Journal</a>.</span></dd>
+    <dt id="term-task">Task <span class="aka">also: route web</span></dt>
+    <dd>An authored job shown in the Waybook's task list and route web, with a Go action that walks there. Main: <code>CircuitTaskDefinition</code> and <code>CircuitRules.Tasks</code>, drawn by <code>IsometricSlice.Waybook.cs</code>. <span class="more">Explained in: <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CIRCUIT_WAYBOOK.md#task-list-and-route-web-target">Task list and route web</a>.</span></dd>
+    <dt id="term-event">Event</dt>
+    <dd>A one-line conversation with up to three pictured answers, whose chosen answer the profile remembers. Its status goes Offered, then Presenting, then Committed. Main: <code>CircuitEventDefinition</code>, <code>CircuitEventStatus</code>, and <code>CircuitRules.OfferEvent</code>, <code>BeginEvent</code> and <code>CommitEvent</code>. <span class="more">Explained in: <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CIRCUIT_DIRECTION.md">The Travellers' Circuit guide</a>.</span></dd>
+    <dt id="term-episode">Episode <span class="aka">also: friendly game, story match</span></dt>
+    <dd>A story match against a named friend. It grants no rewards. Main: <code>CircuitEpisodeDefinition</code> and <code>CircuitRules.BeginEpisodeDuel</code>, hosted as <code>HostedSessionKind.FriendlyGame</code>. <span class="more">Explained in: <a href="sessions.html#kinds">Hosted Sessions</a>.</span></dd>
+    <dt id="term-visit">Visit <span class="aka">also: story route</span></dt>
+    <dd>A story path that opens a later district early, after a committed event. Main: <code>CircuitVisitDefinition</code> and <code>CircuitRules.OpenVisit</code>; the game walks there in <code>IsometricSlice.World.cs</code>. <span class="more">Explained in: <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Toolkit/Packages/com.catsplat.cardforge/Runtime/Circuit/README.md#world-and-tournaments">World and tournaments</a>.</span></dd>
+    <dt id="term-club-opening">Club opening</dt>
+    <dd>The voiced first arrival: meet the club, choose a badge and nickname, then go to the first practice. Main: <code>CircuitOpeningDefinition</code>, drawn by <code>IsometricSlice.Onboarding.cs</code>. <span class="more">Explained in: <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CIRCUIT_FIRST_STEPS.md">First steps</a>.</span></dd>
+    <dt id="term-saved-deck">Saved deck <span class="aka">also: Your decks</span></dt>
+    <dd>A named deck kept on the profile, separate from the run's own copy. Starting a run from it copies it into the run. Main: <code>CircuitDeck</code>, <code>CircuitRules.CreateDeck</code>, <code>StartFromDeck</code> and <code>SaveRunDeck</code>, edited in <code>IsometricSlice.DeckBuilder.cs</code>. <span class="more">Explained in: <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Toolkit/Packages/com.catsplat.cardforge/Runtime/Circuit/README.md#saved-decks">Saved decks</a>.</span></dd>
+    <dt id="term-pending-duel">Pending duel</dt>
+    <dd>The match the run is waiting on. It is set by <code>BeginDuel</code> and cleared by <code>ResolveDuel</code>. A save that still has one at start-up resolves it as Interrupted. Main: <code>CircuitRun.PendingDuel</code> (a <code>CircuitDuel</code>), and <code>IsometricSlice.RestoreCircuit</code>. <span class="more">Explained in: <a href="world.html#rules">World &amp; Journal</a>.</span></dd>
+    <dt id="term-receipt">Receipt</dt>
+    <dd>An Id attached to one duel attempt or event, so that delivering the same result twice changes nothing the second time. Main: <code>CircuitDuel.ReceiptId</code>, passed to <code>IsometricCombatBridge.Play</code> and back into <code>CircuitRules.ResolveDuel</code>. <span class="more">Explained in: <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Toolkit/Packages/com.catsplat.cardforge/Runtime/Circuit/README.md#outcomes-and-receipts">Outcomes and receipts</a>.</span></dd>
+    <dt id="term-outcome">Duel outcome</dt>
+    <dd>How a match ended for the adventure: Won, Lost, Abandoned, Interrupted or Drawn. Main: <code>CircuitDuelOutcome</code>. <span class="more">Explained in: <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Toolkit/Packages/com.catsplat.cardforge/Runtime/Circuit/README.md#outcomes-and-receipts">Outcomes and receipts</a>.</span></dd>
+  </dl>
+</section>
+
+<section id="matches">
+  <h2><span class="num">05</span>Matches and hosted sessions</h2>
+  <dl class="glossary">
+    <dt id="term-combat-core">Combat core</dt>
+    <dd>The pure card-battle rules. Main: the assembly <code>EmberGrove.Expedition</code> in <code>Runtime/Core</code>: <code>CombatContracts.cs</code>, <code>CombatRules.cs</code> and <code>CombatAi.cs</code>. <span class="more">Explained in: <a href="rules.html">Rules Engine</a>.</span></dd>
+    <dt id="term-resolve">CombatRules.Resolve <span class="aka">also: the reducer</span></dt>
+    <dd>Takes a full match state and one command, and returns <code>Result&lt;CombatResolution&gt;</code>: a new state plus ordered events. A rejected command leaves the input untouched. Main: <code>Runtime/Core/CombatRules.cs</code>, next to <code>NewMatch</code> and <code>LegalCommands</code>. <span class="more">Explained in: <a href="rules.html#combat-rules">Rules Engine</a>, <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CODE_ARCHITECTURE_GUIDE.md#one-accepted-command">One accepted command</a>.</span></dd>
+    <dt id="term-combatstate">CombatState</dt>
+    <dd>The whole match: both sides, every card, terrain, turn and round. It is never saved. Main: <code>CombatContracts.cs</code>. The game holds it in <code>ExpeditionApp.State</code>, and the network authority holds its own copy. <span class="more">Explained in: <a href="rules.html#core-state">Rules Engine</a>.</span></dd>
+    <dt id="term-combatcommand">CombatCommand</dt>
+    <dd>One player action: Play, Attack, Move, EndTurn or Concede (<code>ActionKind</code>), with source, target, lane and rank. Main: <code>CombatContracts.cs</code>. <span class="more">Explained in: <a href="rules.html#core-state">Rules Engine</a>.</span></dd>
+    <dt id="term-combatevent">CombatEvent</dt>
+    <dd>One thing that happened during a resolution, such as Draw, Damage, Death, Terrain or Bloomfire. The view animates these after the fact. Main: <code>CombatEventKind</code> in <code>CombatContracts.cs</code>; animated by <code>ExpeditionView.AnimateEvents</code>. <span class="more">Explained in: <a href="ui.html">UI &amp; Menus</a>.</span></dd>
+    <dt id="term-catalog">Catalog</dt>
+    <dd>The card definitions a match is played with. Main: <code>Catalog</code> in <code>CombatContracts.cs</code>, built by <code>ContentPack.CreateCatalog</code>. <span class="more">Explained in: <a href="content.html">Content &amp; Media</a>.</span></dd>
+    <dt id="term-cardquery">CardQuery</dt>
+    <dd>The one card sort, search and trait test that every card list uses. Main: <code>CombatContracts.cs</code>. <span class="more">Explained in: <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CODE_ARCHITECTURE_GUIDE.md#source-map">Source map</a>.</span></dd>
+    <dt id="term-combatai">CombatAi <span class="aka">also: the rival</span></dt>
+    <dd>Chooses the computer opponent's next command and describes its intent. Main: <code>CombatAi.Choose</code> and <code>DescribeIntent</code> in <code>Runtime/Core/CombatAi.cs</code>, called from <code>ExpeditionApp.Update</code>. <span class="more">Explained in: <a href="rules.html#ai-queries-lessons">Rules Engine</a>.</span></dd>
+    <dt id="term-pulse">Pulse, Momentum, terrain</dt>
+    <dd>Rule words. Pulse is the per-turn budget, Momentum is a bonus earned within a turn, and terrain is Clear, Thicket or Ember on a lane. Main: <code>SideState.Pulse</code>, <code>CombatConfig.PulsePerTurn</code> and <code>TerrainKind</code>. <span class="more">Explained in: <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/GAME_RULES.md#terrain-and-momentum">Game rules</a>.</span></dd>
+    <dt id="term-hosted-session">Hosted session</dt>
+    <dd>A complete <code>ExpeditionApp</code> created for one screen, whether a duel, practice, lesson, Versus or Settings. It is put on a "Hosted session" object and destroyed when it ends. Main: <code>IsometricCombatBridge.Begin</code>. <span class="more">Explained in: <a href="sessions.html#kinds">Hosted Sessions</a>.</span></dd>
+    <dt id="term-hostedsessionkind">HostedSessionKind</dt>
+    <dd>What a hosted session is: <code>CircuitDuel</code>, <code>FriendlyGame</code>, <code>Practice</code>, <code>Lesson</code>, <code>Versus</code> or <code>Settings</code>. It is set before the session starts and does not change. Main: <code>ExpeditionApp.Session.cs</code>. <span class="more">Explained in: <a href="sessions.html#kinds">Hosted Sessions</a>.</span></dd>
+    <dt id="term-bridge">IsometricCombatBridge</dt>
+    <dd>Hosts one session from the world. It configures the session by kind, waits until the session resolves, releases it, restores the world's runtime settings, then reports the outcome. Main: <code>Play</code> in <code>Runtime/Exploration/IsometricCombatBridge.cs</code>. <span class="more">Explained in: <a href="sessions.html#start">Hosted Sessions</a>.</span></dd>
+    <dt id="term-expeditionapp">ExpeditionApp</dt>
+    <dd>The coordinator of a hosted session. It loads the pack, holds the <code>CombatState</code>, schedules the rival, polls the network and applies settings. Main: 10 partial files, <code>Runtime/ExpeditionApp*.cs</code> plus <code>WorldTableContext.cs</code>. <span class="more">Explained in: <a href="sessions.html">Hosted Sessions</a>.</span></dd>
+    <dt id="term-expeditionview">ExpeditionView</dt>
+    <dd>The hosted session's screens. It builds the board and menus, routes input, and animates accepted commands and events. Main: 23 partial files, mostly <code>Runtime/ExpeditionView*.cs</code>. <span class="more">Explained in: <a href="ui.html">UI &amp; Menus</a>.</span></dd>
+    <dt id="term-versus">Versus <span class="aka">also: friend play, LocalDuel</span></dt>
+    <dd>The friend-play menu. From it you start a shared-screen match (<code>LocalDuel</code>) or a network match. Main: <code>HostedSessionKind.Versus</code> and <code>ExpeditionApp.ConfigureWorldMenuSession</code>; opened by <code>IsometricSlice.OpenVersusFromTitle</code>. <span class="more">Explained in: <a href="sessions.html#kinds">Hosted Sessions</a>.</span></dd>
+    <dt id="term-world-table">World table <span class="aka">also: living table, the actual table</span></dt>
+    <dd>When a match is played at a venue, the board is drawn on the table in the world rather than on a flat screen. Main: <code>WorldTableContext</code>, <code>ExpeditionView.WorldTable.cs</code>, <code>WorldTablePresentation</code>, <code>LivingTable.prefab</code>, and the camera in <code>IsometricSlice.Table.cs</code>. <span class="more">Explained in: <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Design/CIRCUIT_UNIFIED_WORLD.md#the-actual-table">The actual table</a>, <a href="sessions.html#table">Hosted Sessions</a>.</span></dd>
+    <dt id="term-preparation">Preparation <span class="aka">also: opening choice, FairMatchSetup</span></dt>
+    <dd>An optional solo opening benefit (Momentum, Shield or scouting) chosen before a match, at most one at a time. Main: <code>IsometricSlice.Learning.cs</code> (<code>ChooseCircuitPreparation</code>) and <code>FairMatchSetup</code> in <code>ExpeditionApp.Session.cs</code>. <span class="more">Explained in: <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Tools/CircuitFieldSetupChecks/README.md">Circuit fair-duel initialization checks</a>.</span></dd>
+    <dt id="term-duelui">DuelUi</dt>
+    <dd>The static factory that builds uGUI controls in code. It also holds <code>MenuColour</code>, <code>MenuType</code> and <code>MenuSpace</code>. Main: <code>Runtime/DuelUi.cs</code>, namespace <code>EmberGrove</code>. <span class="more">Explained in: <a href="ui.html#duelui">UI &amp; Menus</a>.</span></dd>
+    <dt id="term-menu-palette">Menu palette</dt>
+    <dd>A named set of menu colours in the pack's media theme, which can be tried without editing the pack by launching with <code>-menu-palette &lt;id&gt;</code>. Main: <code>MenuPaletteDefinition</code> in <code>ContentPackFiles.cs</code>, and <code>DuelUi.MenuColour</code>. <span class="more">Explained in: <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CIRCUIT_PRESENTATION.md#menu-roles">Menu roles</a>, <a href="content.html#palettes">Content &amp; Media</a>.</span></dd>
+  </dl>
+</section>
+
+<section id="learning">
+  <h2><span class="num">06</span>Learning: practice and lessons</h2>
+  <dl class="glossary">
+    <dt id="term-practice">Practice</dt>
+    <dd>The original first game: a scripted introductory match, with a spoken guide, that <span class="kbd">Learn to play</span> starts. Main: <code>Content/Circuit/practice.json</code> and <code>ExpeditionApp.ConfigurePracticeTutorial</code> (<code>ExpeditionApp.Practice.cs</code>), hosted as <code>HostedSessionKind.Practice</code>. <span class="more">Explained in: <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CIRCUIT_FIRST_STEPS.md#practice-and-the-real-adventure">Practice and the real adventure</a>, <a href="sessions.html#practice">Hosted Sessions</a>.</span></dd>
+    <dt id="term-lesson">Lesson</dt>
+    <dd>An authored topic in the Learn window: reading pages, plus an optional practice scenario played with the real combat rules. Main: <code>LessonLibrary</code> and <code>LessonDefinition</code> in <code>Content/Circuit/lessons.json</code>, checked and prepared by <code>LessonRules</code> (<code>CardForge.Lessons</code>), hosted through <code>ExpeditionApp.ConfigureAuthoredLesson</code> as <code>HostedSessionKind.Lesson</code>. <span class="more">Explained in: <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CIRCUIT_LESSONS.md#integration-and-teaching-architecture">The lesson workshop</a>, <a href="sessions.html#practice">Hosted Sessions</a>.</span></dd>
+    <dt id="term-practice-vs-lesson">Practice vs lesson</dt>
+    <dd>Two tutorial systems with separate files and code paths. A practice comes from <code>practice.json</code>, a lesson from <code>lessons.json</code>. <code>BasicPracticeLesson</code> links the first lesson topic to the original practice, so it is not authored twice. Main: <code>ExpeditionApp.Practice.cs</code> and <code>ExpeditionApp.Lessons.cs</code>. <span class="more">Explained in: <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CIRCUIT_LESSONS.md">The lesson workshop</a>, <a href="findings.html">Findings</a>.</span></dd>
+    <dt id="term-practice-path">PracticePath</dt>
+    <dd>The authored order of practices that Continue learning follows. Main: <code>PracticePath</code> in <code>Runtime/Core/LessonContracts.cs</code>, used by <code>IsometricSlice.Onboarding.cs</code>. <span class="more">Explained in: <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CIRCUIT_LESSONS.md">The lesson workshop</a>.</span></dd>
+    <dt id="term-narration">Spoken guide <span class="aka">also: PracticeNarration</span></dt>
+    <dd>Recorded instructions played during a practice. They are optional, and the text stays on screen when a recording is missing. Main: <code>Runtime/PracticeNarration.cs</code> and <code>Content/Circuit/Voice/lines.json</code>. <span class="more">Explained in: <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CIRCUIT_FIRST_STEPS.md#spoken-guide">Spoken guide</a>.</span></dd>
+  </dl>
+</section>
+
+<section id="network">
+  <h2><span class="num">07</span>Networking</h2>
+  <dl class="glossary">
+    <dt id="term-authority">Authority</dt>
+    <dd>The side that holds the full match and resolves every command. It checks seat, sequence, revision and fingerprint, and sends each seat only what that seat may see. Main: <code>ExpeditionAuthority</code> (<code>Receive</code>, <code>ViewFor</code>) in <code>Runtime/Networking/ExpeditionAuthority.cs</code>. It runs in the host's session for LAN and relay games, and in <code>TrustedMatchApplication</code> for the trusted service. <span class="more">Explained in: <a href="networking.html#authority">Networking</a>, <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/NETWORKING.md#current-authority-boundaries">Current authority boundaries</a>.</span></dd>
+    <dt id="term-seat">Seat</dt>
+    <dd>Player 0 or 1 in a network match. A LAN or relay host is seat 0. Main: <code>ExpeditionNetworkSession.Seat</code>, and the seats inside <code>ExpeditionAuthority</code>. <span class="more">Explained in: <a href="networking.html#authority">Networking</a>.</span></dd>
+    <dt id="term-fingerprint">Fingerprint</dt>
+    <dd>A hash of the catalog, deck presets and combat settings. Both players must match it before they can play. Main: <code>ExpeditionFingerprint.Compute</code> in <code>ExpeditionAuthority.cs</code>. <code>ExpeditionProtocol.RulesVersion</code> is one of its inputs. <span class="more">Explained in: <a href="networking.html#authority">Networking</a>.</span></dd>
+    <dt id="term-wire">Wire packet, wire view</dt>
+    <dd>The network message types: a command envelope going in, and a per-seat view coming back. They are serialized with <code>DataContractJsonSerializer</code>. Main: <code>WirePacket</code>, <code>WireCommand</code>, <code>WireView</code> and <code>ExpeditionWireCodec</code> in <code>NetworkContracts.cs</code>. <span class="more">Explained in: <a href="networking.html#wire">Networking</a>.</span></dd>
+    <dt id="term-projection">Projection <span class="aka">also: snapshot, redaction</span></dt>
+    <dd>A seat's view turned back into a local <code>CombatState</code>. The opponent's hidden cards stay hidden. Main: <code>ExpeditionProjection.ToSnapshot</code>, which produces an <code>ExpeditionSnapshot</code>, presented by <code>ExpeditionApp.PresentNetwork</code>. <span class="more">Explained in: <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CODE_ARCHITECTURE_GUIDE.md#multiplayer-authority-and-privacy">Multiplayer authority and privacy</a>.</span></dd>
+    <dt id="term-network-session">ExpeditionNetworkSession</dt>
+    <dd>The one client-side session type for every transport: LAN, relay, named rooms, the trusted service and the table lobby. Main: <code>Runtime/Networking/ExpeditionNetworkSession.cs</code> (<code>Submit</code>, <code>Poll</code>), with <code>TcpNetworkLink</code> and <code>WebSocketNetworkLink</code>. <span class="more">Explained in: <a href="networking.html#session">Networking</a>.</span></dd>
+    <dt id="term-lan">LAN</dt>
+    <dd>A direct TCP match between two players on one network, where the host is the authority. Main: <code>HostLan</code> and <code>JoinLan</code> on <code>ExpeditionProtocol.DefaultPort</code>. <span class="more">Explained in: <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/NETWORKING.md">Networking guide</a>, <a href="networking.html#lan">Networking</a>.</span></dd>
+    <dt id="term-relay">Relay</dt>
+    <dd>A WebSocket server that only forwards bytes between two players. The host stays the authority. Main: <code>Tools/ExpeditionRelay</code> (<code>RelayApplication</code>: <code>/health</code>, <code>/relay</code>), with the Windows companion <code>EmberGroveRelay.exe</code>; on the client, <code>HostRelay</code> and <code>JoinRelay</code>. <span class="more">Explained in: <a href="networking.html#relay">Networking</a>, <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Tools/ExpeditionRelay/README.md">relay README</a>.</span></dd>
+    <dt id="term-named-room">Named room</dt>
+    <dd>A public or private relay room that players find by name instead of a code. Main: <code>HostNamedRelay</code>, <code>JoinNamedRelay</code> and <code>ListRelayRoomsAsync</code>; the menus are in <code>ExpeditionView.Connection.cs</code>. <span class="more">Explained in: <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Tools/ExpeditionRelay/README.md#named-room-protocol-3">Named-room protocol 3</a>.</span></dd>
+    <dt id="term-trusted-service">Trusted service <span class="aka">also: trusted authority, SERVER mode</span></dt>
+    <dd>The relay started with <code>--authority</code>. It runs the authority itself, so neither player holds the full match. It listens on loopback only. Main: <code>Tools/ExpeditionRelay/TrustedMatchApplication.cs</code> (routes under <code>/authority</code>); on the client, <code>CreateTrusted</code>, <code>JoinTrusted</code> and <code>ReconnectTrusted</code>. <span class="more">Explained in: <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/NETWORKING.md#trusted-service-proof-and-remaining-online-work">Trusted service proof</a>, <a href="networking.html#trusted">Networking</a>.</span></dd>
+    <dt id="term-quickmatch">Quickmatch</dt>
+    <dd>An unranked search for an opponent on the trusted service, using a preset deck. Main: <code>ExpeditionNetworkSession.QuickmatchTrusted</code> and <code>CancelQuickmatch</code>; the route <code>/authority/quickmatch</code>. <span class="more">Explained in: <a href="networking.html#trusted">Networking</a>.</span></dd>
+    <dt id="term-table-lobby">Table lobby</dt>
+    <dd>A shared authored room where visitors walk to a table, wait, and challenge each other into a match. Main: <code>IsometricSlice.OpenTableLobby</code> (<code>IsometricSlice.Versus.cs</code>), <code>ExpeditionNetworkSession.JoinLobbyTrusted</code> and <code>ExpeditionApp.AttachLobbyMatch</code>; the service is started with <code>--lobby</code>. <span class="more">Explained in: <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/NETWORKING.md#table-lobby-prototype">Table lobby prototype</a>, <a href="networking.html#lobby">Networking</a>.</span></dd>
+    <dt id="term-private-relay-qa">Private relay QA</dt>
+    <dd>A one-off pair of QA builds, for Windows and Android, that carry an access key for a private relay. The key goes into an ignored, generated source file and is never committed. Main: <code>Tools/Build-PrivateNetworkPair.ps1</code>, the define <code>EMBERGROVE_PRIVATE_RELAY_QA</code>, and <code>Assets/Tests/Runtime/PrivateRelayQaSettings.generated.cs</code> (ignored). <span class="more">Explained in: <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/MAINTAINING.md#android-development-build">Android development build</a>, <a href="builds.html#private">Builds &amp; Tools</a>.</span></dd>
+  </dl>
+</section>
+
+<section id="content">
+  <h2><span class="num">08</span>Content</h2>
+  <dl class="glossary">
+    <dt id="term-content-pack">Content pack</dt>
+    <dd>A folder of authored data. A manifest names a combat document, a world document, a media catalog and optional Circuit dialogue. Main: <code>Content/EmberGroveDefault</code>, loaded by <code>ContentPackFiles.Load</code> into a <code>LoadedContentPack</code>. <span class="more">Explained in: <a href="content.html#pack">Content &amp; Media</a>, <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Tools/ContentStudio/PACK_CONTRACT.md">PACK_CONTRACT.md</a>.</span></dd>
+    <dt id="term-manifest">Manifest</dt>
+    <dd>The pack's <code>manifest.json</code>: its Id, versions and the names of its documents. Main: <code>ContentManifest</code> and <code>ContentPackFiles.ParseManifest</code>. <span class="more">Explained in: <a href="content.html#pack">Content &amp; Media</a>.</span></dd>
+    <dt id="term-combat-document">Combat document</dt>
+    <dd>The cards, encounters, deck presets and match rules. Main: <code>expedition-content.json</code>, parsed by <code>ExpeditionContent.Parse</code> into a <code>ContentPack</code>. <span class="more">Explained in: <a href="content.html#pack">Content &amp; Media</a>.</span></dd>
+    <dt id="term-world-document">World document</dt>
+    <dd>World and campaign data for the toolkit's campaign rules. The game still loads and validates it with every pack. Main: <code>world-content.json</code>, parsed by <code>WorldContent.Parse</code>. <span class="more">Explained in: <a href="content.html#pack">Content &amp; Media</a>.</span></dd>
+    <dt id="term-media-catalog">Media catalog</dt>
+    <dd>The pack's images and audio with their Ids, the menu theme and palettes, and the art roles. Main: <code>media.json</code>, read as <code>MediaDefinition</code> in <code>ContentPackFiles.cs</code>. <span class="more">Explained in: <a href="content.html#media">Content &amp; Media</a>.</span></dd>
+    <dt id="term-circuit-dialogue">Circuit dialogue</dt>
+    <dd>The adventure's speakers and lines, events, episodes, visits and tasks. Main: <code>circuit-dialogue.json</code>, read as <code>CircuitDialogue</code> and checked by <code>CircuitRules.ValidateDialogue</code>. <span class="more">Explained in: <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CIRCUIT_DIRECTION.md#dialogue-format">Dialogue format</a>.</span></dd>
+    <dt id="term-sidecar">Sidecar</dt>
+    <dd>A Circuit file that ships beside the pack rather than inside it: <code>card-guide.json</code>, <code>locations.json</code>, <code>journey.json</code>, <code>practice.json</code> or <code>lessons.json</code>. Main: <code>Content/Circuit</code>. <code>IsometricSliceBuild.CircuitSidecars</code> stages them, and <code>IsometricSlice.LoadCircuit</code> reads them. <span class="more">Explained in: <a href="codebase-tour.html#content">Codebase Tour §08</a>, <a href="content.html#sidecars">Content &amp; Media</a>.</span></dd>
+    <dt id="term-card-guide">Card guide</dt>
+    <dd>Teaching data for each card: archetype, lesson, strength, weakness and unlock order. It must describe every card exactly once. Main: <code>Content/Circuit/card-guide.json</code>, read as <code>IsometricSlice.CircuitGuide</code>. <span class="more">Explained in: <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Design/CIRCUIT_CARD_DESIGN.md">Circuit card design</a>.</span></dd>
+    <dt id="term-staging">Staging <span class="aka">also: StreamingAssets</span></dt>
+    <dd>Validating <code>Content/</code> and copying it into the ignored <code>Assets/StreamingAssets</code>, on every build or on request. Never edit the staged copy. Main: <code>StageEncounterContent</code>, <code>StageCircuit</code> and <code>StageSector</code> in <code>IsometricSliceBuild.cs</code>, and <span class="kbd">Bloomfire Circuit ▸ Stage content for editor</span>. <span class="more">Explained in: <a href="codebase-tour.html#content">Codebase Tour §08</a>, <a href="content.html#staging">Content &amp; Media</a>.</span></dd>
+    <dt id="term-content-root">Content root <span class="aka">also: ContentOverride, -content-pack</span></dt>
+    <dd>The folder a player loads its pack from: <code>-content-pack</code> first, then <code>persistentDataPath/ContentOverride</code> if it has a manifest, then the staged pack. Main: <code>ContentPackFiles.DefaultRoot</code>. <span class="more">Explained in: <a href="content.html#loader">Content &amp; Media</a>.</span></dd>
+    <dt id="term-combat-hash">Combat hash</dt>
+    <dd>The SHA-256 of the combat document. Trusted matches use it to admit only players with identical content. Main: <code>ContentPackFiles.ActiveCombatHash</code> and <code>LoadedContentPack.CombatHash</code>. <span class="more">Explained in: <a href="content.html#limits">Content &amp; Media</a>, <a href="networking.html#trusted">Networking</a>.</span></dd>
+    <dt id="term-content-studio">Content Studio <span class="aka">also: CardForge Content Studio</span></dt>
+    <dd>The standalone Windows editor for cards, the club opening, narrative and media data. It needs no Unity. Main: <code>Tools/ContentStudio</code>, built as <code>EmberGrove.ContentStudio.exe</code> and started by <code>Start-Studio.ps1</code>. <span class="more">Explained in: <a href="content.html#studio">Content &amp; Media</a>, <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Tools/ContentStudio/README.md">Content Studio README</a>.</span></dd>
+    <dt id="term-circuitstudio">CircuitStudio</dt>
+    <dd>Browser pages for simulating dialogue branches (<code>index.html</code>) and authoring lessons (<code>lessons.html</code>). Main: <code>Tools/CircuitStudio</code>. <span class="more">Explained in: <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Tools/README.md#find-the-right-tool">Find the right tool</a>.</span></dd>
+    <dt id="term-card-workshop">Current Card Workshop</dt>
+    <dd>A Unity editor window that maps models and animation clips onto the real card catalog. Main: <code>CurrentCardWorkshop</code> in <code>Assets/Editor/CurrentCardWorkshop.cs</code>, opened from <span class="kbd">CardForge ▸ Current Card Workshop</span>. <span class="more">Explained in: <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CARD_CATALOG_ALIGNMENT.md">Current card catalog and Unity workshop</a>.</span></dd>
+    <dt id="term-artwork-cache">CardArtworkCache <span class="aka">also: lease</span></dt>
+    <dd>Loads card artwork from the pack and hands it out as leases, which are released when a screen is done with it. Main: <code>Runtime/CardArtworkCache.cs</code> (<code>Acquire</code>, <code>Lease</code>). <span class="more">Explained in: <a href="content.html#media">Content &amp; Media</a>.</span></dd>
+  </dl>
+</section>
+
+<section id="saves">
+  <h2><span class="num">09</span>Saves and settings</h2>
+  <dl class="glossary">
+    <dt id="term-circuitsave">CircuitSave</dt>
+    <dd>The game's save file around a <code>CircuitState</code>. It adds world position, camera, accessibility choices, the club name and badge, and lesson progress. Main: <code>CircuitSave</code> in <code>Runtime/Exploration/CircuitPersistence.cs</code>, filled by <code>IsometricSlice.CaptureCircuitSave</code>. <span class="more">Explained in: <a href="saves.html#wrapper">Saves &amp; Settings</a>.</span></dd>
+    <dt id="term-circuitpersistence">CircuitPersistence</dt>
+    <dd>Reads and writes the save file. On restore it tries <code>bloomfire-circuit-v2.json</code>, its <code>.previous</code>, then <code>bloomfire-circuit-v1.json</code> and its <code>.previous</code>. A save written by a newer version blocks writing. Main: <code>Runtime/Exploration/CircuitPersistence.cs</code>. <span class="more">Explained in: <a href="saves.html#restore">Saves &amp; Settings</a>, <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CODE_ARCHITECTURE_GUIDE.md#run-and-profile-state">Run and profile state</a>.</span></dd>
+    <dt id="term-playersettings">PlayerSettings</dt>
+    <dd>The local, versioned player preferences: sound, display, reading and controls. Main: <code>PlayerSettings</code> and <code>PlayerSettingsRules</code> in <code>Runtime/PlayerSettings.cs</code>, stored by <code>ExpeditionApp.Settings.cs</code> in PlayerPrefs under <code>EmberGrove.PlayerSettings.v1</code>. <span class="more">Explained in: <a href="saves.html#settings">Saves &amp; Settings</a>.</span></dd>
+    <dt id="term-testing-save">Testing save</dt>
+    <dd>In a QA player, a separate save that owns every card, kept in a <code>testing-all-cards</code> folder so the tester's own save is untouched. Main: <code>CircuitSliceChecks.TestingAllCards</code> and <code>TestingSaveFolder</code> (<code>CircuitSliceChecks.Saves.cs</code>), turned on with <code>-circuit-all-cards</code> or from <span class="kbd">Settings ▸ Controls</span>. <span class="more">Explained in: <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Game/EmberGrove/Assets/Tests/README.md">Tests README</a>, <a href="saves.html#files">Saves &amp; Settings</a>.</span></dd>
+    <dt id="term-playtest">Playtest report</dt>
+    <dd>An optional local recording of one play session, written only after an explicit start. Main: <code>PlaytestSessionService</code> in <code>Runtime/PlaytestSessionService.cs</code>, writing <code>Playtests/playtest-&lt;id&gt;.json</code> under <code>persistentDataPath</code>. <span class="more">Explained in: <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/PLAYTESTING_API.md">Local playtest recording</a>, <a href="saves.html#playtest">Saves &amp; Settings</a>.</span></dd>
+  </dl>
+</section>
+
+<section id="qa">
+  <h2><span class="num">10</span>QA, builds and documents</h2>
+  <dl class="glossary">
+    <dt id="term-rehearsal">Rehearsal</dt>
+    <dd>An automated run inside a real QA player or the editor. It drives the real game with virtual input and checks what happened. The first failed check ends the run. Main: <code>CircuitSliceChecks</code> (<code>-circuit-verify &lt;folder&gt;</code>) and <code>ExpeditionHarness</code> (<code>-expedition-net-verify</code>). <span class="more">Explained in: <a href="qa.html#rehearsal">QA &amp; Rehearsals</a>.</span></dd>
+    <dt id="term-circuitslicechecks">CircuitSliceChecks</dt>
+    <dd>The Circuit rehearsal. <code>IsometricSlice.Start</code> installs it, it runs its stages, writes <code>verification.txt</code> and quits with 0 or 1. Main: 10 partial files in <code>Assets/Tests/Runtime/CircuitSliceChecks*.cs</code>. <span class="more">Explained in: <a href="qa.html#partials">QA &amp; Rehearsals</a>.</span></dd>
+    <dt id="term-expeditionharness">ExpeditionHarness</dt>
+    <dd>The network rehearsal. It installs itself after the scene loads and exercises real transports. Main: <code>Assets/Tests/Runtime/ExpeditionHarness.cs</code> and <code>.Network.cs</code>. <span class="more">Explained in: <a href="qa.html#network">QA &amp; Rehearsals</a>.</span></dd>
+    <dt id="term-qa-player">QA player <span class="aka">also: rehearsal build</span></dt>
+    <dd>A player built with <code>CIRCUIT_QA</code> (and <code>EMBERGROVE_QA</code> for network QA), so the rehearsals are compiled in. Main: <code>IsometricSliceBuild.Build(true)</code>, from <span class="kbd">Bloomfire Circuit ▸ Build Windows rehearsal</span>. <span class="more">Explained in: <a href="qa.html#rehearsal">QA &amp; Rehearsals</a>.</span></dd>
+    <dt id="term-shipping-player">Shipping player</dt>
+    <dd>An ordinary player build with no QA code in it. Main: <code>IsometricSliceBuild.Build(false)</code>; <code>Tools/Validate-CircuitPlayer.ps1</code> checks its assemblies afterwards. <span class="more">Explained in: <a href="builds.html#validate">Builds &amp; Tools</a>.</span></dd>
+    <dt id="term-build-identity">Build identity <span class="aka">also: build-info.json, AssemblySha256</span></dt>
+    <dd>The record each build writes beside the player: version, scene, platform, times, build GUID, result, and the hash of the built game assembly. A rehearsal report can be matched to the build that produced it by that hash. Main: <code>BuildIdentity</code> in <code>IsometricSliceBuild.cs</code>. <span class="more">Explained in: <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Game/EmberGrove/Assets/Tests/README.md">Tests README</a>, <a href="builds.html#identity">Builds &amp; Tools</a>.</span></dd>
+    <dt id="term-batch-entry">Batch entry point</dt>
+    <dd>A static method that a batch-mode Unity editor runs from the command line with <code>-executeMethod</code>. Main: <code>CircuitPersistenceVerification.RunBatch</code>, <code>CircuitSliceChecks.RunCardPresentationBatch</code> and <code>RunCircuitContentBatch</code>. <span class="more">Explained in: <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Game/EmberGrove/Assets/Tests/README.md">Tests README</a>, <a href="qa.html#editor">QA &amp; Rehearsals</a>.</span></dd>
+    <dt id="term-suite">Suite <span class="aka">also: Portable</span></dt>
+    <dd>A named check in the check runner. <code>Portable</code> is the default group, and <code>All</code> adds the optional suites. Main: <code>Tools/Run-Checks.ps1</code>. <span class="more">Explained in: <a href="qa.html#suites">QA &amp; Rehearsals</a>, <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Tools/README.md">tools README</a>.</span></dd>
+    <dt id="term-candidate">Candidate <span class="aka">also: internal preview candidate</span></dt>
+    <dd>A build put forward for review. It needs fresh builds, a rehearsal and an inspection of the shipping assemblies. Main: <code>Tools/Package-Isometric.ps1</code>. <span class="more">Explained in: <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/MAINTAINING.md#internal-preview-candidate">Internal preview candidate</a>, <a href="builds.html#candidate">Builds &amp; Tools</a>.</span></dd>
+    <dt id="term-guide">Guide</dt>
+    <dd>A Markdown file that owns the current procedure or rules for one subject. Pages in this wiki link to guides and do not copy them. Main: <code>Docs/Guides/*.md</code>, and the toolkit's <code>Documentation~/*.md</code>. <span class="more">Explained in: <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/README.md">Docs/README.md</a>.</span></dd>
+    <dt id="term-roadmap">Roadmap <span class="aka">also: cleanup milestone, owner decisions</span></dt>
+    <dd>The only backlog. It owns priorities, status and decisions, including the cleanup milestone and the open owner decisions. Main: <code>Docs/Release/ROADMAP.md</code>. <span class="more">Explained in: <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Release/ROADMAP.md">ROADMAP.md</a>.</span></dd>
+    <dt id="term-offline-reference">Offline reference <span class="aka">also: handbook</span></dt>
+    <dd>The older generated documentation, a single-file content and code inventory plus the portable Studio handbook, written into the ignored <code>Builds/Documentation</code>. Main: <code>Tools/Documentation/export_wiki.py</code> (<code>--handbook-only</code> for the handbook alone). <span class="more">Explained in: <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Tools/Documentation/README.md">Documentation README</a>, <a href="maintaining.html">Maintaining</a>.</span></dd>
+    <dt id="term-honest-box">Keep this page honest</dt>
+    <dd>The dashed box at the foot of a wiki page, listing the source files the page describes. When you change one of those files, fix the page in the same commit. Main: the <code>.honest</code> block on each page. <span class="more">Explained in: <a href="maintaining.html">Maintaining</a>.</span></dd>
+  </dl>
+</section>
+
+<div class="honest">
+  <h4>Keep this page honest</h4>
+  <ul>
+    <li><code>Docs/Guides/CODE_ARCHITECTURE_GUIDE.md</code> (Product names): §02. When a name changes owner there, change the entry here.</li>
+    <li><code>Toolkit/…/Runtime/Circuit/CircuitDefinition.cs</code> (<code>CircuitLocationKind</code>, <code>CircuitDuelOutcome</code>, <code>CircuitEventStatus</code>) and <code>Runtime/Core/CombatContracts.cs</code> (<code>ActionKind</code>, <code>CombatEventKind</code>, <code>TerrainKind</code>): the enum values spelled out in §04 and §05.</li>
+    <li><code>Runtime/ExpeditionApp.Session.cs</code> (<code>HostedSessionKind</code>), <code>Runtime/Exploration/IsometricCombatBridge.cs</code> and <code>IsometricSlice.Circuit.cs</code> (<code>ApplyCircuit</code>, <code>CircuitPage</code>): §04 and §05.</li>
+    <li><code>Runtime/Exploration/CircuitPersistence.cs</code>, <code>IsometricSlice.Circuit.cs</code> (<code>CircuitPath</code>, <code>PreviousCircuitPath</code>) and <code>Runtime/ExpeditionApp.Settings.cs</code> (preference keys): §09.</li>
+    <li><code>Toolkit/…/Runtime/Content/ContentPackFiles.cs</code> (<code>DefaultRoot</code>, <code>ActiveCombatHash</code>, <code>MenuPaletteOverride</code>) and <code>Assets/Editor/IsometricSliceBuild.cs</code> (<code>CircuitSidecars</code>, the <code>Stage*</code> methods, <code>BuildIdentity</code>): §08 and §10.</li>
+    <li>The A–Z list in §01 is generated from the <code>dt</code> ids on this page. Add a term as a <code>dt</code> in its section, then regenerate the list.</li>
+  </ul>
+</div>
+
+</main>
+<footer>Bloomfire Wiki · page source <code>Docs/Wiki/glossary.html</code>, built by <code>Tools/Documentation/structure_wiki.py</code> · Found a mistake? Fix it in the same commit as the code that made it one.</footer>
+</body>
+</html>

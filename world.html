@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>World &amp; Journal — Bloomfire Wiki</title>
+<link rel="stylesheet" href="wiki.css">
+<script src="mermaid.min.js" defer></script>
+<script src="wiki.js" defer></script>
+</head>
+<body>
+<nav class="wiki">
+  <a class="home" href="index.html">🔥 Bloomfire Wiki</a>
+  <div class="grp"><span class="grp-t">Start here</span>
+    <a href="codebase-tour.html">Codebase Tour</a>
+    <a href="glossary.html">Glossary</a>
+  </div>
+  <div class="grp"><span class="grp-t">Game systems</span>
+    <a href="rules.html">Rules Engine</a>
+    <a class="on" href="world.html">World &amp; Journal</a>
+    <a href="sessions.html">Hosted Sessions</a>
+    <a href="ui.html">UI &amp; Menus</a>
+    <a href="networking.html">Networking</a>
+    <a href="content.html">Content &amp; Media</a>
+    <a href="saves.html">Saves &amp; Settings</a>
+  </div>
+  <div class="grp"><span class="grp-t">Code health</span>
+    <a href="diagrams.html">Diagrams</a>
+    <a href="complexity.html">Complexity</a>
+    <a href="findings.html">Findings</a>
+  </div>
+  <div class="grp"><span class="grp-t">Ship &amp; maintain</span>
+    <a href="qa.html">QA &amp; Rehearsals</a>
+    <a href="builds.html">Builds &amp; Tools</a>
+    <a href="maintaining.html">Maintaining</a>
+  </div>
+</nav>
+<header class="page"><h1>The world and the <span class="flame">journal</span></h1><p class="tag">How the CircuitJourney scene boots, routes every frame, walks the traveller, opens journal pages, saves rule changes and builds the districts it walks on.</p></header>
+<main>
+  <div class="tldr"><h4>In 60 seconds</h4><ul>
+    <li><b>One MonoBehaviour runs the world.</b> <code>IsometricSlice</code>, split over 19 partial files in <code>Game/EmberGrove/Assets/Runtime/Exploration/</code>, owns boot, input, walking, the camera, the HUD, the journal and the live Circuit state. Its only partner in the scene is <code>IsometricSectorVisuals</code> on the same <code>Circuit world</code> GameObject. <a href="#anatomy">§01</a></li>
+    <li><b>Boot is one coroutine.</b> <code>Start</code> reads <code>sector.json</code>, loads the Circuit sidecars and the content pack, restores the save, builds the district window, then makes the camera, the world, the HUD and the title. A load error skips the remaining load steps and ends on an error panel. <a href="#boot">§02</a></li>
+    <li><b>Every frame goes through one router.</b> <code>Update</code> gives the frame to the table lobby, a hosted session, the startup error or the world, in that order; inside the world it tries Start, Back, the open page and world input in turn. <a href="#frame">§03</a></li>
+    <li><b>Every rule change is <code>ApplyCircuit(CircuitRules.X(...))</code>.</b> The toolkit returns a new state, <code>ApplyCircuit</code> adopts it and calls <code>SaveCircuit</code>, and a change that must be durable is rolled back if the write fails. <a href="#rules">§07</a></li>
+    <li><b>The world is authored first and procedural second.</b> <code>CircuitWorldLayout</code> turns the run into a grid of up to three districts; <code>IsometricSectorVisuals.Build</code> binds the saved district and room prefabs onto it and draws procedural geometry only where nothing is bound. <a href="#layout">§08</a>, <a href="#visuals">§09</a></li>
+  </ul></div>
+
+  <div class="prereq"><h4>Before you start</h4>
+    <p>Read the <a href="codebase-tour.html">Codebase Tour</a> first; this page assumes you know where the toolkit and the game live. The adventure rules themselves (<code>CircuitRules</code>, receipts, tasks) are on <a href="rules.html">Rules Engine</a>, the hosted battle a duel opens is on <a href="sessions.html">Hosted Sessions</a>, the save file is on <a href="saves.html">Saves &amp; Settings</a> and the menu toolkit is on <a href="ui.html">UI &amp; Menus</a>. Class diagrams of the game assembly are generated on <a href="diagrams.html">Diagrams</a>. What the player sees in the book is owned by <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CIRCUIT_WAYBOOK.md">CIRCUIT_WAYBOOK.md</a>; this page explains the code behind it.</p>
+  </div>
+
+  <section id="anatomy"><h2><span class="num">01</span>Where the pieces live</h2>
+    <p class="lead">The world is the only build scene, <code>Game/EmberGrove/Assets/Scenes/CircuitJourney.unity</code>. Its <code>Circuit world</code> GameObject carries <code>IsometricSlice</code> and <code>IsometricSectorVisuals</code>. The scene also saves the prefab instances the visuals bind to; everything else the slice needs, it creates at runtime.</p>
+
+    <div class="grid c2">
+      <div class="card accent-ember"><h4>Saved in the scene</h4>
+        <p><code>IsometricSlice</code>: <code>WorldPipeline</code>, <code>SurfaceMaterial</code> and the opening-shot tuning fields.</p>
+        <p><code>IsometricSectorVisuals</code>: the first district's fields, <code>AdditionalDistricts</code> (district 2), <code>ReusableDistricts</code>, <code>StoryProps</code>, <code>CharacterAppearances</code> and <code>LodgeWaybook</code>.</p>
+        <p>Prefab instances from <code>Assets/ExplorationPrototype/</code>: three <code>ClubDistrict</code>, six each of <code>ClubRoomTable</code>, <code>ClubRoomVisit</code> and <code>ClubRoomCounter</code> (the three role variants of the six flexible venues in districts 1 and 2), one <code>LodgeWaybook</code>, and the <code>ClubTable</code>, <code>CourtyardPlanter</code> and character-model instances placed in districts 1 and 2.</p>
+      </div>
+      <div class="card accent-cyan"><h4>Made at runtime</h4>
+        <p><code>World camera</code> and the <code>Late afternoon</code> light (<code>CreateCamera</code>).</p>
+        <p><code>World interface</code> canvas, and <code>World input</code> when no EventSystem exists (<code>BuildHud</code>).</p>
+        <p><code>Living station · replaceable prototype art</code>, the generated root, and the traveller (<code>IsometricSectorVisuals.Build</code>, <code>CreateTraveller</code>).</p>
+        <p><code>IsometricCombatBridge</code>, added to the slice's GameObject on first use, and the <code>Hosted session</code> child it makes for each duel, practice, lesson, Versus visit or Settings.</p>
+      </div>
+    </div>
+
+    <h3>The IsometricSlice partial files</h3>
+    <p>All 19 files declare <code>public sealed partial class IsometricSlice</code> in namespace <code>EmberGrove.Exploration</code>; only <code>IsometricSlice.cs</code> adds the <code>: MonoBehaviour</code> base. They share every field, so the split is by topic, not by boundary.</p>
+    <div class="scrollx"><table>
+      <tr><th>File</th><th>What it holds</th></tr>
+      <tr><td><code>IsometricSlice.cs</code></td><td><code>Start</code>, <code>Update</code>, <code>LateUpdate</code>, movement and pointer input, <code>RefreshNearby</code>, <code>Interact</code>, <code>OpenModal</code>/<code>CloseModal</code>, the camera, and the focus/pause/quit/destroy handlers.</td></tr>
+      <tr><td><code>IsometricSlice.Circuit.cs</code></td><td><code>LoadCircuit</code>, <code>RestoreCircuit</code>, <code>SaveCircuit</code>, <code>ApplyCircuit</code>, the <code>CircuitPage</code> enum and back stack, <code>MakeCircuitSector</code>, <code>RebuildCircuitPlace</code>, <code>CircuitInteract</code>, tasks, events, episodes and <code>PlayCircuitDuel</code>.</td></tr>
+      <tr><td><code>IsometricSlice.CircuitUi.cs</code></td><td><code>DrawCircuitModal</code> (the journal shell and page dispatch) and most page drawers.</td></tr>
+      <tr><td><code>IsometricSlice.Hud.cs</code></td><td><code>BuildHud</code>, the prompt, <code>DrawModal</code>, modal focus (<code>FocusButton</code>, <code>NavigateModal</code>) and the encounter loading cover.</td></tr>
+      <tr><td><code>IsometricSlice.World.cs</code></td><td>District streaming (<code>UpdateCircuitWorld</code>), arrival, <code>FocusCircuitLocation</code>, <code>MarkCircuitLandmarks</code>, story visits and the Gate page.</td></tr>
+      <tr><td><code>IsometricSlice.Waybook.cs</code></td><td>The task book (<code>DrawAdventureTasks</code>) and local paging (<code>CycleCircuitPage</code>).</td></tr>
+      <tr><td><code>IsometricSlice.WaybookMenu.cs</code></td><td>The title page written on the lodge waybook with UI Toolkit (<code>DrawWaybookTitle</code>, <code>NavigateWaybook</code>).</td></tr>
+      <tr><td><code>IsometricSlice.Title.cs</code></td><td><code>OrdinaryTitleChoices</code>, <code>DrawCircuitTitle</code>, the title camera and the startup-error panel.</td></tr>
+      <tr><td><code>IsometricSlice.DeckBuilder.cs</code></td><td>The deck builder page, its search and filters, and text entry.</td></tr>
+      <tr><td><code>IsometricSlice.Lessons.cs</code></td><td>The lesson library and reading pages.</td></tr>
+      <tr><td><code>IsometricSlice.Learning.cs</code></td><td>Journey validation, a duel's match rules (<code>ConfigureCircuitMatch</code>) and the helping-hand page.</td></tr>
+      <tr><td><code>IsometricSlice.Onboarding.cs</code></td><td>The club opening, the Welcome and PracticeNext pages and <code>PlayCircuitPractice</code>.</td></tr>
+      <tr><td><code>IsometricSlice.Table.cs</code></td><td>Opening world shots and the camera move onto a venue's table.</td></tr>
+      <tr><td><code>IsometricSlice.Presentation.cs</code></td><td>Presentation validation, sun and fog, and the wayfinder line.</td></tr>
+      <tr><td><code>IsometricSlice.Preferences.cs</code></td><td>The world's copy of the player settings.</td></tr>
+      <tr><td><code>IsometricSlice.Settings.cs</code></td><td>Settings, opened as a hosted session.</td></tr>
+      <tr><td><code>IsometricSlice.Versus.cs</code></td><td>Play with friends and the table lobby.</td></tr>
+      <tr><td><code>IsometricSlice.Audio.cs</code></td><td>Music, voice lines and spoken focus help.</td></tr>
+      <tr><td><code>IsometricSlice.Progress.cs</code></td><td><code>inEncounter</code>, the bridge field, <code>SaveProgress</code> and the quit confirmation.</td></tr>
+    </table></div>
+
+    <h3>The other world files</h3>
+    <div class="scrollx"><table>
+      <tr><th>File</th><th>Kind</th><th>Role</th></tr>
+      <tr><td><code>IsometricSectorVisuals.cs</code> and its <code>.Authored</code>, <code>.Models</code>, <code>.Civic</code>, <code>.Venues</code>, <code>.Meshes</code> partials</td><td>MonoBehaviour, 6 files</td><td>Builds what the sector looks like: binds saved prefabs (<code>.Authored</code>), spawns characters and the traveller (<code>.Models</code>), and draws procedural tiles, tables and venues (the rest). <a href="#visuals">§09</a></td></tr>
+      <tr><td><code>CircuitWorldLayout.cs</code></td><td>static class, no Unity types</td><td>Projects the saved run onto a <code>SectorDefinition</code>. <a href="#layout">§08</a></td></tr>
+      <tr><td><code>AuthoredCircuitDistrict.cs</code>, <code>AuthoredCircuitRoom.cs</code>, <code>LodgeWaybookBinding.cs</code></td><td>MonoBehaviour metadata on prefabs</td><td>Name the anchors of a reusable district, a room revision and the title notebook; each validates its own prefab.</td></tr>
+      <tr><td><code>IsometricCombatBridge.cs</code></td><td>MonoBehaviour</td><td>Hosts one <code>ExpeditionApp</code> for a duel or another hosted session; see <a href="sessions.html">Hosted Sessions</a>.</td></tr>
+      <tr><td><code>CircuitPersistence.cs</code></td><td>class, plus <code>CircuitSave</code></td><td>The save file and its backups; see <a href="saves.html">Saves &amp; Settings</a>.</td></tr>
+      <tr><td><code>TravellerPictures.cs</code>, <code>TravellerUiMotion.cs</code>, <code>TravellerWaybookFrame.cs</code></td><td>UI pieces</td><td>The picture vocabulary, button and panel motion, and the book's frame mesh. <a href="#traveller">§10</a></td></tr>
+      <tr><td><code>Toolkit/…/Runtime/Exploration/SectorDefinition.cs</code></td><td>data</td><td><code>SectorDefinition</code>, <code>LobbyDefinition</code>, <code>LandmarkDefinition</code>, <code>GridPoint</code>.</td></tr>
+      <tr><td><code>Toolkit/…/Runtime/Exploration/SectorNavigation.cs</code></td><td>static class</td><td><code>Validate</code>, <code>IsWalkable</code>, <code>FindPath</code>, <code>PointWalkable</code>. <a href="#walking">§04</a></td></tr>
+      <tr><td><code>Toolkit/…/Runtime/Exploration/LandmarkRules.cs</code></td><td>static class</td><td>Landmark progress rules; nothing in the game calls them.</td></tr>
+    </table></div>
+    <p>Product names: the <code>Traveller*</code> types are named after The Travellers' Circuit, and <code>Isometric*</code> is a kept code name for the Circuit world; see <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CODE_ARCHITECTURE_GUIDE.md#product-names">CODE_ARCHITECTURE_GUIDE.md § Product names</a>. Which layer owns what is in <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Design/CIRCUIT_UNIFIED_WORLD.md#architecture-and-extension-boundaries">CIRCUIT_UNIFIED_WORLD.md § Architecture and extension boundaries</a>.</p>
+  </section>
+
+  <section id="boot"><h2><span class="num">02</span>Boot order in Start</h2>
+    <p class="lead"><code>IsometricSlice.Start</code> is an <code>IEnumerator</code>, so Unity runs it as a coroutine and each file read is a yielded <code>UnityWebRequest</code>. The order below is the order in <code>IsometricSlice.cs</code> and <code>LoadCircuit</code>.</p>
+
+    <div class="diagram"><pre class="mermaid">
+sequenceDiagram
+  autonumber
+  participant U as Unity
+  participant S as IsometricSlice
+  participant SA as StreamingAssets
+  participant N as SectorNavigation
+  participant C as ContentPackFiles
+  participant L as CircuitWorldLayout
+  participant V as IsometricSectorVisuals
+  U-&gt;&gt;S: Start() as a coroutine
+  S-&gt;&gt;S: StartRenderPipeline()
+  S-&gt;&gt;SA: GET Exploration/sector.json
+  S-&gt;&gt;N: StartReadSector: Validate(Sector)
+  opt no Error
+    S-&gt;&gt;SA: LoadCircuit: CircuitText for card-guide, locations,&lt;br/&gt;journey, practice, lessons
+    S-&gt;&gt;C: Load(CircuitContentRoot)
+    C--&gt;&gt;S: LoadedContentPack
+    S-&gt;&gt;S: ResolveCircuitDialogue, worldArtwork.Load
+    S-&gt;&gt;S: check tables, build CircuitDefinition,&lt;br/&gt;LoadCircuitCheckRivals
+    S-&gt;&gt;S: RestoreCircuit() through CircuitPersistence
+    S-&gt;&gt;L: MakeCircuitSector: SelectTemplate, Build
+    L--&gt;&gt;S: Sector, replacing the sector.json one
+    S-&gt;&gt;S: LoadWorldPreferences, InitializeCircuitMusic
+  end
+  S-&gt;&gt;S: CreateCamera()
+  opt no Error
+    S-&gt;&gt;V: StartBuildWorld: Build(Sector)
+    S-&gt;&gt;V: CreateTraveller(start tile)
+    S-&gt;&gt;S: RestoreWorldTraveller, MarkCircuitLandmarks, Ready
+  end
+  S-&gt;&gt;S: BuildHud()
+  opt Ready
+    S-&gt;&gt;S: RefreshNearby, ShowCircuit(Title)
+  end
+  Note over S: UNITY_EDITOR or CIRCUIT_QA only: CircuitSliceChecks.Install(this)
+</pre></div>
+    <p class="caption">Boot. A failed step sets <code>Error</code>; the following load steps are skipped, but <code>CreateCamera</code> and <code>BuildHud</code> always run, so the error has a screen to appear on.</p>
+
+    <div class="scrollx"><table>
+      <tr><th>Step</th><th>Method</th><th>What it does</th><th>If it fails</th></tr>
+      <tr><td class="num">1</td><td><code>StartRenderPipeline</code></td><td>Remembers <code>QualitySettings.renderPipeline</code> and installs <code>WorldPipeline</code>. In a macOS player on Metal, when the pipeline asks for MSAA above one sample, it installs a single-sample runtime copy instead (the code comment names Intel Macs; the check does not). <code>OnDestroy</code> puts the previous pipeline back. <code>Start</code> also sets <code>Application.targetFrameRate</code> to 60.</td><td>—</td></tr>
+      <tr><td class="num">2</td><td><code>StartSectorUri</code>, <code>StartReadSector</code></td><td>Reads <code>StreamingAssets/Exploration/sector.json</code> with <code>JsonUtility</code> into a <code>SectorDefinition</code> and checks it with <code>SectorNavigation.Validate</code>.</td><td><code>Error</code> ("The sector could not be loaded", "Invalid sector data" or the validation messages).</td></tr>
+      <tr><td class="num">3</td><td><code>LoadCircuit</code></td><td><code>CircuitText</code> reads five sidecars from <code>StreamingAssets/Circuit/</code>: <code>card-guide.json</code>, <code>locations.json</code> (also hashed with SHA-256 into <code>lobbyContentHash</code>), <code>journey.json</code>, and the optional <code>practice.json</code> and <code>lessons.json</code>. <code>ContentPackFiles.Load(CircuitContentRoot)</code> loads the pack; its callback sets the menu palette (<code>DuelUi.MenuColour.Use</code>) and acquires the card-art lease (<code>CardArtworkCache.Acquire</code>). <code>ResolveCircuitDialogue</code> takes the pack's dialogue, or the bundled <code>circuit-dialogue.json</code> for an older pack that declares none. The art lease loads and is handed to <code>TravellerPictures.ConfigureArtwork</code>.</td><td>A missing required sidecar or pack sets <code>Error</code>; a missing optional sidecar only logs a warning.</td></tr>
+      <tr><td class="num">3a</td><td>inside <code>LoadCircuit</code></td><td><code>LoadCircuitCheckTables</code> (guide, dialogue and layout tables present; every layout passes <code>SectorNavigation.Validate</code>), a check that the card guide describes every card once, <code>ValidateJourney</code>, <code>ValidatePresentation</code>, <code>PrepareLessonLibrary</code>, then a <code>CircuitDefinition</code> with Id <code>bloomfire-circuit</code> and <code>LoadCircuitCheckRivals</code> (every rival deck is a legal match deck).</td><td>"The circuit needs attention." plus the exception message.</td></tr>
+      <tr><td class="num">3b</td><td><code>RestoreCircuit</code></td><td>Creates <code>CircuitPersistence</code> for <code>bloomfire-circuit-v2.json</code> (with <code>bloomfire-circuit-v1.json</code> as the older file) and restores it unless saves are suppressed. With no profile it makes one (<code>CircuitRules.NewProfile</code>); with no run it starts one from the first playable saved deck or the initial starter. A duel left pending by a process exit is resolved as <code>Interrupted</code>. The save format is on <a href="saves.html">Saves &amp; Settings</a>.</td><td>Unreadable files leave a notice and a fresh adventure.</td></tr>
+      <tr><td class="num">3c</td><td><code>MakeCircuitSector</code></td><td>Builds the district window from the run (<a href="#layout">§08</a>) and assigns it to <code>Sector</code>, replacing the one read in step 2.</td><td>Same as 3a.</td></tr>
+      <tr><td class="num">4</td><td><code>LoadWorldPreferences</code>, <code>InitializeCircuitMusic</code></td><td>Reads the player settings through <code>ExpeditionApp.ReadPreferences</code> and starts the optional music track from the pack's media. After a load error, <code>ApplyWorldPreferences</code> still runs so the error panel uses the player's text and contrast settings.</td><td>Music is optional and only warns.</td></tr>
+      <tr><td class="num">5</td><td><code>CreateCamera</code></td><td>An orthographic <code>World camera</code> pitched and turned by the sector's <code>CameraPitch</code>/<code>CameraYaw</code>, a directional <code>Late afternoon</code> light, then <code>InitializeWorldPresentation</code>.</td><td>Always runs.</td></tr>
+      <tr><td class="num">6</td><td><code>StartBuildWorld</code></td><td>Gets (or adds) <code>IsometricSectorVisuals</code>, calls <code>Build(Sector)</code>, creates the traveller on the sector's start tile, moves it to the saved position (<code>RestoreWorldTraveller</code>), marks completed venues and story props (<code>MarkCircuitLandmarks</code>), and sets <code>Ready</code>.</td><td>"The world needs attention." <code>Ready</code> stays false and the visuals are hidden.</td></tr>
+      <tr><td class="num">7</td><td><code>BuildHud</code></td><td>The canvas, HUD and modal layer (<a href="#journal">§06</a>). With an error and no world it shows the startup-error panel.</td><td>Always runs.</td></tr>
+      <tr><td class="num">8</td><td><code>RefreshNearby</code>, <code>ShowCircuit(CircuitPage.Title)</code></td><td>Only when <code>Ready</code>. The title draws itself on the lodge waybook (<a href="#journal">§06</a>).</td><td>A waybook that cannot be written shows the startup error with its reason.</td></tr>
+      <tr><td class="num">9</td><td><code>CircuitSliceChecks.Install(this)</code></td><td>Only under <code>UNITY_EDITOR</code> or <code>CIRCUIT_QA</code>, and it returns at once unless the player was started with <code>-circuit-verify &lt;dir&gt;</code>; then it starts the rehearsal. See <a href="qa.html">QA &amp; Rehearsals</a>.</td><td>—</td></tr>
+    </table></div>
+
+    <div class="note warn"><b><code>sector.json</code> is a start-up gate, not the world.</b> It must load and validate, but once the Circuit loads, <code>MakeCircuitSector</code> replaces it with the generated district window. Its camera values matter only when the Circuit fails to load. <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Content/Exploration/README.md"><code>Content/Exploration/README.md</code></a> says the same and names the build and packaging steps that depend on the file.</div>
+    <p>Where the pack is read from (<code>ContentPackFiles.DefaultRoot</code>, or <code>StreamingAssets/Content</code> during a verification run) is on <a href="content.html">Content &amp; Media</a>.</p>
+  </section>
+
+  <section id="frame"><h2><span class="num">03</span>The per-frame router</h2>
+    <p class="lead">All world input is read in <code>IsometricSlice.Update</code>. Each handler that uses the frame returns, so at most one thing reacts to a press. <code>BuildHud</code> sets <code>EventSystem.sendNavigationEvents</code> to false, so uGUI never moves focus by itself; the slice's router does.</p>
+
+    <div class="diagram"><pre class="mermaid">
+flowchart TD
+  U["Update()"] --&gt; MU["TickCircuitMusic()"]
+  MU --&gt; LB{"LobbyActive?"}
+  LB --&gt;|yes| TL["TickTableLobby()"]
+  LB --&gt;|no| EN{"inEncounter?"}
+  EN --&gt;|yes| FE["UpdateFrameEncounter()&lt;br/&gt;cancel loading, CommitFinishedCircuitDuel"]
+  EN --&gt;|no| LY["UpdateFrameLayout()&lt;br/&gt;BuildHud when the screen changed"]
+  LY --&gt; SE{"startupError set?"}
+  SE --&gt;|yes| FS["UpdateFrameStartupError()"]
+  SE --&gt;|no| FW["UpdateFrameWorld()"]
+  FW --&gt; GD{"Ready, focused,&lt;br/&gt;not just opened or closed?"}
+  GD --&gt;|"title active, no page"| TI["ShowCircuit(Title)"]
+  GD --&gt;|yes| TX["HandleClubNameInput&lt;br/&gt;HandleCircuitTextEntry"]
+  TX --&gt; MB["UpdateFrameMenuButton&lt;br/&gt;Start opens or closes the Menu"]
+  MB --&gt; BK["UpdateFrameBack&lt;br/&gt;stop a walk, step back, or open the Menu"]
+  BK --&gt; MO{"ModalOpen?"}
+  MO --&gt;|yes| FM["UpdateFrameModal()&lt;br/&gt;CycleCircuitPage or NavigateModal"]
+  MO --&gt;|no| WI["UpdateFrameWorldInput()"]
+  WI --&gt; PG["ShowCircuit(Tasks) or ShowCircuit(Map)"]
+  WI --&gt; GO["GoNextAdventureAction()"]
+  WI --&gt; IA["Interact()"]
+  WI --&gt; MV["UpdateFrameWorldMovement()&lt;br/&gt;MoveScreen or FollowPath,&lt;br/&gt;UpdateCircuitWorld, RefreshNearby"]
+</pre></div>
+    <p class="caption">Update routing. The four outputs of <code>UpdateFrameWorldInput</code> are tried top to bottom and the first match returns; movement runs only when nothing else took the frame.</p>
+
+    <ul>
+      <li><b>Guards.</b> <code>UpdateFrameWorld</code> ignores input on the frame a page opened (<code>modalFrame</code>) and until <code>blockedUntil</code>, which <code>CloseModal</code> and a regained window focus set 0.12 s ahead. After a page closes, movement and Interact also wait for the stick to return to neutral (<code>movementNeedsNeutral</code>).</li>
+      <li><b>An open page.</b> <code>UpdateFrameModal</code> turns a shoulder or page key into <code>CycleCircuitPage</code>, lets the west face button act on the task book (<code>ActivateAdventureBookAction</code>), and otherwise calls <code>NavigateModal</code> (in <code>IsometricSlice.Hud.cs</code>), which moves focus through <code>MenuNavigationRows</code> and submits the focused button. While the written title page is up, <code>NavigateModal</code> hands the direction to <code>NavigateWaybook</code>.</li>
+      <li><b><code>LateUpdate</code></b> moves the camera (<code>UpdateCamera</code>), draws the wayfinder (<code>UpdateWayfinder</code>) and, while a page is open, keeps the world animating (<code>visuals.AnimateWorld</code>). It does nothing during a hosted session.</li>
+    </ul>
+    <p>Which key does what is owned by <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/PLAYER_CONTROLS.md#keyboard-and-controller">PLAYER_CONTROLS.md § Keyboard and controller</a> and, for the book, <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CIRCUIT_WAYBOOK.md#moving-around">CIRCUIT_WAYBOOK.md § Moving around</a>. The one Back behaviour the router implements is <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/PLAYER_CONTROLS.md#one-back-rule">PLAYER_CONTROLS.md § One Back rule</a>.</p>
+  </section>
+
+  <section id="walking"><h2><span class="num">04</span>Walking and pathing</h2>
+    <p class="lead">Navigation is grid data: <code>SectorDefinition.Rows</code> holds one character per tile, and only <code>'.'</code> is walkable (<code>'#'</code> blocks, <code>'~'</code> is water). The toolkit's <code>SectorNavigation</code> answers every question about it; the slice only moves a transform.</p>
+
+    <div class="scrollx"><table>
+      <tr><th>Movement</th><th>Entry</th><th>How it moves</th></tr>
+      <tr><td><b>Direct</b> (keys, stick, d-pad)</td><td><code>ReadMove</code> → <code>MoveScreen</code></td><td>Turns the input into a camera-relative step at <code>Sector.MoveSpeed</code>. <code>MoveWorld</code> splits the step into pieces no longer than a tenth of a cell and tests each with <code>CanStand</code> (<code>SectorNavigation.PointWalkable</code> with a radius of 0.18 cell); a blocked step slides along X, then Z. Direct input cancels any route.</td></tr>
+      <tr><td><b>Routed</b> (click, tap, Go)</td><td><code>WalkTo(x, z)</code> → <code>FollowPath</code></td><td><code>WalkTo</code> needs a walkable target, then asks <code>SectorNavigation.FindPath</code> for a breadth-first, four-neighbour shortest path (ties broken east, north, west, south). <code>FollowPath</code> walks the tile centres through the same <code>MoveWorld</code>, and drops the route when a step is fully blocked.</td></tr>
+    </table></div>
+
+    <ul>
+      <li><b>Pointer.</b> <code>ReadPointer</code> turns a mouse click, or a short tap, that is not over UI into <code>GroundClick</code>. A ray that hits a landmark (<code>visuals.TryPickLandmark</code>) routes to that landmark and remembers it as <code>walkingDestination</code>; otherwise the ray meets the ground plane and routes to that tile.</li>
+      <li><b>Guided travel.</b> A task's Go sets <code>adventureTravelTarget</code> and calls <code>ContinueAdventureTravel</code>. A target outside the loaded window is reached through the arrival landmark (<code>s&lt;stage&gt;-arrival</code>) at the window's edge, and the walk resumes after each rebuild; dialogue never carries coordinates. The player-facing contract is <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CIRCUIT_WAYBOOK.md#one-click-navigation">CIRCUIT_WAYBOOK.md § One-click navigation</a>.</li>
+      <li><b>District streaming.</b> Each walking frame, <code>UpdateCircuitWorld</code> works out which district the traveller stands in (<code>CircuitWorldLayout.StageAtLocalZ</code>, capped at the highest open district). When that changes it sets <code>worldFocusStage</code> and calls <code>RebuildCircuitPlace</code>, which makes a new sector, rebuilds the visuals, recreates the traveller shifted by the district stride, keeps the camera where it was, saves, and resumes the walk.</li>
+      <li><b>Arrival.</b> When a route ends near its <code>walkingDestination</code> (within 1.65 cells), <code>UpdateCircuitWorldArrive</code> refreshes the nearby landmark. Guided travel stops there and selects the location; a walk the player started by clicking a landmark goes straight on to <code>CircuitInteract</code>.</li>
+    </ul>
+    <p>The rules a sector file must meet are the <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Tools/ExplorationChecks/README.md#content-contract">ExplorationChecks content contract</a>; <code>Tools/ExplorationChecks</code> compiles the toolkit's <code>Runtime/Exploration</code> directly and exercises it outside Unity.</p>
+  </section>
+
+  <section id="interact"><h2><span class="num">05</span>Nearby, interact, and the way to a duel</h2>
+    <p class="lead"><code>RefreshNearby</code> picks the closest landmark within 1.6 cells of the traveller. When it changes, the visuals show that landmark's nearby ring (<code>SetNearby</code>) and <code>UpdatePrompt</code> fills the <code>Nearby action</code> prompt with the landmark's title, <code>CircuitNearbyHint</code> and the <code>CircuitNearbyAction</code> button label. The prompt shows only while the world is ready, no page is open and the title is gone.</p>
+
+    <div class="diagram"><pre class="mermaid">
+flowchart TD
+  KEY["Use key or Interact button"] --&gt; IA["Interact()&lt;br/&gt;needs Ready, no page, a nearby landmark"]
+  ARR["Clicked landmark reached&lt;br/&gt;UpdateCircuitWorldArrive"] --&gt; CI
+  IA --&gt; CI["CircuitInteract()"]
+  CI --&gt;|"Run.Ended"| PEND["ShowCircuit(Ended)"]
+  CI --&gt;|"PendingReward"| PREW["ShowCircuit(Reward)"]
+  CI --&gt;|"locked gate"| PGATE["ShowCircuit(Gate)"]
+  CI --&gt;|"a location"| FOC["FocusCircuitLocation&lt;br/&gt;ApplyCircuit(SelectLocation)"]
+  FOC --&gt; AT["CircuitInteractAtLocation()"]
+  AT --&gt;|"open event here"| EV["OpenAdventureEvent&lt;br/&gt;ApplyCircuit(OfferEvent, BeginEvent)"]
+  EV --&gt; PEV["ShowCircuit(Event)"]
+  AT --&gt;|"episode here"| PEP["OpenEpisode&lt;br/&gt;ShowCircuit(Episode)"]
+  AT --&gt;|"ready dialogue task"| GT["GoAdventureTask"]
+  AT --&gt;|"Workshop"| PDECK["OpenDeckWindow&lt;br/&gt;ShowCircuit(Deck)"]
+  AT --&gt;|"Mentor"| CONV["OpenCircuitConversation"]
+  GT --&gt; DLG["VisitCircuitDialogue&lt;br/&gt;ApplyCircuit(RecordDialogue)"]
+  CONV --&gt; DLG
+  DLG --&gt; PDLG["ShowCircuit(Dialogue)"]
+  AT --&gt;|"anything else"| PLOC["ShowCircuit(Location)"]
+  PLOC --&gt;|"Begin circuit duel"| DU["PlayCircuitDuel()&lt;br/&gt;ApplyCircuit(BeginDuel)"]
+  PEP --&gt;|"Begin episode duel"| DE["PlayCircuitDuel(episodeId)&lt;br/&gt;ApplyCircuit(BeginEpisodeDuel)"]
+  DU --&gt; BR["IsometricCombatBridge.Play&lt;br/&gt;hosts an ExpeditionApp"]
+  DE --&gt; BR
+  BR --&gt; RES["ApplyCircuit(ResolveDuel)&lt;br/&gt;then PlayCircuitDuelReturn"]
+</pre></div>
+    <p class="caption">From a press to a journal page or a duel. Every arrow into a <code>ShowCircuit</code> box opens the journal (<a href="#journal">§06</a>); every <code>ApplyCircuit</code> saves (<a href="#rules">§07</a>). <code>CircuitInteractAtLocation</code> tries its branches in this order: a pending reward, an open event, an episode, a ready dialogue task, a Workshop, a Mentor, then the Location page.</p>
+
+    <h3>The duel round trip</h3>
+    <ol class="steps">
+      <li><b>Begin.</b> <code>PlayCircuitDuel</code> applies <code>CircuitRules.BeginDuel</code> (or <code>BeginEpisodeDuel</code> for a friendly game, which must save). The run now holds a <code>PendingDuel</code> with a <code>ReceiptId</code>.</li>
+      <li><b>Prepare.</b> <code>PlayCircuitDuelPrepare</code> closes the journal, sets <code>inEncounter</code>, shows the loading cover, adds <code>IsometricCombatBridge</code> if needed, and sets its deck, seed, content root, kind and table (<code>PrepareWorldTablePresentation</code>).</li>
+      <li><b>Play.</b> <code>BeginWorldTableSessionView</code> moves the camera onto the table, then <code>combat.Play(EncounterId, …, ReceiptId)</code> hosts the battle until it resolves. The table hand-off is owned by <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Design/CIRCUIT_UNIFIED_WORLD.md#the-actual-table">CIRCUIT_UNIFIED_WORLD.md § The actual table</a>; the hosted app is on <a href="sessions.html">Hosted Sessions</a>.</li>
+      <li><b>Commit early.</b> While the session runs, <code>UpdateFrameEncounter</code> calls <code>CommitFinishedCircuitDuel</code> every frame. As soon as the hosted battle is over it applies <code>ResolveDuel</code> with the battle's outcome, so leaving on the result screen keeps the result. <code>SaveProgress</code> (pause, quit) tries the same commit first.</li>
+      <li><b>Return.</b> When <code>Play</code> returns, <code>PlayCircuitDuel</code> applies <code>ResolveDuel</code> again; a receipt already applied makes <code>CircuitRules.ResolveDuel</code> return an unchanged copy. <code>EndWorldTableSessionView</code> and <code>PlayCircuitDuelReturn</code> show the world again and open Ended, Reward or Location (or EpisodeResult/Episode for a friendly game).</li>
+    </ol>
+    <details class="why"><summary>Why the result is applied twice</summary>
+      <p>The comment on <code>CommitFinishedCircuitDuel</code> gives the reason: the result is recorded while its screen is visible, "so exiting before Continue cannot discard earned cards". The later callback from the bridge can then arrive safely, because <code>ResolveDuel</code> remembers applied receipts and never grants twice. The check that <code>combat.ReceiptId</code> matches the pending duel stops a retained result from being applied to the next table.</p>
+    </details>
+  </section>
+
+  <section id="journal"><h2><span class="num">06</span>The journal: ShowCircuit, CircuitPage and DrawModal</h2>
+    <p class="lead">Every journal window, the title included, is the one modal kind (<code>Modal.Circuit</code>) showing one <code>CircuitPage</code>. <code>ShowCircuit(page, prepare)</code> opens a page, a back stack remembers where the player came from, and <code>DrawModal</code> redraws the whole page from the current fields every time anything changes.</p>
+
+    <h3>Opening a page</h3>
+    <ol class="steps">
+      <li><b><code>ShowCircuitHistory</code>.</b> If the journal is closed the back stack is cleared. If it is open and the page changes, <code>CaptureCircuitPage</code> pushes a <code>CircuitPageState</code> of the page being left: its focused button, selected card, dialogue, event, episode, lesson position, builder search and filters, armed deck slot and target deck. The stack keeps at most 16 entries and drops the second-oldest, so the page the journal opened on is never lost.</li>
+      <li><b>Reset and prepare.</b> Per-page leftovers are cleared (builder status, an armed delete, a filter sheet), then the optional <code>prepare</code> action sets the new page's fields, for example <code>OpenCircuitCard</code> sets <code>selectedCollectionCard</code>.</li>
+      <li><b><code>OpenModal(Modal.Circuit)</code>.</b> Stops any walk, sets <code>modalFrame</code>, calls <code>DrawModal</code> and <code>UpdatePrompt</code>, and, outside the title, calls <code>SaveProgress</code>: opening any page writes the save.</li>
+    </ol>
+
+    <h3>Going back</h3>
+    <p><code>BackCircuitPage</code> first lets the page undo something inside itself (<code>BackCircuitPageWithin</code>: close Location tips, leave the Done pocket, stay on an episode result still being saved; <code>BackCircuitPageNested</code>: step back inside lessons, clear a builder pick, or let the title handle Back). Only then does it pop the stack, skipping Reward and Replace pages whose reward has been claimed. An empty stack closes the journal; otherwise <code>RestoreCircuitPage</code> restores the fields, falls back to Deck or Decks when the saved card or deck no longer exists, reopens the page and refocuses the button by name.</p>
+
+    <h3>Drawing a page</h3>
+    <p><code>DrawModal</code> (in <code>IsometricSlice.Hud.cs</code>) clears <code>modalButtons</code>, calls <code>DrawCircuitModal</code>, applies the player's text size and contrast (<code>ApplyWorldPreferenceText</code>) and rebuilds focus links (<code>RebuildModalNavigation</code>). <code>DrawCircuitModal</code> in <code>IsometricSlice.CircuitUi.cs</code>:</p>
+    <ol class="steps">
+      <li>Sends the title and the club opening to their own surfaces (<code>DrawCircuitModalOtherSurface</code>); every other page hides the written title page.</li>
+      <li>Sizes the book (<code>DrawCircuitModalLayout</code>: card pages are wider, a notice adds a band), builds the <code>Circuit shade</code> and <code>Travel journal</code> shell only if it is missing, and rebuilds the frame and page art, destroying the previous page's objects.</li>
+      <li>Draws the heading and a Back button (hidden while an episode result is waiting to save), then the page itself through four switch methods.</li>
+      <li>Draws the notice band, picks the default focus for the page, and starts the page-turn motion (<code>TravellerPanelMotion</code>).</li>
+    </ol>
+    <div class="scrollx"><table>
+      <tr><th>Switch</th><th>Pages (<code>CircuitPage</code>)</th><th>Drawers live in</th></tr>
+      <tr><td><code>DrawCircuitModalOtherSurface</code></td><td>Title, and Welcome while the club opening runs</td><td><code>.Title</code> / <code>.WaybookMenu</code>, <code>.Onboarding</code></td></tr>
+      <tr><td><code>DrawCircuitModalPage</code></td><td>Menu, More, Welcome, PracticeNext, Map, Location, Dialogue, Event</td><td><code>.CircuitUi</code>; Welcome and PracticeNext in <code>.Onboarding</code></td></tr>
+      <tr><td><code>DrawCircuitModalStoryPage</code></td><td>Episode, EpisodeResult, EpisodeComplete, Tasks, TaskWeb, Conversations, Card</td><td><code>.CircuitUi</code>; Tasks and TaskWeb in <code>.Waybook</code></td></tr>
+      <tr><td><code>DrawCircuitModalCardsPage</code></td><td>Deck, Replace, Reward, Starters, Controls, Ended, Gate, Lessons</td><td><code>.CircuitUi</code>; Deck/Replace in <code>.DeckBuilder</code>, Gate in <code>.World</code>, Lessons in <code>.Lessons</code></td></tr>
+      <tr><td><code>DrawCircuitModalChoicePage</code></td><td>Preparations, Restart, Decks, Quit</td><td><code>.CircuitUi</code>; Preparations in <code>.Learning</code></td></tr>
+    </table></div>
+    <p>That is all 28 values of the enum, which is declared in <code>IsometricSlice.Circuit.cs</code>; a value added to the enum draws nothing until one of these switches names it.</p>
+
+    <h3>The title</h3>
+    <p><code>ShowCircuit(CircuitPage.Title)</code> reaches <code>DrawCircuitTitle</code>, which sets <code>titleActive</code> and asks <code>DrawWaybookTitle</code> to write the six <code>OrdinaryTitleChoices</code> onto the notebook bound at <code>IsometricSectorVisuals.LodgeWaybook</code>. That page is a world-space UI Toolkit panel built from <code>Resources/UI/WaybookPage.uxml</code> and <code>.uss</code>, parented to <code>LodgeWaybookBinding.PageSurface</code>. When the binding or an asset is missing, the title shows the startup error with the reason (<code>waybookFailure</code>); there is no second menu. The player-facing behaviour is <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CIRCUIT_WAYBOOK.md#arriving-at-the-lodge">CIRCUIT_WAYBOOK.md § Arriving at the lodge</a>; the prefab contract is <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CIRCUIT_PRESENTATION.md#the-lodge-waybook">CIRCUIT_PRESENTATION.md § The lodge waybook</a>; the menu toolkit is on <a href="ui.html">UI &amp; Menus</a>.</p>
+
+    <h3>The HUD under the journal</h3>
+    <p><code>BuildHud</code> destroys and rebuilds everything on the <code>World interface</code> canvas: the safe-area root, the <code>Location</code> panel (area, current task, goal pictures), the <code>Pause</code> and <code>World map</code> buttons, the <code>Adventure bookmark</code> with its Go button, the <code>Nearby action</code> prompt, the input hints and the <code>Modal layer</code> the journal draws into. <code>UpdateFrameLayout</code> calls it again whenever the screen size or safe area changes, and it redraws an open page. Which windows the player can reach from the Menu is described in <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CIRCUIT_WAYBOOK.md#inside-the-adventure">CIRCUIT_WAYBOOK.md § Inside the adventure</a>.</p>
+  </section>
+
+  <section id="rules"><h2><span class="num">07</span>Every rule change goes through ApplyCircuit</h2>
+    <p class="lead">The live adventure is the field <code>circuit</code> (a <code>CircuitState</code>). The slice never edits it: it calls a pure <code>CircuitRules</code> function, which returns a <code>Result</code> holding a new state or an error, and passes that result to <code>ApplyCircuit</code>. Outside <code>ApplyCircuit</code>, the only production code that assigns <code>circuit</code> is <code>RestoreCircuit</code> during boot.</p>
+
+    <div class="diagram"><pre class="mermaid">
+flowchart TD
+  R["CircuitRules.X(circuitDefinition, circuit, ...)&lt;br/&gt;returns a Result"] --&gt; A["ApplyCircuit(result, requireSaved, restoreAtArrival)"]
+  A --&gt; OK{"result.IsSuccess?"}
+  OK --&gt;|no| NO["circuitNotice = the error message&lt;br/&gt;redraw the open page, return false"]
+  OK --&gt;|yes| SET["previous = circuit&lt;br/&gt;circuit = result.Value&lt;br/&gt;ApplyCircuitAdvanceTask"]
+  SET --&gt; SV["SaveCircuit(restoreAtArrival)&lt;br/&gt;CaptureCircuitSave, CircuitPersistence.Save"]
+  SV --&gt; W{"written?"}
+  W --&gt;|"yes, or the save was optional"| UP["CircuitObjective, MarkCircuitLandmarks,&lt;br/&gt;UpdatePrompt, return true"]
+  W --&gt;|"no, and requireSaved"| RB["circuit = previous&lt;br/&gt;Could not save notice, return false"]
+</pre></div>
+    <p class="caption"><code>ApplyCircuit</code> in <code>IsometricSlice.Circuit.cs</code>. <code>ApplyCircuitAdvanceTask</code> selects the next task when the selected one has just become Done.</p>
+
+    <ul>
+      <li><b>What <code>SaveCircuit</code> skips.</b> It returns true without writing in the table lobby and when saves are suppressed (a verification run without a lifecycle folder), and false before the world is <code>Ready</code>. Otherwise <code>SaveCircuitWrite</code> captures a <code>CircuitSave</code> (version 5: the state, camera and motion settings, zoom, the traveller's position relative to the occupied district, and the onboarding and lesson fields) and hands its JSON to <code>CircuitPersistence.Save</code>. An IO failure becomes a notice.</li>
+      <li><b>Changes that must be durable</b> pass <code>requireSaved: true</code>: starting an adventure (<code>StartCircuitFromDeck</code>, <code>BeginNextAdventureWithCurrentDeck</code>, which also pass <code>restoreAtArrival</code>), offering, beginning and committing an event, opening a story visit, and beginning or resolving a friendly episode duel (<code>RetryEpisodeSave</code> retries that one). Every other change, for example deck edits, <code>SelectLocation</code>, <code>SelectTask</code>, <code>RecordDialogue</code> or an ordinary duel, keeps the new state when the write fails and shows the notice.</li>
+      <li><b>Saves that are not rule changes.</b> Fields that live in <code>CircuitSave</code> but not in <code>CircuitState</code> call <code>SaveCircuit</code> directly: the camera, motion and zoom buttons on the Controls page, the club badge, name, opening beat and welcome flag, and read lessons. <code>ReturnToTitle</code> and the return from Settings save too. <code>SaveProgress</code> runs on every page open except the title, on application pause and quit, and in <code>OnDestroy</code>; it commits a finished duel first.</li>
+      <li><b>Boot is the exception.</b> <code>RestoreCircuit</code> assigns the restored state, a new profile, a new run, or the <code>Interrupted</code> resolution of a duel the process died in, before the world exists, so there is nothing to refresh and <code>SaveCircuit</code> would refuse anyway.</li>
+    </ul>
+    <div class="note"><b>Rehearsals do bypass it.</b> <code>circuit</code> is <code>internal</code>, and the <code>CircuitSliceChecks</code> partials in <code>Assets/Tests/Runtime</code> assign <code>slice.circuit</code> directly to stage fixtures, then redraw or rebuild by reflection. A state staged that way has not been saved or had its landmarks refreshed. See <a href="qa.html">QA &amp; Rehearsals</a>.</div>
+    <p>What each <code>CircuitRules</code> function does, and how receipts make a repeated call safe, is on <a href="rules.html">Rules Engine</a>. File names, backups and version blocks are on <a href="saves.html">Saves &amp; Settings</a>.</p>
+  </section>
+
+  <section id="layout"><h2><span class="num">08</span>CircuitWorldLayout: from a run to a sector</h2>
+    <p class="lead"><code>CircuitWorldLayout</code> (in <code>Game/EmberGrove/Assets/Runtime/Exploration/</code>, with no Unity types) is a pure projection of the saved run onto a <code>SectorDefinition</code>. The slice calls it from <code>MakeCircuitSector</code> at boot and on every <code>RebuildCircuitPlace</code>. <code>Tools/CircuitWorldChecks</code> compiles the same file outside Unity.</p>
+
+    <div class="scrollx"><table>
+      <tr><th>Constant</th><th>Value</th><th>Meaning</th></tr>
+      <tr><td><code>DistrictStride</code></td><td class="num">32</td><td>Tile rows per district along Z.</td></tr>
+      <tr><td><code>Width</code></td><td class="num">29</td><td>Tile columns of every district.</td></tr>
+      <tr><td><code>MaximumVisibleDistricts</code></td><td class="num">3</td><td>The window: the district before the occupied one, the occupied one and the next.</td></tr>
+    </table></div>
+
+    <ol class="steps">
+      <li><b><code>SelectTemplate</code></b> picks one of the three <code>Layouts</code> in <code>locations.json</code> by the run seed, using the frozen template IDs <code>circuit-courtyard-0</code> to <code>-2</code>, and rejects a template whose cell size is not 1.25 m. The template supplies cell size, speed, camera and colours.</li>
+      <li><b><code>WindowFirstStage</code></b> starts the window one district before the occupied one; the last district is the next one at most, which can be a locked preview from <code>CircuitRules.PreviewDistrict</code>.</li>
+      <li><b><code>Build</code></b> fills a grid of blocked tiles, paints garden pools, paints each visible location (<code>Position</code>: X = 5 + 9·node.X, Z = 4 + 6·node.Y within its district) and the roads between linked locations, and opens the seams between districts. That painted grid is kept as <code>VisualRows</code>.</li>
+      <li>Each location becomes a <code>LandmarkDefinition</code> with its Id (<code>s1-l1-1</code>, <code>s2-arrival</code>, <code>s1-tournament</code> …), <code>RoomId</code> and <code>RoomRevision</code>, and a <code>Kind</code> such as <code>cardtable</code>, <code>npc-&lt;mentor&gt;</code>, <code>workshop</code>, <code>reward</code> or <code>refuge</code>. Locked locations become decorations. Each district border gets a <code>gate-&lt;stage&gt;</code>. The tile behind each venue is blocked, and a locked district's walkable tiles are closed.</li>
+      <li>The result has the Id <code>circuit-world-&lt;seed&gt;-&lt;firstStage&gt;</code>, which <code>IsometricSectorVisuals</code> parses to find the window's first district. <code>MakeCircuitSector</code> then sets the title and objective, and the start tile to the current location when it lies in the focus district.</li>
+    </ol>
+    <p>Coordinates in the sector are local to the window, so a long adventure never needs large numbers. <code>CaptureCircuitSave</code> stores the traveller relative to the occupied district (<code>FocusStage</code>), and <code>RestoreWorldTraveller</code> converts back. Which layout versions and room revisions are supported, and how old saves are kept on their geometry, is owned by <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/MAINTAINING.md#supported-circuit-world-layouts">MAINTAINING.md § Supported Circuit world layouts</a>.</p>
+  </section>
+
+  <section id="visuals"><h2><span class="num">09</span>IsometricSectorVisuals: authored first, procedural second</h2>
+    <p class="lead"><code>IsometricSectorVisuals.Build(sector)</code> runs at boot and on every district rebuild. It first binds the saved prefab districts and rooms that the scene provides, then draws procedural geometry for every tile row and landmark that no saved prefab claims. In the shipping scene every visible district is bound; the procedural path remains the fallback.</p>
+
+    <div class="diagram"><pre class="mermaid">
+flowchart TD
+  B["Build(sector)"] --&gt; AV["ApplyAuthoredVenues(sector)"]
+  AV --&gt; UB{"anything bound&lt;br/&gt;in the scene?"}
+  UB --&gt;|no| PR["ApplyAuthoredVenuesProcedural&lt;br/&gt;refuses a RoomRevision above 1"]
+  UB --&gt;|yes| VA["ValidateAuthoredVenues"]
+  VA --&gt; FX["ApplyAuthoredVenuesFixed&lt;br/&gt;district 1 fields, AdditionalDistricts"]
+  FX --&gt; RU["ApplyAuthoredVenuesReusable&lt;br/&gt;ProjectDistrict maps s3-* ids to the stage"]
+  RU --&gt; BD["BindDistrict per district&lt;br/&gt;move root to its window offset,&lt;br/&gt;ResolveRoom, SelectAuthoredPaths"]
+  BD --&gt; RN["ApplyAuthoredVenuesFirstDuel, ApplyRoomNavigation&lt;br/&gt;write NavigationRows into sector.Rows"]
+  RN --&gt; CK["ApplyAuthoredVenuesCheckNavigation&lt;br/&gt;Validate, FindPath to every landmark"]
+  PR --&gt; PV["PrepareAuthoredVisibility&lt;br/&gt;hide saved roots that are not bound"]
+  CK --&gt; PV
+  PV --&gt; RW["BuildSectorRow per row&lt;br/&gt;BuildTile only where IsAuthoredTile is false"]
+  RW --&gt; LM["BuildSectorLandmarks, BuildSectorDecorations&lt;br/&gt;BindAuthoredVenue, else BuildLandmark"]
+</pre></div>
+    <p class="caption"><code>Build</code> and <code>ApplyAuthoredVenues</code>, in <code>IsometricSectorVisuals.cs</code> and <code>IsometricSectorVisuals.Authored.cs</code>. Any validation failure throws, and the slice reports "The world needs attention."</p>
+
+    <h3>What the scene binds</h3>
+    <div class="scrollx"><table>
+      <tr><th>Binding</th><th>Type</th><th>Used for</th></tr>
+      <tr><td><code>AuthoredDistrictRoot</code>, <code>AuthoredPaths</code>, <code>AuthoredVenues</code>, <code>SwayingFoliage</code></td><td>fields on the visuals</td><td>District 1 at the world origin. <code>Districts()</code> wraps them as an <code>AuthoredDistrict</code> with Stage 1.</td></tr>
+      <tr><td><code>AdditionalDistricts</code></td><td><code>AuthoredDistrict[]</code></td><td>Fixed later districts; the scene has one, district 2.</td></tr>
+      <tr><td><code>ReusableDistricts</code></td><td><code>AuthoredCircuitDistrict[]</code></td><td>Exactly three saved instances of <code>ClubDistrict.prefab</code>, parked at world Z 80, 120 and 160. Each carries stage-3 identities (<code>s3-*</code>, <code>gate-4</code>); <code>ProjectDistrict</code> renames a copy for whatever district 3 or later is in the window.</td></tr>
+      <tr><td><code>AuthoredVenue</code></td><td>serializable class</td><td>One location: <code>LandmarkId</code>, <code>Root</code>, <code>Interaction</code> and <code>Spawn</code> anchors, table surface and props, pickers, characters, five-row <code>NavigationRows</code>, and <code>Variants</code>.</td></tr>
+      <tr><td><code>KindVariant</code> with an <code>AuthoredCircuitRoom</code></td><td>prefab metadata</td><td>One appearance of a venue. <code>ResolveRoom</code> picks the room whose <code>RoomId</code> and <code>Revision</code> match the landmark's saved <code>RoomId</code>/<code>RoomRevision</code>; room ids are <code>club-table</code>, <code>club-tournament</code>, <code>club-visit</code>, <code>club-arrival</code> and <code>club-counter</code>.</td></tr>
+      <tr><td><code>StoryProps</code></td><td><code>StoryProp[]</code></td><td>An event Id and a root; <code>ApplyStoryProps</code> shows the root once that event is committed (called from <code>MarkCircuitLandmarks</code>).</td></tr>
+      <tr><td><code>LodgeWaybook</code></td><td>Transform</td><td>The title notebook; must carry <code>LodgeWaybookBinding</code>.</td></tr>
+      <tr><td><code>CharacterAppearances</code></td><td><code>CharacterAppearance[]</code></td><td>Models and clips keyed by <code>player</code> or a speaker Id.</td></tr>
+    </table></div>
+
+    <div class="note warn"><b>The visuals edit the navigation grid.</b> <code>Build</code> receives the same <code>SectorDefinition</code> object the slice walks on. <code>ApplyAuthoredVenuesFirstDuel</code> and <code>ApplyRoomNavigation</code> copy the first duel venue's or the bound room's <code>NavigationRows</code> into <code>sector.Rows</code> and move each landmark's X/Z (and the start tile) onto the room's <code>Interaction</code> and <code>Spawn</code> anchors, then re-check that every landmark is reachable. So the grid the traveller walks is <code>CircuitWorldLayout</code>'s output as amended by prefab metadata, even though the class summary calls geometry "presentation only".</div>
+
+    <p>The editing limits for authored districts and rooms are owned by <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Design/CIRCUIT_UNIFIED_WORLD.md#authored-world-target">CIRCUIT_UNIFIED_WORLD.md § Authored world target</a>; story props by <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CIRCUIT_PRESENTATION.md#saved-story-props">CIRCUIT_PRESENTATION.md § Saved story props</a>. The table lobby reuses one room revision through <code>CreateLobbyRoom</code>; its pinned layout is described in <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Design/CIRCUIT_UNIFIED_WORLD.md#data-driven-content-updates">CIRCUIT_UNIFIED_WORLD.md § Data-driven content updates</a> and the lobby itself on <a href="networking.html">Networking</a>.</p>
+  </section>
+
+  <section id="traveller"><h2><span class="num">10</span>The traveller</h2>
+    <p class="lead">The traveller is the player's figure in the world, the <code>IsometricSlice.Traveller</code> transform. The visuals create and animate it; only the slice moves it.</p>
+    <ul>
+      <li><b>Creation.</b> <code>CreateTraveller(position)</code> calls <code>BuildCharacterTraveller</code>, which spawns the <code>player</code> entry of <code>CharacterAppearances</code> under <code>Traveller · replaceable character</code>, or builds a procedural figure (<code>BuildCraftedTraveller</code>) when that entry has no model. Every <code>RebuildCircuitPlace</code> makes a new one and carries over its position (shifted by the district stride) and heading.</li>
+      <li><b>Animation.</b> Each walking frame <code>visuals.AnimateTraveller(velocity, time, reducedMotion)</code> turns it toward its velocity, ticks its <code>CharacterAnimation</code>, and animates the rest of the world. A comment in <code>IsometricSectorVisuals.Models.cs</code> states the boundary: the world owns movement, and imported clips only pose the model.</li>
+      <li><b>Camera.</b> <code>UpdateCamera</code> follows the traveller with a small lead in the direction of travel when <code>FollowCamera</code> is on, and otherwise frames the occupied district. Opening shots and the title camera take over first (<code>TickOpeningWorldShot</code>, <code>UpdateTitleCamera</code>).</li>
+      <li><b>Saved position.</b> The position goes into <code>CircuitSave</code> relative to the occupied district (<a href="#layout">§08</a>); during a table session the save uses the position the traveller will return to (<code>WorldTableSavePosition</code>).</li>
+      <li><b>Lobby travellers.</b> The table lobby draws its members' travellers with <code>CreateLobbyTraveller</code>, <code>AnimateLobbyTraveller</code> and <code>ReleaseLobbyTraveller</code>, driven from <code>IsometricSlice.Versus.cs</code>.</li>
+    </ul>
+    <h3>The Traveller UI types</h3>
+    <p><code>TravellerPictures</code> is the picture vocabulary (the 21 values of <code>TravellerPicture</code>) shared by the world's menus, the written title page and the battle view. Its card-art resolver is static: <code>LoadCircuit</code> sets it with <code>ConfigureArtwork</code> and <code>OnDestroy</code> clears it. <code>TravellerButtonMotion</code> and <code>TravellerPanelMotion</code> (in <code>TravellerUiMotion.cs</code>) give buttons and page entrances their motion, and <code>TravellerWaybookFrame</code> is the book's frame mesh behind every journal page. The replacement contracts are in <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CIRCUIT_PRESENTATION.md#rigged-world-characters-in-unity">CIRCUIT_PRESENTATION.md § Rigged world characters in Unity</a> and <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CIRCUIT_WAYBOOK.md#motion-and-accessibility">CIRCUIT_WAYBOOK.md § Motion and accessibility</a>.</p>
+  </section>
+
+  <section id="watch"><h2><span class="num">11</span>What to know before you change it</h2>
+    <p class="lead">These are facts on <code>main</code> that shape any change here. The ranked list of structural problems, with proposed fixes, is on <a href="findings.html">Findings</a>; the complexity numbers are on <a href="complexity.html">Complexity</a>.</p>
+    <div class="scrollx"><table>
+      <tr><th>Fact</th><th>Where</th><th>Why it matters</th></tr>
+      <tr><td>One class holds boot, input, the HUD, every page, the rules glue and the save.</td><td>19 <code>IsometricSlice</code> partials</td><td>Every partial can read and write every field; the split gives no isolation.</td></tr>
+      <tr><td><code>sector.json</code> must load and validate but is replaced as soon as the Circuit loads.</td><td><code>Start</code>, <code>MakeCircuitSector</code></td><td>Editing it changes nothing a player sees, yet deleting it stops the game.</td></tr>
+      <tr><td>The visuals rewrite navigation rows and landmark positions.</td><td><code>ApplyRoomNavigation</code>, <code>ApplyAuthoredVenuesFirstDuel</code></td><td>Navigation depends on prefab metadata as well as <code>CircuitWorldLayout</code>.</td></tr>
+      <tr><td>Rehearsals assign <code>slice.circuit</code> and call private members by name.</td><td><code>Assets/Tests/Runtime/CircuitSliceChecks.*.cs</code></td><td>A rename compiles and fails only in a rehearsal.</td></tr>
+      <tr><td>Process-wide statics are set during boot.</td><td><code>DuelUi.MenuColour.Use</code>, <code>TravellerPictures.ConfigureArtwork</code></td><td>The values live in statics, not in the world, so a hosted session reads and writes the same ones; <code>BuildHud</code> re-applies the world's High Contrast for that reason.</td></tr>
+      <tr><td>The world's modal focus uses a type from the battle view.</td><td><code>MenuNavigationRows</code> in <code>ExpeditionView.Navigation.cs</code>; HUD hints call <code>ExpeditionView.ResolveControllerGlyphFamily</code></td><td>Both are in Assembly-CSharp, so no assembly boundary separates the world from the battle view.</td></tr>
+      <tr><td>The hosted app finds the world by search.</td><td><code>ExpeditionApp.EnterTableLobby</code> calls <code>FindAnyObjectByType&lt;IsometricSlice&gt;</code></td><td>The dependency points back from the session into the world.</td></tr>
+    </table></div>
+    <div class="note warn"><b>One guide disagrees with the code.</b> <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CIRCUIT_PRESENTATION.md#world-assets-and-procedural-fallbacks">CIRCUIT_PRESENTATION.md § World assets and procedural fallbacks</a> says districts after Lantern Quay retain runtime construction. On <code>main</code> the scene binds three <code>ReusableDistricts</code> and <code>ApplyAuthoredVenuesReusable</code> projects them onto every later district, as <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/MAINTAINING.md#supported-circuit-world-layouts">MAINTAINING.md § Supported Circuit world layouts</a> describes.</div>
+  </section>
+
+  <section id="guides"><h2><span class="num">12</span>Where the rules for this area live</h2>
+    <p class="lead">This page explains the code. The decisions, contracts and player-facing behaviour belong to these guide sections; change them there.</p>
+    <div class="grid c2">
+      <a class="card accent-gold" href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Design/CIRCUIT_UNIFIED_WORLD.md#architecture-and-extension-boundaries"><h4>CIRCUIT_UNIFIED_WORLD § Architecture and extension boundaries</h4><p>Which layer owns rules, UI, content and tools.</p></a>
+      <a class="card accent-gold" href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Design/CIRCUIT_UNIFIED_WORLD.md#authored-world-target"><h4>CIRCUIT_UNIFIED_WORLD § Authored world target</h4><p>The lobby room, and the rules for editing saved scenes, prefabs and bindings.</p></a>
+      <a class="card accent-gold" href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Design/CIRCUIT_UNIFIED_WORLD.md#the-actual-table"><h4>CIRCUIT_UNIFIED_WORLD § The actual table</h4><p>Who owns the camera transition and the table presentation during a duel.</p></a>
+      <a class="card accent-gold" href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Design/CIRCUIT_UNIFIED_WORLD.md#the-lodge-and-waybook"><h4>CIRCUIT_UNIFIED_WORLD § The lodge and Waybook</h4><p>What the menu must keep offering.</p></a>
+      <a class="card accent-cyan" href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CIRCUIT_WAYBOOK.md#task-list-and-route-web-target"><h4>CIRCUIT_WAYBOOK § Task list and route web target</h4><p>The task book, its List and Web views, and the bookmark.</p></a>
+      <a class="card accent-cyan" href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CIRCUIT_WAYBOOK.md#one-click-navigation"><h4>CIRCUIT_WAYBOOK § One-click navigation</h4><p>What Go must do, and when it must refuse.</p></a>
+      <a class="card accent-cyan" href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CIRCUIT_WAYBOOK.md#arriving-at-the-lodge"><h4>CIRCUIT_WAYBOOK § Arriving at the lodge</h4><p>The title page and its six choices.</p></a>
+      <a class="card accent-cyan" href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CIRCUIT_WAYBOOK.md#inside-the-adventure"><h4>CIRCUIT_WAYBOOK § Inside the adventure</h4><p>The Menu, its windows and the deck builder, as the player meets them.</p></a>
+      <a class="card accent-cyan" href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CIRCUIT_WAYBOOK.md#implementation-and-extension"><h4>CIRCUIT_WAYBOOK § Implementation and extension</h4><p>The guide's own file-to-responsibility table for the book.</p></a>
+      <a class="card accent-green" href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/MAINTAINING.md#supported-circuit-world-layouts"><h4>MAINTAINING § Supported Circuit world layouts</h4><p>Layout versions, room revisions and save compatibility.</p></a>
+    </div>
+  </section>
+
+  <div class="honest"><h4>Keep this page honest</h4><ul>
+    <li><code>Game/EmberGrove/Assets/Runtime/Exploration/IsometricSlice.cs</code> — <code>Start</code>, <code>Update</code>/<code>LateUpdate</code> routing, movement, <code>RefreshNearby</code>, <code>OpenModal</code>/<code>CloseModal</code>, camera (§02–§05, §10)</li>
+    <li><code>Game/EmberGrove/Assets/Runtime/Exploration/IsometricSlice.Circuit.cs</code> — <code>LoadCircuit</code>, <code>RestoreCircuit</code>, <code>SaveCircuit</code>, <code>ApplyCircuit</code>, <code>CircuitPage</code>, back stack, <code>CircuitInteract</code>, <code>PlayCircuitDuel</code> (§02, §05–§07)</li>
+    <li><code>Game/EmberGrove/Assets/Runtime/Exploration/IsometricSlice.CircuitUi.cs</code> and <code>IsometricSlice.Hud.cs</code> — <code>DrawCircuitModal</code> and its four page switches, <code>DrawModal</code>, <code>BuildHud</code>, <code>NavigateModal</code> (§06)</li>
+    <li><code>Game/EmberGrove/Assets/Runtime/Exploration/IsometricSlice.World.cs</code>, <code>IsometricSlice.Title.cs</code>, <code>IsometricSlice.WaybookMenu.cs</code> — streaming and arrival, the title and the written page (§04, §06)</li>
+    <li><code>Game/EmberGrove/Assets/Runtime/Exploration/CircuitWorldLayout.cs</code> — constants and <code>Build</code> steps (§08)</li>
+    <li><code>Game/EmberGrove/Assets/Runtime/Exploration/IsometricSectorVisuals.cs</code>, <code>IsometricSectorVisuals.Authored.cs</code>, <code>IsometricSectorVisuals.Models.cs</code> — <code>Build</code>, authored binding, the traveller (§09, §10)</li>
+    <li><code>Game/EmberGrove/Assets/Runtime/Exploration/AuthoredCircuitDistrict.cs</code>, <code>AuthoredCircuitRoom.cs</code>, <code>LodgeWaybookBinding.cs</code>, <code>IsometricCombatBridge.cs</code>, <code>TravellerPictures.cs</code> (§05, §09, §10)</li>
+    <li><code>Toolkit/Packages/com.catsplat.cardforge/Runtime/Exploration/SectorNavigation.cs</code> and <code>SectorDefinition.cs</code> — validation and pathing (§04)</li>
+    <li><code>Game/EmberGrove/Assets/Scenes/CircuitJourney.unity</code> — the <code>Circuit world</code> GameObject, its bindings and the prefab instances (§01, §09)</li>
+  </ul></div>
+</main>
+<footer>Bloomfire Wiki · page source <code>Docs/Wiki/world.html</code>, built by <code>Tools/Documentation/structure_wiki.py</code> · Found a mistake? Fix it in the same commit as the code that made it one.</footer>
+</body>
+</html>

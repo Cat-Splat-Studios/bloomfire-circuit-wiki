@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Findings — Bloomfire Wiki</title>
+<link rel="stylesheet" href="wiki.css">
+<script src="mermaid.min.js" defer></script>
+<script src="wiki.js" defer></script>
+</head>
+<body>
+<nav class="wiki">
+  <a class="home" href="index.html">🔥 Bloomfire Wiki</a>
+  <div class="grp"><span class="grp-t">Start here</span>
+    <a href="codebase-tour.html">Codebase Tour</a>
+    <a href="glossary.html">Glossary</a>
+  </div>
+  <div class="grp"><span class="grp-t">Game systems</span>
+    <a href="rules.html">Rules Engine</a>
+    <a href="world.html">World &amp; Journal</a>
+    <a href="sessions.html">Hosted Sessions</a>
+    <a href="ui.html">UI &amp; Menus</a>
+    <a href="networking.html">Networking</a>
+    <a href="content.html">Content &amp; Media</a>
+    <a href="saves.html">Saves &amp; Settings</a>
+  </div>
+  <div class="grp"><span class="grp-t">Code health</span>
+    <a href="diagrams.html">Diagrams</a>
+    <a href="complexity.html">Complexity</a>
+    <a class="on" href="findings.html">Findings</a>
+  </div>
+  <div class="grp"><span class="grp-t">Ship &amp; maintain</span>
+    <a href="qa.html">QA &amp; Rehearsals</a>
+    <a href="builds.html">Builds &amp; Tools</a>
+    <a href="maintaining.html">Maintaining</a>
+  </div>
+</nav>
+<header class="page"><h1>What to <span class="flame">fix next</span></h1><p class="tag">The structural problems left after the cleanup milestone and the complexity work, each with options and a rough size, so the owner can choose what to fix next.</p></header>
+<main>
+  <div class="tldr"><h4>In 60 seconds</h4><ul>
+    <li><b>24 findings in five groups.</b> Architecture, coupling, duplication, dead code and tooling. Each has evidence checked against <code>main</code>, why it matters, two or three fix options with a rough size, and its roadmap item if there is one. This page suggests a priority but decides nothing.</li>
+    <li><b>Methods are small now, classes are not.</b> Every member is below cyclomatic complexity 10 (<a href="complexity.html">Complexity</a>). That metric measures branches inside one member. It does not measure how many members a class has, and <code>IsometricSlice</code> still holds hundreds of methods and fields in one MonoBehaviour (snapshot in <a href="#architecture">§03</a>).</li>
+    <li><b>Two findings are marked high.</b> <a href="#f01">F01</a>, <code>IsometricSlice</code>'s size, and <a href="#f08">F08</a>, the rehearsals reaching private members by string name. F08 makes every extraction riskier, because a rename still compiles and fails only in a player run.</li>
+    <li><b>Much of the menu duplication already has a plan.</b> Cleanup steps G and H and the UI Toolkit migration cover the two menu stacks, the hosted windows and Settings. Those findings link the plan rather than decide it again.</li>
+    <li><b>Some fixes are small.</b> Dead loaders, an unused component, a class that a script cuts out of a source file by counting braces, and a duplicated set of data types each take a day or less (size S).</li>
+  </ul></div>
+  <div class="prereq"><h4>Before you start</h4><p>Read the <a href="codebase-tour.html">Codebase Tour</a> for the names used here, and keep the <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Release/ROADMAP.md#cleanup-milestone">cleanup milestone</a> and <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Release/ROADMAP.md#menus-on-ui-toolkit">Menus on UI Toolkit</a> open: several findings sit inside steps the roadmap already owns. Class diagrams of each assembly are on <a href="diagrams.html">Diagrams</a>.</p></div>
+
+  <section id="summary"><h2><span class="num">01</span>Summary</h2>
+    <p class="lead">Every finding on one screen. <b>Priority</b> is a suggestion with a one-line reason under each finding. <b>Size</b> is the range from the smallest to the largest option: <b>S</b> is about a day or less, <b>M</b> a few days, <b>L</b> a week or more. The sizes are rough guesses from reading the code, not commitments.</p>
+    <div class="scrollx"><table>
+      <thead><tr><th>ID</th><th>Finding</th><th>Priority</th><th>Area</th><th>Size of fix</th></tr></thead>
+      <tbody>
+        <tr><td><a href="#f01">F01</a></td><td><code>IsometricSlice</code> holds the whole world in one MonoBehaviour</td><td><span class="badge high">high</span></td><td>Architecture</td><td>S–L</td></tr>
+        <tr><td><a href="#f02">F02</a></td><td><code>ExpeditionView</code> draws the board and every hosted window</td><td><span class="badge medium">medium</span></td><td>Architecture</td><td>M–L</td></tr>
+        <tr><td><a href="#f03">F03</a></td><td>A full <code>ExpeditionApp</code> for every hosted screen, Settings included</td><td><span class="badge medium">medium</span></td><td>Architecture</td><td>S–M</td></tr>
+        <tr><td><a href="#f04">F04</a></td><td><code>ExpeditionApp</code>'s screen is an implicit state machine</td><td><span class="badge medium">medium</span></td><td>Architecture</td><td>S–M</td></tr>
+        <tr><td><a href="#f05">F05</a></td><td><code>ExpeditionNetworkSession</code> carries every transport in one class</td><td><span class="badge medium">medium</span></td><td>Architecture</td><td>S–L</td></tr>
+        <tr><td><a href="#f06">F06</a></td><td><code>CircuitRules</code> is one static class across three files</td><td><span class="badge low">low</span></td><td>Architecture</td><td>S–M</td></tr>
+        <tr><td><a href="#f07">F07</a></td><td>Namespaces do not follow assemblies</td><td><span class="badge low">low</span></td><td>Architecture</td><td>S–M</td></tr>
+        <tr><td><a href="#f08">F08</a></td><td>Rehearsals and tools reach private members by string</td><td><span class="badge high">high</span></td><td>Coupling</td><td>S–L</td></tr>
+        <tr><td><a href="#f09">F09</a></td><td>Production code calls into the rehearsal classes</td><td><span class="badge medium">medium</span></td><td>Coupling</td><td>S–M</td></tr>
+        <tr><td><a href="#f10">F10</a></td><td>The world and the hosted session reach into each other</td><td><span class="badge low">low</span></td><td>Coupling</td><td>S–M</td></tr>
+        <tr><td><a href="#f11">F11</a></td><td>Code in files named for other types</td><td><span class="badge low">low</span></td><td>Coupling</td><td>S</td></tr>
+        <tr><td><a href="#f12">F12</a></td><td>Process-wide static state</td><td><span class="badge low">low</span></td><td>Coupling</td><td>S–M</td></tr>
+        <tr><td><a href="#f13">F13</a></td><td>Two menu stacks, with the glyph mapping written three times</td><td><span class="badge medium">medium</span></td><td>Duplication</td><td>S–M</td></tr>
+        <tr><td><a href="#f14">F14</a></td><td>The Circuit sidecars are read by hand, and their types declared twice</td><td><span class="badge medium">medium</span></td><td>Duplication</td><td>S–L</td></tr>
+        <tr><td><a href="#f15">F15</a></td><td>Two progression models, with their own result types</td><td><span class="badge medium">medium</span></td><td>Duplication</td><td>S–L</td></tr>
+        <tr><td><a href="#f16">F16</a></td><td>Two tutorial engines and two voice catalogues</td><td><span class="badge low">low</span></td><td>Duplication</td><td>S–M</td></tr>
+        <tr><td><a href="#f17">F17</a></td><td>The same content is parsed by two JSON libraries</td><td><span class="badge low">low</span></td><td>Duplication</td><td>S–M</td></tr>
+        <tr><td><a href="#f18">F18</a></td><td>Loaders and a component with no callers</td><td><span class="badge low">low</span></td><td>Dead code</td><td>S</td></tr>
+        <tr><td><a href="#f19">F19</a></td><td>Toolkit code that only its own checks use</td><td><span class="badge low">low</span></td><td>Dead code</td><td>S–M</td></tr>
+        <tr><td><a href="#f20">F20</a></td><td>Tools compile game files by path, and one cuts source text</td><td><span class="badge medium">medium</span></td><td>Tooling</td><td>S–M</td></tr>
+        <tr><td><a href="#f21">F21</a></td><td><code>CircuitSliceChecks</code> is one long, stop-at-first-failure run</td><td><span class="badge medium">medium</span></td><td>Tooling</td><td>S–L</td></tr>
+        <tr><td><a href="#f22">F22</a></td><td><code>IsometricSliceBuild</code> builds, authors scenes and runs Android QA</td><td><span class="badge low">low</span></td><td>Tooling</td><td>S–M</td></tr>
+        <tr><td><a href="#f23">F23</a></td><td>An older wiki and three declaration readers beside this one</td><td><span class="badge medium">medium</span></td><td>Tooling</td><td>S–M</td></tr>
+        <tr><td><a href="#f24">F24</a></td><td>A rehearsal capture can race the result presentation</td><td><span class="badge low">low</span></td><td>Tooling</td><td>S–M</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section id="connections"><h2><span class="num">02</span>How the findings connect</h2>
+    <p class="lead">Some fixes make others cheaper, and some findings shrink when a roadmap step lands. This is not an order; it shows what each choice touches.</p>
+    <div class="diagram"><pre class="mermaid">
+flowchart LR
+  F08["F08 string-keyed reflection"]
+  F01["F01 IsometricSlice"]
+  F02["F02 ExpeditionView"]
+  F04["F04 implicit screen state"]
+  F21["F21 rehearsal runner"]
+  F03["F03 app per hosted screen"]
+  F13["F13 two menu stacks"]
+  F14["F14 Circuit sidecars"]
+  F15["F15 two progression models"]
+  F17["F17 two JSON parsers"]
+  F18["F18 dead loaders"]
+  F11["F11 misplaced code"]
+  F20["F20 tools compile by path"]
+  MIG(["Roadmap: Menus on UI Toolkit"])
+  F08 --&gt;|cheaper to change| F01
+  F08 --&gt; F02
+  F08 --&gt; F04
+  F08 --&gt; F21
+  MIG --&gt;|retires windows| F02
+  MIG --&gt;|Settings slice| F03
+  MIG --&gt;|hints slice, step G| F13
+  F13 --&gt;|shrinks| F01
+  F03 ---|same class| F04
+  F14 --&gt;|shrinks| F01
+  F14 --&gt;|real definition for fast checks| F21
+  F15 --&gt;|removes| F18
+  F15 --&gt;|shrinks| F17
+  F11 --&gt;|FairMatchSetup in its own file| F20
+</pre></div>
+    <p class="caption">Solid arrows read "fixing this first makes that one cheaper or smaller". The rounded node is a roadmap item, not a finding.</p>
+  </section>
+
+  <section id="architecture"><h2><span class="num">03</span>Architecture</h2>
+    <p class="lead">The complexity work split long methods until every member scored below 10. Class sizes and member counts were not its target, and the largest classes are still large. The table is a snapshot of <code>main</code> at <code>ca8d41e</code>, so it will drift. <a href="complexity.html">Complexity</a> carries the live per-member numbers.</p>
+    <div class="scrollx"><table>
+      <thead><tr><th>Type</th><th>Assembly</th><th class="num">Files</th><th class="num">Lines (k)</th><th class="num">Methods</th><th class="num">Properties</th><th class="num">Instance fields</th><th class="num">Nested types</th><th>Finding</th></tr></thead>
+      <tbody>
+        <tr><td><code>IsometricSlice</code></td><td>Assembly-CSharp</td><td class="num">19</td><td class="num">8.1</td><td class="num">680</td><td class="num">90</td><td class="num">251</td><td class="num">21</td><td><a href="#f01">F01</a></td></tr>
+        <tr><td><code>CircuitSliceChecks</code></td><td>Assembly-CSharp (QA only)</td><td class="num">10</td><td class="num">11.9</td><td class="num">697</td><td class="num">10</td><td class="num">20</td><td class="num">10</td><td><a href="#f21">F21</a></td></tr>
+        <tr><td><code>ExpeditionView</code></td><td>Assembly-CSharp</td><td class="num">23</td><td class="num">5.5</td><td class="num">540</td><td class="num">37</td><td class="num">129</td><td class="num">5</td><td><a href="#f02">F02</a></td></tr>
+        <tr><td><code>CircuitRules</code></td><td>CardForge.Circuit</td><td class="num">3</td><td class="num">3.0</td><td class="num">345</td><td class="num">0</td><td class="num">0</td><td class="num">1</td><td><a href="#f06">F06</a></td></tr>
+        <tr><td><code>IsometricSliceBuild</code></td><td>Assembly-CSharp-Editor</td><td class="num">1</td><td class="num">2.4</td><td class="num">155</td><td class="num">4</td><td class="num">0</td><td class="num">7</td><td><a href="#f22">F22</a></td></tr>
+        <tr><td><code>ExpeditionNetworkSession</code></td><td>EmberGrove.Expedition.Networking</td><td class="num">1</td><td class="num">1.1</td><td class="num">134</td><td class="num">25</td><td class="num">44</td><td class="num">2</td><td><a href="#f05">F05</a></td></tr>
+        <tr><td><code>ExpeditionApp</code></td><td>Assembly-CSharp</td><td class="num">10</td><td class="num">1.6</td><td class="num">193</td><td class="num">109</td><td class="num">65</td><td class="num">0</td><td><a href="#f03">F03</a>, <a href="#f04">F04</a></td></tr>
+        <tr><td><code>IsometricSectorVisuals</code></td><td>Assembly-CSharp</td><td class="num">6</td><td class="num">2.7</td><td class="num">234</td><td class="num">8</td><td class="num">71</td><td class="num">12</td><td>none; for comparison</td></tr>
+      </tbody>
+    </table></div>
+    <p class="caption">Methods are the method, constructor and operator declarations directly on the type, summed over every partial part; nested types' members and local functions are not counted. Lines are the lines inside the type's declarations, in thousands. How these were counted is in <a href="#method">§09</a>.</p>
+
+    <h3 id="f01">F01 · <code>IsometricSlice</code> holds the whole world in one MonoBehaviour <span class="badge high">high</span></h3>
+    <p class="dim"><b>Why this priority:</b> it is the largest production class in the game, the menu migration's lodge-list, deck-builder and map slices all start inside it, and most of the rehearsals' string-keyed reflection points at it.</p>
+    <p><b>Evidence.</b></p>
+    <ul>
+      <li>19 partial files in <code>Game/EmberGrove/Assets/Runtime/Exploration</code>: <code>IsometricSlice.cs</code> plus Audio, Circuit, CircuitUi, DeckBuilder, Hud, Learning, Lessons, Onboarding, Preferences, Presentation, Progress, Settings, Table, Title, Versus, Waybook, WaybookMenu and World.</li>
+      <li>One MonoBehaviour; its member counts are in the table above. The journal alone has a private <code>CircuitPage</code> enum with one value per page and a back stack of pages.</li>
+      <li>It boots the scene, reads the Circuit sidecars and builds the <code>CircuitDefinition</code> (<a href="#f14">F14</a>), and owns the <code>circuit</code> field (<code>CircuitState</code>) with <code>ApplyCircuit</code>, <code>SaveCircuit</code> and <code>CaptureCircuitSave</code>. It also walks the traveller, draws the HUD and every lodge window, and runs the deck builder, lessons, onboarding, the Versus table lobby and the hand-off to Settings.</li>
+    </ul>
+    <p><b>Why it matters.</b> The partial files name topics but enforce nothing: any of the 19 files can read and write any of its instance fields, so a deck-builder change can break the title page. Nothing in the class can be tested without the scene and a player run. The roadmap's later migration slices move the lodge lists, the deck builder, and the map, tasks, dialogue and onboarding, and each of those starts by untangling its screen from this class.</p>
+    <div class="scrollx"><table>
+      <thead><tr><th>Option</th><th>Size</th><th>Trade-offs</th></tr></thead>
+      <tbody>
+        <tr><td>Extract one screen per migration slice. Each slice moves its screen's state and rules into a plain C# model that the new view binds to. The roadmap already plans the deck builder as "its model, then a redesigned view".</td><td>M per slice</td><td>Fits work already planned. The class shrinks only as slices land, and the boot, world and save core stays.</td></tr>
+        <tr><td>Extract the non-UI core first. A plain class takes <code>circuit</code>, <code>ApplyCircuit</code>, <code>SaveCircuit</code>, <code>CaptureCircuitSave</code> and the duel commit (<code>CommitFinishedCircuitDuel</code>), and a separate loader takes the sidecars (<a href="#f14">F14</a>). The MonoBehaviour keeps references to both.</td><td>L</td><td>The save and duel path becomes testable in the fast portable suites. Every moved member that a rehearsal names by string must be renamed there by hand, so <a href="#f08">F08</a> first makes this cheaper.</td></tr>
+        <tr><td>Freeze it. Add no new partial files or fields, and build new features in new classes.</td><td>S</td><td>Stops the growth. Removes nothing.</td></tr>
+      </tbody>
+    </table></div>
+    <p><b>Roadmap.</b> <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Release/ROADMAP.md#menus-on-ui-toolkit">Menus on UI Toolkit</a>, its slices for lodge lists, the deck builder and the map, tasks, dialogue and onboarding.</p>
+
+    <h3 id="f02">F02 · <code>ExpeditionView</code> draws the board and every hosted window <span class="badge medium">medium</span></h3>
+    <p class="dim"><b>Why this priority:</b> large, but the UI Toolkit migration plans to replace most of its windows, so a split made first may be done twice.</p>
+    <p><b>Evidence.</b></p>
+    <ul>
+      <li>23 files: 21 named <code>ExpeditionView*.cs</code>, plus parts inside <code>ExpeditionApp.Session.cs</code> and <code>ExpeditionTheme.cs</code> (<a href="#f11">F11</a>). Its size is in the table above.</li>
+      <li>One MonoBehaviour draws the flat and world-table battle boards and every hosted window: pause, settings, feedback, help, move help, the connection and deck menus, practice and results, and the Versus home, in landscape and portrait. Hundreds of <code>IsPortrait ?</code> choices place them.</li>
+      <li><code>Render</code> destroys and rebuilds the whole page each time. <code>RewriteHostedMenuCopy</code> and <code>SkinWaybook</code> (<code>ExpeditionView.WorldMenus.cs</code>) then relabel and repaint the built windows by object name. One navigation partial, <code>ExpeditionView.Navigation.cs</code>, routes input for every hosted window.</li>
+    </ul>
+    <p><b>Why it matters.</b> A window change risks the battle board in the same class, and a repaint by name fails silently when a name changes.</p>
+    <div class="scrollx"><table>
+      <thead><tr><th>Option</th><th>Size</th><th>Trade-offs</th></tr></thead>
+      <tbody>
+        <tr><td>Let the migration retire the windows slice by slice, and decide the battle board after its own proof, as the roadmap plans.</td><td>follows the roadmap</td><td>No extra work. The class shrinks only as slices land; if the migration stops, the roadmap brings steps G and H back.</td></tr>
+        <tr><td>Split now into two components on the hosted GameObject: the battle board, and the hosted windows, both reading the same <code>ExpeditionApp</code>.</td><td>L</td><td>Clear ownership now. Part of the work is thrown away when the migration replaces the windows.</td></tr>
+        <tr><td>Cleanup step H as written: one shell with a data row per window kind and orientation, and one button factory, so <code>RewriteHostedMenuCopy</code> and <code>SkinWaybook</code> go.</td><td>M–L</td><td>Removes the repaint by name. The roadmap ties step H to the migration proof's outcome.</td></tr>
+      </tbody>
+    </table></div>
+    <p><b>Roadmap.</b> Step H in the <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Release/ROADMAP.md#cleanup-milestone">cleanup milestone</a>, and the hosted windows slice of <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Release/ROADMAP.md#menus-on-ui-toolkit">Menus on UI Toolkit</a>.</p>
+
+    <h3 id="f03">F03 · A full <code>ExpeditionApp</code> for every hosted screen, Settings included <span class="badge medium">medium</span></h3>
+    <p class="dim"><b>Why this priority:</b> every Settings or Versus visit builds a battle app and reloads the content pack. The migration's Settings slice is a natural moment to change this.</p>
+    <p><b>Evidence.</b></p>
+    <ul>
+      <li><code>IsometricCombatBridge.Begin</code> creates a "Hosted session" GameObject and adds an <code>ExpeditionApp</code> for every <code>HostedSessionKind</code>: <code>CircuitDuel</code>, <code>FriendlyGame</code>, <code>Practice</code>, <code>Lesson</code>, <code>Versus</code> and <code>Settings</code>. <code>IsometricSlice.ShowWorldSettings</code> opens Settings this way.</li>
+      <li><code>ExpeditionApp.Start</code> then calls <code>ContentPackFiles.Load</code>, which reads the manifest, combat, world and media files, validates them and hashes the combat file. It also adds a <code>GameAudioDirector</code>, prepares media and a <code>PlaytestSessionService</code>, and adds an <code>ExpeditionView</code>.</li>
+      <li>Around each session, the bridge's private <code>RuntimePreferences</code> snapshots and later restores the quality level, frame rate, vSync, render pipeline, <code>AudioListener.volume</code>, the cursor and the EventSystem's navigation and selection.</li>
+      <li>Player settings live on the hosted app. The world reads them back from <code>ResultSettings</code> and applies them with <code>ApplyWorldPreferences</code>.</li>
+    </ul>
+    <div class="diagram"><pre class="mermaid">
+sequenceDiagram
+  participant IS as IsometricSlice
+  participant BR as IsometricCombatBridge
+  participant APP as ExpeditionApp
+  participant CPF as ContentPackFiles
+  IS-&gt;&gt;BR: ShowWorldSettings sets Kind = Settings, calls Play(null, ...)
+  BR-&gt;&gt;BR: new RuntimePreferences() snapshots quality, frame rate, vSync, pipeline, volume, cursor, EventSystem
+  BR-&gt;&gt;APP: Begin creates the Hosted session GameObject and adds ExpeditionApp
+  BR-&gt;&gt;APP: ConfigureWorldTable, ConfigureSettingsSession
+  APP-&gt;&gt;CPF: Start calls Load(contentRoot)
+  CPF--&gt;&gt;APP: manifest, combat, world and media, validated, combat file hashed
+  APP-&gt;&gt;APP: CreateCatalog, add GameAudioDirector, PrepareTable, InitializeMedia
+  APP-&gt;&gt;APP: add ExpeditionView, View.Initialize
+  Note over APP: the player changes settings and leaves
+  BR-&gt;&gt;APP: Release: FlushSettings, set ResultSettings, ReleasePresentation, Destroy
+  BR-&gt;&gt;BR: previous.Restore()
+  BR--&gt;&gt;IS: Play finishes
+  IS-&gt;&gt;IS: ApplyWorldPreferences(combat.ResultSettings)
+</pre></div>
+    <p class="caption">Opening Settings from the title or the lodge, traced from <code>IsometricSlice.Settings.cs</code>, <code>IsometricCombatBridge.cs</code> and <code>ExpeditionApp.cs</code>. Every hosted session kind follows the same path.</p>
+    <p><b>Why it matters.</b> A screen with no battle pays for a pack load and a full battle view. Every global the session might touch has to be snapshotted and restored by hand, so a new global setting needs a matching line in <code>RuntimePreferences</code>. Settings have no owner outside a hosted battle app.</p>
+    <div class="scrollx"><table>
+      <thead><tr><th>Option</th><th>Size</th><th>Trade-offs</th></tr></thead>
+      <tbody>
+        <tr><td>Give settings their own owner: a settings model and store outside <code>ExpeditionApp</code> that the world and the hosted app both read. The Settings screen stops being a hosted session.</td><td>M</td><td>Matches the migration's "Settings and its store" slice. The world and the hosted app both change how they read settings.</td></tr>
+        <tr><td>Keep one app per session but hand it the world's <code>LoadedContentPack</code> instead of reloading.</td><td>S–M</td><td>Removes the reloads and the per-session change of <code>ContentPackFiles.ActiveCombatHash</code> (<a href="#f12">F12</a>). Non-battle screens still build the battle stack.</td></tr>
+        <tr><td>Keep it as it is.</td><td>none</td><td>One path for every session kind. The costs stay.</td></tr>
+      </tbody>
+    </table></div>
+    <p><b>Roadmap.</b> The Settings slice of <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Release/ROADMAP.md#menus-on-ui-toolkit">Menus on UI Toolkit</a>. The hosted-session flow itself is described on <a href="sessions.html">Hosted Sessions</a>.</p>
+
+    <h3 id="f04">F04 · <code>ExpeditionApp</code>'s screen is an implicit state machine <span class="badge medium">medium</span></h3>
+    <p class="dim"><b>Why this priority:</b> which screen is open is spread over ten flags written from eight files, and each new window adds a flag and a place in an if-chain.</p>
+    <p><b>Evidence.</b></p>
+    <ul>
+      <li>Ten public booleans decide what <code>ExpeditionView</code> draws: <code>Busy</code>, <code>Paused</code>, <code>Handoff</code>, <code>HelpOpen</code>, <code>FeedbackOpen</code>, <code>SettingsOpen</code>, <code>NetworkMenuOpen</code>, <code>DeckMenuOpen</code>, <code>WorldCardLibraryOpen</code> and <code>MoveHelpOpen</code>. The view adds its own private <code>confirmTurn</code>, and the session's <code>Kind</code> is fixed before start.</li>
+      <li>Eight of <code>ExpeditionApp</code>'s ten files write those flags, and <code>ResetScreen</code> clears all of them except <code>Busy</code>.</li>
+      <li>Hand-kept lists read them, and they differ. <code>CanAct</code> combines <code>CanActMenusClosed</code> (eight of the flags) with <code>CanActGuidanceClear</code> (<code>WorldCardLibraryOpen</code>, <code>MoveHelpOpen</code> and a lesson wait). <code>UpdateRivalScreenOpen</code>, which holds the rival back, checks eight flags too, but not the same eight: it leaves out <code>NetworkMenuOpen</code> and <code>DeckMenuOpen</code>.</li>
+      <li><code>ExpeditionView.Render</code> picks the screen by the order of the checks in <code>RenderFocusedWindow</code>, <code>RenderScreen</code> and <code>RenderWindow</code>.</li>
+    </ul>
+    <div class="diagram"><pre class="mermaid">
+flowchart TD
+  R["ExpeditionView.Render()"] --&gt; FE{"app.FatalError set?"}
+  FE --&gt;|yes| FA["Fatal()"]
+  FE --&gt;|no| FW["focused = RenderFocusedWindow()"]
+  FW --&gt; RS{"RenderScreen: first match wins"}
+  RS --&gt;|Handoff| HO["Handoff()"]
+  RS --&gt;|"State != null"| BA["Battle(), then PracticePresentation() or BattleResult()"]
+  RS --&gt;|"Versus session, not focused"| VH["WorldVersusHome()"]
+  FW --&gt; RW{"RenderWindow: first match wins"}
+  RW --&gt;|"not focused"| CS["BuildConnectionScreens()"]
+  RW --&gt;|WorldCardLibraryOpen| CL["card library, drawn by the shared pass"]
+  RW --&gt;|SettingsOpen| SE["SettingsScreen()"]
+  RW --&gt;|confirmTurn| ET["EndTurnConfirmation()"]
+  RW --&gt;|FeedbackOpen| FB["Feedback()"]
+  RW --&gt;|HelpOpen| HE["Help()"]
+  RW --&gt;|MoveHelpOpen| MH["MoveHelp()"]
+  RW --&gt;|otherwise| PA["Pause()"]
+</pre></div>
+    <p class="caption">The screen choice in <code>ExpeditionView.cs</code>. "Focused" is true when any of <code>WorldCardLibraryOpen</code>, <code>SettingsOpen</code>, <code>confirmTurn</code>, <code>FeedbackOpen</code>, <code>HelpOpen</code>, <code>Paused</code> or <code>MoveHelpOpen</code> is set. Nothing stops two of them being true at once; the order of the checks decides.</p>
+    <p><b>Why it matters.</b> Combinations that should be impossible, such as <code>Paused</code> and <code>SettingsOpen</code> together, can be represented, and only the order of the if-chain settles them. When a window is added, every reader must be updated by hand, and they already differ. The migration's input gate needs to know exactly which window is open.</p>
+    <div class="scrollx"><table>
+      <thead><tr><th>Option</th><th>Size</th><th>Trade-offs</th></tr></thead>
+      <tbody>
+        <tr><td>One enum for the open window, set through one method that checks the allowed changes. <code>Busy</code> and <code>Handoff</code> stay separate facts. The view switches on the enum.</td><td>M</td><td>Impossible combinations disappear. Every writer changes, and rehearsals that set these flags by string must change with them (<a href="#f08">F08</a>).</td></tr>
+        <tr><td>Keep the flags, and add one computed property that states today's order once. <code>CanAct</code>, <code>UpdateRivalScreenOpen</code> and <code>Render</code> all read it.</td><td>S</td><td>The order is written in one place. Impossible combinations can still be represented.</td></tr>
+        <tr><td>Wait for the migration's input gate, build it with its own window stack, and retire each flag as its window moves.</td><td>follows the roadmap</td><td>No separate work. The flags stay for windows that remain on uGUI.</td></tr>
+      </tbody>
+    </table></div>
+    <p><b>Roadmap.</b> The input gate in <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Release/ROADMAP.md#menus-on-ui-toolkit">Menus on UI Toolkit</a>.</p>
+
+    <h3 id="f05">F05 · <code>ExpeditionNetworkSession</code> carries every transport in one class <span class="badge medium">medium</span></h3>
+    <p class="dim"><b>Why this priority:</b> the network gates come next after the menus, and every transport change edits this one class.</p>
+    <p><b>Evidence.</b></p>
+    <ul>
+      <li>One class in the toolkit's Networking assembly; its size is in the table above. Its entry points are LAN (<code>HostLan</code>, <code>JoinLan</code>), relay (<code>HostRelay</code>, <code>JoinRelay</code>, <code>HostNamedRelay</code>, <code>JoinNamedRelay</code>), trusted authority (<code>QuickmatchTrusted</code>, <code>CreateTrusted</code>, <code>JoinTrusted</code>), the table lobby (<code>JoinLobbyTrusted</code>, <code>SubmitLobby</code>), and <code>Submit</code> and <code>Poll</code> for all of them.</li>
+      <li>The same file also holds <code>NetworkLink</code>, <code>TcpNetworkLink</code>, <code>WebSocketNetworkLink</code> and the relay-readiness types.</li>
+      <li><code>Tools/ExpeditionNetworkChecks</code> compiles this toolkit file by path. <code>ExpeditionHarness.Network.cs</code> reaches its internal <code>RelayReadiness</code> and <code>ListRelayRoomsCoreAsync</code> by reflection.</li>
+    </ul>
+    <p><b>Why it matters.</b> A player host, a forwarding relay and a trusted service share one set of state and lifecycle fields. Network work still ahead in the roadmap, such as platform integration and verified identity, would add another path into the same class.</p>
+    <div class="scrollx"><table>
+      <thead><tr><th>Option</th><th>Size</th><th>Trade-offs</th></tr></thead>
+      <tbody>
+        <tr><td>Split by hosting model behind one facade: a peer session for LAN and relay, and a trusted-service session, both using the link classes.</td><td>L</td><td>Game code keeps calling one type. The socket and trusted-service suites move with the split.</td></tr>
+        <tr><td>Move only the helpers out: the links, relay readiness and room browsing go into their own files.</td><td>S</td><td>Shorter file. The class itself is unchanged.</td></tr>
+        <tr><td>Wait, and split when the next transport arrives.</td><td>none now</td><td>No cost now. The split then lands in the middle of network work.</td></tr>
+      </tbody>
+    </table></div>
+    <p><b>Roadmap.</b> Items 3 and 4 of <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Release/ROADMAP.md#next-actions">Next actions</a>; the boundary is owned by <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/NETWORKING.md#current-authority-boundaries">NETWORKING</a>.</p>
+
+    <h3 id="f06">F06 · <code>CircuitRules</code> is one static class across three files <span class="badge low">low</span></h3>
+    <p class="dim"><b>Why this priority:</b> it is pure, static and covered by the fast portable Circuit suite, so its size costs reading time rather than safety.</p>
+    <p><b>Evidence.</b> <code>public static partial class CircuitRules</code> is split over <code>CircuitRules.cs</code>, <code>CircuitValidation.cs</code> and <code>CircuitGraph.cs</code> in the toolkit's <code>Runtime/Circuit</code>. It has no fields other than constants. Every Circuit rule lives on this one type: profiles, saved decks, runs and duels, rewards, events, episodes, visits, tasks, the location graph, validation and save recovery. No type named <code>CircuitValidation</code> or <code>CircuitGraph</code> exists; the files are named by subject.</p>
+    <p><b>Why it matters.</b> Finding a rule means searching one type with several hundred methods, and two file names suggest types that are not there.</p>
+    <div class="scrollx"><table>
+      <thead><tr><th>Option</th><th>Size</th><th>Trade-offs</th></tr></thead>
+      <tbody>
+        <tr><td>Split into static classes by subject, following the sections of the <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Toolkit/Packages/com.catsplat.cardforge/Runtime/Circuit/README.md">Circuit README</a>.</td><td>M</td><td>Easier to find a rule. Callers in the game and tools change, and so does the public toolkit API.</td></tr>
+        <tr><td>Keep one class and add a map from rule group to file in the Circuit README.</td><td>S</td><td>No code change. The map is another thing to keep in step.</td></tr>
+        <tr><td>Leave it.</td><td>none</td><td>The tests make changes safe; only the reading cost remains.</td></tr>
+      </tbody>
+    </table></div>
+    <p><b>Roadmap.</b> None.</p>
+
+    <h3 id="f07">F07 · Namespaces do not follow assemblies <span class="badge low">low</span></h3>
+    <p class="dim"><b>Why this priority:</b> the game-side names are kept on purpose and documented, and renaming toolkit namespaces breaks the package for its users.</p>
+    <p><b>Evidence.</b> The namespace each asmdef's sources declare:</p>
+    <div class="scrollx"><table>
+      <thead><tr><th>Assembly</th><th>Namespaces inside</th></tr></thead>
+      <tbody>
+        <tr><td><code>CardForge.Functional</code></td><td><code>EmberGrove</code> (<code>Result&lt;T&gt;</code>, <code>RuleError</code>)</td></tr>
+        <tr><td><code>EmberGrove.Expedition</code> (<code>Runtime/Core</code>)</td><td><code>EmberGrove.Expedition</code> and <code>CardForge.Lessons</code></td></tr>
+        <tr><td><code>EmberGrove.Expedition.Progression</code></td><td><code>EmberGrove.Expedition</code></td></tr>
+        <tr><td><code>CardForge.Content</code></td><td><code>EmberGrove.Expedition</code></td></tr>
+        <tr><td><code>CardForge.Linker.Editor</code></td><td><code>CardForge.Editor</code></td></tr>
+        <tr><td>Assembly-CSharp (the game)</td><td><code>EmberGrove</code>, <code>EmberGrove.Expedition</code>, <code>EmberGrove.Exploration</code>, <code>EmberGrove.Audio</code>, <code>EmberGrove.Playtesting</code></td></tr>
+      </tbody>
+    </table></div>
+    <p>So <code>EmberGrove.Expedition</code> spans four assemblies and <code>EmberGrove</code> two. <code>CardForge.Circuit</code>, <code>CardForge.Exploration</code> and <code>EmberGrove.Expedition.Networking</code> match their assemblies.</p>
+    <p><b>Why it matters.</b> A reader cannot tell from a <code>using</code> line which assembly, or which side of the toolkit boundary, a type comes from.</p>
+    <div class="scrollx"><table>
+      <thead><tr><th>Option</th><th>Size</th><th>Trade-offs</th></tr></thead>
+      <tbody>
+        <tr><td>Rename toolkit namespaces to match their assemblies.</td><td>M</td><td>Names become predictable. A breaking change for package users, and every <code>using</code> in the game, tools and samples changes.</td></tr>
+        <tr><td>Rename the asmdefs to match the namespaces.</td><td>S–M</td><td>Fewer files change. Assembly names are a public surface too, and the guide says the <code>EmberGrove.Expedition</code> assemblies are kept for compatibility.</td></tr>
+        <tr><td>Add the assembly-to-namespace map to the product-names guide and leave the code.</td><td>S</td><td>No code change. The mismatch stays.</td></tr>
+      </tbody>
+    </table></div>
+    <p><b>Roadmap.</b> Step K of the <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Release/ROADMAP.md#cleanup-milestone">cleanup milestone</a> records the names kept on purpose; <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CODE_ARCHITECTURE_GUIDE.md#product-names">Product names</a> owns the map.</p>
+  </section>
+
+  <section id="coupling"><h2><span class="num">04</span>Coupling</h2>
+    <p class="lead">Dependencies that run the wrong way or bypass the compiler: production code calling test code, a hosted session finding the world globally, and rehearsals and tools reaching private members by name.</p>
+    <div class="diagram"><pre class="mermaid">
+flowchart LR
+  subgraph GAME["Assembly-CSharp"]
+    IS["IsometricSlice"]
+    EA["ExpeditionApp"]
+    EV["ExpeditionView"]
+    SESS["ExpeditionApp.Session.cs"]
+    GPURE["CircuitPersistence.cs, CircuitWorldLayout.cs"]
+    CSC["CircuitSliceChecks, QA only"]
+    EH["ExpeditionHarness, QA only"]
+  end
+  subgraph EDIT["Assembly-CSharp-Editor"]
+    ISB["IsometricSliceBuild"]
+  end
+  subgraph TOOLS["Tools, .NET projects"]
+    FS["CircuitFieldSetupChecks Run-Checks.ps1"]
+    PT["CircuitPersistenceChecks, CircuitWorldChecks"]
+    NT["ExpeditionNetworkChecks, WorldFactChecks"]
+  end
+  AUTH["ExpeditionAuthority, toolkit"]
+  IS --&gt;|"QA-guarded: Install, testing save"| CSC
+  EV --&gt;|"QA-guarded: testing-save toggles"| CSC
+  EA --&gt;|"QA-guarded: relay rehearsal handlers"| EH
+  IS --&gt;|"QA-guarded: rehearsal handler"| EH
+  ISB --&gt;|CheckAndroidNetworkLaunch| EH
+  EA --&gt;|FindAnyObjectByType| IS
+  IS --&gt;|"glyph family, MenuNavigationRows"| EV
+  CSC -.-&gt;|"hundreds of member names as strings"| IS
+  FS -.-&gt;|"cuts FairMatchSetup by counting braces"| SESS
+  PT -.-&gt;|"compiles by file path"| GPURE
+  NT -.-&gt;|"private fields by reflection"| AUTH
+</pre></div>
+    <p class="caption">Solid arrows are compiled calls the compiler checks. Dotted arrows are links it cannot see: names in strings, files by path, or text cut from a source file.</p>
+
+    <h3 id="f08">F08 · Rehearsals and tools reach private members by string <span class="badge high">high</span></h3>
+    <p class="dim"><b>Why this priority:</b> any rename or extraction still compiles and then fails minutes later in a player run, so this raises the cost of <a href="#f01">F01</a>, <a href="#f02">F02</a>, <a href="#f04">F04</a> and <a href="#f21">F21</a>.</p>
+    <p><b>Evidence.</b></p>
+    <ul>
+      <li>In <code>Game/EmberGrove/Assets/Tests</code>, about 800 accesses name a member in a string literal, covering about 180 distinct names. They go through <code>CircuitSliceChecks</code>' helpers <code>Get</code>, <code>Get&lt;T&gt;</code>, <code>Set</code>, <code>SetProperty</code> and <code>Invoke</code>, or through <code>GetField</code>, <code>GetProperty</code>, <code>GetMethod</code> and <code>GetNestedType</code> directly. Most target the <code>IsometricSlice</code> instance. Pages open through <code>Enum.Parse</code> on the private <code>CircuitPage</code> type. Every one of those names still appears in the production source on <code>main</code>. More accesses set the compiler-generated backing fields of <code>ExpeditionApp</code> auto-properties, such as <code>&lt;State&gt;k__BackingField</code>, which exist only while the property has no body.</li>
+      <li>The rehearsal finds <code>EmberGrove.Editor.CurrentCardWorkshop</code> in the editor assembly by its type name.</li>
+      <li><code>Tools/ExpeditionNetworkChecks</code> reads <code>ExpeditionAuthority</code>'s private <code>state</code>, finds the relay's <code>RelayAdmission</code> type by name and reads its maps <code>addresses</code> and <code>failures</code>, and calls <code>RelayApplication.NormalizeSourceRevision</code>. <code>Tools/ExpeditionPerformance/WorldFactChecks.cs</code> reads <code>ExpeditionAuthority</code>'s <code>state</code>, <code>lastCommand</code> and <code>lastEvents</code>.</li>
+      <li><code>IsometricSliceBuild</code> looks up Unity's <code>UnityEditor.Android.AndroidExternalToolsSettings</code> by name across the loaded assemblies and reads <code>jdkRootPath</code>, <code>ndkRootPath</code>, <code>sdkRootPath</code> and <code>gradlePath</code>. It throws a clear message if the API is missing.</li>
+    </ul>
+    <p><b>Why it matters.</b> Neither the compiler nor the IDE's rename can see these names. A rehearsal stops at its first failed check (<a href="#f21">F21</a>), so each broken name costs a build and a run before the next one shows. The Unity lookup can break on an editor upgrade with no compile error.</p>
+    <div class="scrollx"><table>
+      <thead><tr><th>Option</th><th>Size</th><th>Trade-offs</th></tr></thead>
+      <tbody>
+        <tr><td>Make the members the rehearsals use <code>internal</code> and call them directly. The rehearsals already share Assembly-CSharp. For the .NET tools, <code>internal</code> is visible where a tool compiles the source itself; the relay project would need <code>InternalsVisibleTo</code>.</td><td>M</td><td>Renames become compile errors. Visibility widens inside the assembly, and the change is wide but mechanical.</td></tr>
+        <tr><td>Give each large class a narrow QA surface: one internal, QA-guarded accessor that exposes what the rehearsals need, and nothing else.</td><td>M–L</td><td>One place lists every seam. More code to keep.</td></tr>
+        <tr><td>Keep the strings, and add a fast check that resolves every name the rehearsals use before a build is made.</td><td>S</td><td>A broken name shows in seconds rather than after a build. The coupling stays.</td></tr>
+      </tbody>
+    </table></div>
+    <p><b>Roadmap.</b> None.</p>
+
+    <h3 id="f09">F09 · Production code calls into the rehearsal classes <span class="badge medium">medium</span></h3>
+    <p class="dim"><b>Why this priority:</b> shipping players are guarded and checked, but the testing save and the rehearsal hand-offs live inside test classes, so the save path cannot be read or changed on its own.</p>
+    <p><b>Evidence.</b></p>
+    <ul>
+      <li>Six Runtime files name <code>CircuitSliceChecks</code> or <code>ExpeditionHarness</code>, every reference inside <code>#if UNITY_EDITOR || CIRCUIT_QA</code> or <code>#if UNITY_EDITOR || EMBERGROVE_QA</code>:
+        <ul>
+          <li><code>IsometricSlice.cs</code> calls <code>CircuitSliceChecks.Install(this)</code>.</li>
+          <li><code>IsometricSlice.Circuit.cs</code> picks the save folder from <code>LifecycleSaveDirectory</code>, <code>TestingAllCards</code> and <code>TestingSaveFolder</code>, and calls <code>ApplyTestingReset</code> and <code>TopUpTestingSave</code>.</li>
+          <li><code>ExpeditionView.Settings.cs</code> draws the testing-save toggles, and <code>IsometricSlice.Hud.cs</code> labels the testing save.</li>
+          <li><code>ExpeditionApp.Network.cs</code> and <code>IsometricSlice.Versus.cs</code> take the relay rehearsal handlers.</li>
+        </ul>
+        These testing-save members are declared in <code>CircuitSliceChecks.Saves.cs</code>.</li>
+      <li>The editor build calls a test class: <code>IsometricSliceBuild.CircuitAndroidPreparationChecks</code> calls <code>ExpeditionHarness.CheckAndroidNetworkLaunch</code>.</li>
+      <li><code>-circuit-verify</code> and <code>-expedition-net-verify</code> are read outside the guards, in <code>ExpeditionApp.RehearsalPreferenceFlag</code> and <code>IsometricSlice.CircuitVerifying</code>. Whether shipping players keep reading them is an open owner decision.</li>
+      <li>Shipping stays clean: <code>Tools/Validate-CircuitPlayer.ps1</code> checks that a shipping player has no <code>CircuitSliceChecks</code> or <code>ExpeditionHarness</code> types and no testing members. The rehearsals share the game assembly on purpose, as <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CODE_ARCHITECTURE_GUIDE.md#test-and-package-boundaries">Test and package boundaries</a> explains.</li>
+    </ul>
+    <p><b>Why it matters.</b> Production depends on test code, which is the reverse of the usual direction. The save code's folder choice depends on statics declared in a rehearsal, every new seam needs a matching pair of guards, and the editor build script depends on a Runtime test class.</p>
+    <div class="scrollx"><table>
+      <thead><tr><th>Option</th><th>Size</th><th>Trade-offs</th></tr></thead>
+      <tbody>
+        <tr><td>Invert it: production exposes a small hook that a rehearsal installs when it starts, and production code never names a rehearsal class.</td><td>M</td><td>Runtime stops depending on Tests. The hook becomes a permanent production seam.</td></tr>
+        <tr><td>Move the testing-save feature (folder, top-up, reset, summary) out of <code>CircuitSliceChecks.Saves.cs</code> into a QA-only Runtime class beside the save code.</td><td>S–M</td><td>Save behaviour can be read in one place. It still compiles only in QA builds.</td></tr>
+        <tr><td>Keep the structure and settle the open verify-flag decision.</td><td>S</td><td>Closes the one unguarded part. The rest stays.</td></tr>
+      </tbody>
+    </table></div>
+    <p><b>Roadmap.</b> <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Release/ROADMAP.md#open-owner-decisions">Open owner decisions</a> (the verify flags), and the QA seam in the first slice of <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Release/ROADMAP.md#menus-on-ui-toolkit">Menus on UI Toolkit</a>.</p>
+
+    <h3 id="f10">F10 · The world and the hosted session reach into each other <span class="badge low">low</span></h3>
+    <p class="dim"><b>Why this priority:</b> each case is small and local, but together they keep the two halves of Assembly-CSharp from being separable.</p>
+    <p><b>Evidence.</b></p>
+    <ul>
+      <li><code>ExpeditionApp.EnterTableLobby</code> finds the world with <code>FindAnyObjectByType&lt;EmberGrove.Exploration.IsometricSlice&gt;()</code> and calls its <code>OpenTableLobby</code>.</li>
+      <li>The world calls the view's static <code>ExpeditionView.ResolveControllerGlyphFamily</code> and uses <code>MenuNavigationRows</code>, which is declared inside <code>ExpeditionView.Navigation.cs</code>.</li>
+      <li><code>IsometricCombatBridge</code> is configured through public mutable fields (<code>Kind</code>, <code>Lesson</code>, <code>PlayerDeck</code>, <code>PracticeContentJson</code>, <code>OpponentName</code> and others). Each caller sets them and clears the ones it does not use before <code>Play</code>; for example, <code>IsometricSlice.Versus.cs</code> sets <code>Lesson</code> and <code>PlayerDeck</code> to null.</li>
+    </ul>
+    <p><b>Why it matters.</b> The hosted app is meant to be hosted by the world but looks it up globally. Shared helpers hidden inside view files make the world depend on the view class. A field one caller forgets to clear carries into the next session.</p>
+    <div class="scrollx"><table>
+      <thead><tr><th>Option</th><th>Size</th><th>Trade-offs</th></tr></thead>
+      <tbody>
+        <tr><td>Pass the world in: the bridge gives the session a callback for "open the table lobby".</td><td>S</td><td>Removes the global lookup. One more configuration call.</td></tr>
+        <tr><td>Move <code>MenuNavigationRows</code> and the glyph family detector into their own files (see also <a href="#f11">F11</a> and <a href="#f13">F13</a>).</td><td>S</td><td>Both stacks depend on a shared helper instead of on the view.</td></tr>
+        <tr><td>Replace the bridge's public fields with one request object passed to <code>Play</code>.</td><td>S–M</td><td>No stale fields between sessions. Every caller builds a complete request.</td></tr>
+      </tbody>
+    </table></div>
+    <p><b>Roadmap.</b> None.</p>
+
+    <h3 id="f11">F11 · Code in files named for other types <span class="badge low">low</span></h3>
+    <p class="dim"><b>Why this priority:</b> each move is small, and one of them removes the text cutting in <a href="#f20">F20</a>.</p>
+    <p><b>Evidence.</b></p>
+    <div class="scrollx"><table>
+      <thead><tr><th>File</th><th>Also holds</th></tr></thead>
+      <tbody>
+        <tr><td><code>ExpeditionApp.Session.cs</code></td><td>An <code>ExpeditionView</code> part (<code>ReleaseSessionSprites</code>), the <code>FairMatchSetup</code> class and the <code>HostedSessionKind</code> enum</td></tr>
+        <tr><td><code>ExpeditionTheme.cs</code></td><td>An <code>ExpeditionView</code> part: theme loading and the environment art</td></tr>
+        <tr><td><code>WorldTableContext.cs</code></td><td>An <code>ExpeditionApp</code> part: <code>WorldTable</code> and <code>ConfigureWorldTable</code></td></tr>
+        <tr><td><code>ExpeditionView.Navigation.cs</code>, <code>ExpeditionView.Glyphs.cs</code></td><td><code>MenuNavigationRows</code> and <code>ExpeditionControllerGlyphFamily</code>, which both menu stacks use</td></tr>
+        <tr><td><code>CircuitValidation.cs</code>, <code>CircuitGraph.cs</code></td><td>Parts of <code>CircuitRules</code>; no type of either name exists (<a href="#f06">F06</a>)</td></tr>
+        <tr><td><code>DuelUi.cs</code>, <code>TravellerUiMotion.cs</code>, <code>IsometricSlice.Preferences.cs</code>, <code>ExpeditionView.Input.cs</code>, <code>ExpeditionView.SettingsNavigation.cs</code>, <code>ExpeditionFocusMotion.cs</code>, <code>PracticeNarration.cs</code></td><td>MonoBehaviours with other names: <code>DuelPointer</code>, <code>DuelHoverLift</code>, <code>TravellerButtonMotion</code>, <code>TravellerPanelMotion</code>, <code>TravellerPreferenceText</code>, <code>ExpeditionCardGesture</code>, <code>ExpeditionSettingAdjustment</code>, <code>ExpeditionFocusRowPointer</code>, <code>PracticeVoiceAvailability</code></td></tr>
+      </tbody>
+    </table></div>
+    <p><b>Why it matters.</b> Searching by file name misses this code. The FieldSetup suite depends on <code>FairMatchSetup</code> staying inside <code>ExpeditionApp.Session.cs</code>. Unity can only attach a MonoBehaviour from the editor when its file has the same name, so the components in the last row can be added from code but not authored on a prefab, which the migration wants for the notebook.</p>
+    <div class="scrollx"><table>
+      <thead><tr><th>Option</th><th>Size</th><th>Trade-offs</th></tr></thead>
+      <tbody>
+        <tr><td>Give each shared type and each MonoBehaviour its own file, and move the foreign partial parts into files named for their class.</td><td>S</td><td>Search and prefab authoring work. <code>Tools/CircuitFieldSetupChecks/Run-Checks.ps1</code> must change in the same commit as <code>FairMatchSetup</code>.</td></tr>
+        <tr><td>Move only the partial parts and <code>FairMatchSetup</code>; leave the small components where they are.</td><td>S</td><td>Fixes the misleading files. Components still cannot be authored on prefabs.</td></tr>
+        <tr><td>Leave it.</td><td>none</td><td>No churn.</td></tr>
+      </tbody>
+    </table></div>
+    <p><b>Roadmap.</b> None.</p>
+
+    <h3 id="f12">F12 · Process-wide static state <span class="badge low">low</span></h3>
+    <p class="dim"><b>Why this priority:</b> each static works today, but behaviour depends on who wrote last, and the toolkit reads process arguments.</p>
+    <p><b>Evidence.</b></p>
+    <ul>
+      <li><code>DuelUi.MenuColour</code>: the writable colour roles are mutable statics that both menu stacks read. <code>Use</code>, called by each stack as its pack loads, and <code>UseHighContrast</code> rewrite them, and a menu that is already drawn keeps its old colours.</li>
+      <li><code>ContentPackFiles.ActiveCombatHash</code> is set by every pack load, and every hosted session reloads the pack (<a href="#f03">F03</a>). Only a rehearsal reads it; the per-load value is also on <code>LoadedContentPack.CombatHash</code>.</li>
+      <li>In the toolkit, <code>ContentPackFiles.MenuPaletteOverride</code> is initialised from the <code>-menu-palette</code> argument, and <code>ContentPackFiles.DefaultRoot</code> reads <code>-content-pack</code>.</li>
+      <li><code>TravellerPictures.ConfigureArtwork</code> sets a static picture resolver that the world sets after loading and clears when it is destroyed.</li>
+      <li>The testing-save statics in <code>CircuitSliceChecks.Saves.cs</code> (<code>TestingAllCards</code>, <code>TestingAllCardsWanted</code>, <code>TestingResetWanted</code>, <code>TestingSaveSummary</code>) are read and written by the world and the hosted settings (<a href="#f09">F09</a>).</li>
+    </ul>
+    <p><b>Why it matters.</b> The last writer wins. Rehearsals must reset these statics between stages; for example, the menu-rules stage sets <code>ContentPackFiles.MenuPaletteOverride</code> back to null. A reusable package that reads process arguments surprises the projects that use it.</p>
+    <div class="scrollx"><table>
+      <thead><tr><th>Option</th><th>Size</th><th>Trade-offs</th></tr></thead>
+      <tbody>
+        <tr><td>Pass state explicitly: each stack holds the palette and contrast in a theme object, and callers read <code>LoadedContentPack.CombatHash</code> instead of the static.</td><td>M</td><td>No order dependence. Every menu builder that reads <code>DuelUi.MenuColour</code> changes.</td></tr>
+        <tr><td>Move argument reading out of the toolkit: the game reads <code>-content-pack</code> and <code>-menu-palette</code> and passes them to <code>ContentPackFiles</code>.</td><td>S</td><td>The toolkit stops reading the process's arguments. The game's callers and the rehearsal stage that sets <code>MenuPaletteOverride</code> change with it.</td></tr>
+        <tr><td>Keep the statics and document them in one list, reset in one place at boot.</td><td>S</td><td>Visible and resettable. The globals stay.</td></tr>
+      </tbody>
+    </table></div>
+    <p><b>Roadmap.</b> Retiring <code>MenuPalettes</code> is an open decision in <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Release/ROADMAP.md#menus-on-ui-toolkit">Menus on UI Toolkit</a>; pinning <code>-content-pack</code> for candidates is in <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Release/ROADMAP.md#open-owner-decisions">Open owner decisions</a>.</p>
+  </section>
+
+  <section id="duplication"><h2><span class="num">05</span>Duplication</h2>
+    <p class="lead">Concepts that exist twice or three times. The cleanup milestone's rule applies to every option here: give a shared rule one owner that both sides call, and never make one copy match another by writing a second one.</p>
+
+    <h3 id="f13">F13 · Two menu stacks, with the glyph mapping written three times <span class="badge medium">medium</span></h3>
+    <p class="dim"><b>Why this priority:</b> two parts already have one owner, and the rest waits on a roadmap decision, so the cost is the drift until then.</p>
+    <p><b>Evidence.</b></p>
+    <ul>
+      <li>The hosted windows (<code>ExpeditionView</code>) and the lodge windows (<code>IsometricSlice</code>) are two code-built uGUI stacks. The title page is a third surface, on UI Toolkit (<code>IsometricSlice.WaybookMenu.cs</code>, <code>LodgeWaybookBinding</code>).</li>
+      <li>Two parts already have one owner: neighbour finding (<code>MenuNavigationRows</code>) and colour roles (<code>DuelUi.MenuColour</code>).</li>
+      <li>Controller glyphs have one family detector, <code>ExpeditionView.ResolveControllerGlyphFamily</code>, but the step from family to glyph prefix (<code>sony_</code>, <code>switch_</code>, <code>xbox_</code>) and the <code>Resources.Load</code> of the glyph sprite are written three times: the prefix in <code>ExpeditionView.UpdateNavigationHintsKeys</code>, <code>IsometricSlice.UpdatePromptControllerHints</code> and <code>IsometricSlice.RefreshWaybookHintsNames</code>, and the sprite load in <code>ExpeditionView.DrawNavigationGlyph</code>, <code>IsometricSlice.Glyph</code> and <code>IsometricSlice.RefreshWaybookHintsShoulder</code>.</li>
+      <li>Focus and press feedback has two components, <code>ExpeditionFocusMotion</code> (hosted) and <code>TravellerButtonMotion</code> (lodge).</li>
+      <li>Menu direction input is read twice: by <code>ExpeditionView.ReadKeyboardNavigation</code> and <code>ResolveNavigationDirection</code> in hosted menus, and by <code>IsometricSlice.ReadMove</code>, which drives both walking and lodge menus.</li>
+    </ul>
+    <p><b>Why it matters.</b> Each menu rule change is made twice and tested twice, and the copies drift. The roadmap builds the planned lodge hint strip on step G's single hint owner, so that strip waits for G.</p>
+    <div class="scrollx"><table>
+      <thead><tr><th>Option</th><th>Size</th><th>Trade-offs</th></tr></thead>
+      <tbody>
+        <tr><td>Cleanup step G as written: one implementation each for glyph hints, colour resolution, control feedback and navigation input, which both stacks call.</td><td>M</td><td>Ends the drift. The roadmap makes step G's scope depend on the migration proof.</td></tr>
+        <tr><td>Do the smallest piece now: one helper beside <code>ResolveControllerGlyphFamily</code> that returns the prefix and loads the sprite, used by all three hint drawers.</td><td>S</td><td>Removes the triple copy before the lodge hint strip is built. The hint layouts stay twice.</td></tr>
+        <tr><td>Let the migration replace the hosted windows and hints, deleting the hosted copies as they go.</td><td>follows the roadmap</td><td>No interim work. If the migration stops, step G returns as written.</td></tr>
+      </tbody>
+    </table></div>
+    <p><b>Roadmap.</b> Step G of the <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Release/ROADMAP.md#cleanup-milestone">cleanup milestone</a>, the hint strip in <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Release/ROADMAP.md#menu-ui-cleanup">Menu UI cleanup</a>, and <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Release/ROADMAP.md#menus-on-ui-toolkit">Menus on UI Toolkit</a>. The shared rules themselves are owned by <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CIRCUIT_PRESENTATION.md#menu-roles">Menu roles</a>.</p>
+
+    <h3 id="f14">F14 · The Circuit sidecars are read by hand, and their types declared twice <span class="badge medium">medium</span></h3>
+    <p class="dim"><b>Why this priority:</b> the rules that turn content into the Circuit live in a MonoBehaviour, so no fast check sees the definition the game actually builds.</p>
+    <p><b>Evidence.</b></p>
+    <ul>
+      <li><code>IsometricSlice.LoadCircuit</code> reads <code>Circuit/card-guide.json</code>, <code>locations.json</code>, <code>journey.json</code>, <code>practice.json</code> and <code>lessons.json</code> from StreamingAssets through <code>CircuitText</code>. That is outside the content pack, so <code>-content-pack</code> and a <code>ContentOverride</code> do not reach them. The manifest's <code>CircuitPackDefinition</code> holds only <code>DialogueFile</code>.</li>
+      <li>It parses them into DTOs nested in <code>IsometricSlice</code> (<code>CircuitGuide</code>, <code>CardGuide</code>, <code>ArchetypeGuide</code>, <code>CircuitPlaces</code> and others), then builds the <code>CircuitDefinition</code> inline. The rules written there include card tier from unlock order (<code>(UnlockOrder - 1) / 20 + 1</code>), <code>"midrange"</code> as the starter available at first, and rival tier from list position.</li>
+      <li><code>Tools/CircuitContentChecks/Program.cs</code> declares its own copies: <code>CardGuide</code>, <code>CardNote</code> and <code>ArchetypeNote</code>. There <code>CardGuide</code> names the whole file; in the game it names one card. <code>Tools/ExpeditionPerformance/Program.cs</code> reads <code>StarterCardIds</code> through <code>JsonElement</code>.</li>
+      <li>The portable suites (<code>CircuitChecks</code>, <code>CircuitWorldChecks</code>) build synthetic definitions and repeat the tier rule as <code>1 + i / 20</code>. The live definition is checked only inside the rehearsal; <code>PureTournamentFixture</code> runs pure rules on <code>slice.circuitDefinition</code>.</li>
+      <li>The sidecar names are listed again in <code>IsometricSliceBuild</code> and <code>Tools/Package-Isometric.ps1</code>, and the starter decks exist in both <code>card-guide.json</code> and <code>expedition-content.json</code>. Both are open owner decisions.</li>
+    </ul>
+    <p><b>Why it matters.</b> Content Studio, the tools and the relay cannot build the definition the game plays. A field added to the guide must be added to two DTO sets, and Circuit rule tests run against fixtures rather than the shipped content.</p>
+    <div class="scrollx"><table>
+      <thead><tr><th>Option</th><th>Size</th><th>Trade-offs</th></tr></thead>
+      <tbody>
+        <tr><td>Move the sidecar DTOs and the definition builder into the toolkit as a pure function next to <code>CircuitDefinition</code> or <code>ContentPackFiles</code>. The game and the tools call it.</td><td>M</td><td>One owner, and the portable suites can test the real definition, so checks like <code>PureTournamentFixture</code> could leave the player run. The toolkit gains knowledge of the Circuit sidecars (<code>CardForge.Content</code> already references <code>CardForge.Circuit</code>).</td></tr>
+        <tr><td>Share only the DTOs: one file of card-guide types compiled into both the game and <code>CircuitContentChecks</code>.</td><td>S</td><td>Removes the duplicate types. The definition rules stay in <code>IsometricSlice</code>.</td></tr>
+        <tr><td>Declare the sidecars in the pack manifest's <code>Circuit</code> section, so <code>ContentPackFiles.Load</code> loads them like the other pack files.</td><td>M–L</td><td>One loading path, and the pack override covers them. A pack-format change for Content Studio and the <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Tools/ContentStudio/PACK_CONTRACT.md">pack contract</a>.</td></tr>
+      </tbody>
+    </table></div>
+    <p><b>Roadmap.</b> The starter-deck copies and the staged-sidecar list are both in <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Release/ROADMAP.md#open-owner-decisions">Open owner decisions</a>.</p>
+
+    <h3 id="f15">F15 · Two progression models, with their own result types <span class="badge medium">medium</span></h3>
+    <p class="dim"><b>Why this priority:</b> the retired model is loaded and validated on every pack load, and the one thing the game still takes from it, a boss-music rule, never marks a Circuit champion.</p>
+    <p><b>Evidence.</b></p>
+    <ul>
+      <li>The game plays the Circuit: <code>CircuitRules</code> and <code>CircuitState</code> in <code>CardForge.Circuit</code>.</li>
+      <li>The toolkit's <code>EmberGrove.Expedition.Progression</code> assembly still holds the retired campaign: <code>RunState</code> and <code>RunRules</code>, <code>ProfileState</code> and <code>ProfileRules</code>, <code>StoryRules</code>, <code>CampaignRules</code> and <code>WorldDefinition</code> with its entries. The game calls none of these rules; it reads <code>WorldDefinition</code> only for the music rule below.</li>
+      <li>The live types the game needs share those files. <code>ContentPack</code>, <code>EncounterDefinition</code> and <code>DeckPresetDefinition</code> sit in <code>ExpeditionRun.cs</code> beside <code>RunState</code>, and Networking uses <code>CombatProgressFacts</code>.</li>
+      <li>The assembly does not reference <code>CardForge.Functional</code>, so it declares its own <code>RunResult&lt;T&gt;</code> and <code>WorldResult&lt;T&gt;</code>. Both repeat <code>Result&lt;T&gt;</code>'s <code>Ok</code>, <code>Fail</code>, <code>Map</code> and <code>Bind</code>.</li>
+      <li><code>ContentPackFiles.Load</code> parses <code>world-content.json</code> (about 230 KB) and runs <code>World.Validate</code> on every load, including each hosted session (<a href="#f03">F03</a>).</li>
+      <li>The game's only use of the world is <code>ExpeditionApp.TickMediaBossEncounter</code>, which picks <code>MusicBossId</code> when the encounter is a Boss node in the retired route stages. On <code>main</code> those nodes' encounters are <code>hollow_crown</code>, <code>last_covenant</code> and <code>unwritten_engine</code>, which no Circuit sidecar names. The Circuit's champion encounters (<code>circuit_boss_*</code>) are not Boss nodes. Sessions shown on the world table skip this music logic altogether: <code>TickMedia</code> returns early when <code>UsesWorldPresentation</code> is true, because the world's score owns the music there.</li>
+      <li>Outside the game's runtime, the retired model is used by <code>IsometricSliceBuild</code>'s content staging, which parses and validates the world, by the non-default <code>LegacyProgression</code> suite, by <code>WorldFactChecks</code> (in the default <code>Portable</code> group), by the toolkit's <code>MinimalTactics</code> sample and by Content Studio's world editing. <code>WorldFile</code> is part of the pack manifest.</li>
+    </ul>
+    <p><b>Why it matters.</b> Two models that share a name and an assembly confuse every new reader. The game pays a load and validation for data whose one use reads the retired model rather than the Circuit's own champion flag.</p>
+    <div class="scrollx"><table>
+      <thead><tr><th>Option</th><th>Size</th><th>Trade-offs</th></tr></thead>
+      <tbody>
+        <tr><td>Retire the shell. Move <code>ContentPack</code>, <code>EncounterDefinition</code>, <code>DeckPresetDefinition</code> and <code>CombatProgressFacts</code> into their own files. Delete the retired rules, the world definitions, the two result types, <code>WorldContent</code> and <code>world-content.json</code>, and give boss music a Circuit source. Then rewrite or drop the suites and the sample that use them.</td><td>L</td><td>The largest removal on this page. It changes the pack contract, Content Studio's world editing, and the toolkit's public API and sample.</td></tr>
+        <tr><td>Stop loading it in the game: make <code>WorldFile</code> optional in <code>ContentPackFiles.Load</code>, drop the music rule or pass the Circuit's champion flag (<code>PendingDuel.Champion</code>) to the session instead. Keep the toolkit code, marked retired.</td><td>M</td><td>A lighter load, and boss music decided by Circuit data if it is wanted. The toolkit still carries two models.</td></tr>
+        <tr><td>Reference <code>CardForge.Functional</code> from Progression and replace <code>RunResult&lt;T&gt;</code> and <code>WorldResult&lt;T&gt;</code> with <code>Result&lt;T&gt;</code>.</td><td>S</td><td>One result type. The retired model stays.</td></tr>
+      </tbody>
+    </table></div>
+    <p><b>Roadmap.</b> None. The pack format is owned by the <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Tools/ContentStudio/PACK_CONTRACT.md">pack contract</a>.</p>
+
+    <h3 id="f16">F16 · Two tutorial engines and two voice catalogues <span class="badge low">low</span></h3>
+    <p class="dim"><b>Why this priority:</b> both work, and the lessons guide documents them. The cost is two authoring paths for one kind of experience.</p>
+    <p><b>Evidence.</b></p>
+    <ul>
+      <li>The first practice is a fixed script: <code>practice.json</code> fills the text fields of <code>PracticeTutorialContent</code> (<code>ExpeditionApp.Practice.cs</code>), and the rival's moves come from <code>PracticeOpponentCommand</code>.</li>
+      <li>Lessons are data-driven scenarios: <code>lessons.json</code> holds a <code>LessonLibrary</code> (<code>CardForge.Lessons</code>), checked by <code>LessonRules.Validate</code> and run through <code>ExpeditionApp.Lessons.cs</code>. Both kinds run as hosted sessions, and <code>ExpeditionView.Practice.cs</code> presents both.</li>
+      <li>Hosted narration (<code>PracticeNarration</code>) plays from <code>Content/Circuit/Voice/lines.json</code>, matched by text. World narration (<code>IsometricSlice.Audio.cs</code>) plays <code>Voice</code> assets from the pack's <code>media.json</code>, matched by <code>MatchesTranscript</code>.</li>
+    </ul>
+    <p><b>Why it matters.</b> A writer edits tutorials in two formats and records voice into two catalogues. A change to how guided play works is made in two engines.</p>
+    <div class="scrollx"><table>
+      <thead><tr><th>Option</th><th>Size</th><th>Trade-offs</th></tr></thead>
+      <tbody>
+        <tr><td>Express the first practice as an authored lesson and retire <code>PracticeTutorialContent</code>, if the lesson format can express its steps.</td><td>M</td><td>One engine and one authoring tool. The first practice must be rewritten in the lesson format and checked again.</td></tr>
+        <tr><td>Keep both engines and merge the voice: one catalogue for world and hosted narration.</td><td>S–M</td><td>One place to record and replace voice. Fits the migration's slice for hints, voice and press sound.</td></tr>
+        <tr><td>Leave both, and keep the split stated in the lessons guide.</td><td>S</td><td>No change. Two paths remain.</td></tr>
+      </tbody>
+    </table></div>
+    <p><b>Roadmap.</b> The voice slice of <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Release/ROADMAP.md#menus-on-ui-toolkit">Menus on UI Toolkit</a>. The lesson architecture is owned by <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CIRCUIT_LESSONS.md#integration-and-teaching-architecture">CIRCUIT_LESSONS</a>.</p>
+
+    <h3 id="f17">F17 · The same content is parsed by two JSON libraries <span class="badge low">low</span></h3>
+    <p class="dim"><b>Why this priority:</b> the network fingerprint already catches parse differences in the rules it covers; what remains is a pack that Content Studio accepts and the game reads differently.</p>
+    <p><b>Evidence.</b></p>
+    <ul>
+      <li>Three serializers are in use: Unity's <code>JsonUtility</code> (saves, settings, packs and sidecars in the game), <code>System.Text.Json</code> (the relay, Content Studio and every .NET tool), and <code>DataContractJsonSerializer</code> (the network wire codec in <code>NetworkContracts.cs</code>).</li>
+      <li><code>ExpeditionContent.Parse</code> switches on <code>CARDFORGE_HEADLESS</code>: <code>System.Text.Json</code> in the relay (<code>TrustedMatchApplication</code>) and Content Studio, <code>JsonUtility</code> in Unity. Tools without that define, and <code>WorldContent.Parse</code> everywhere outside Unity, get <code>System.Text.Json</code> through a UnityEngine stand-in (<a href="#f20">F20</a>).</li>
+      <li>The two libraries treat missing fields and null objects differently. The lessons guide warns about one case: <code>JsonUtility</code> turns an optional null inline class into an empty object.</li>
+      <li>Saves have one scenario set run under both libraries (cleanup step I, <code>CircuitPersistenceVerification</code>). No equivalent parity check for content packs was found on <code>main</code>.</li>
+      <li>Online play is partly protected. A trusted match compares the SHA-256 of the combat JSON and also <code>ExpeditionFingerprint.Compute</code>, which hashes the parsed cards, deck presets and match settings. A parse difference in those fields refuses the match instead of letting the two sides play different rules.</li>
+    </ul>
+    <p><b>Why it matters.</b> Content Studio validates a pack with one parser and the game loads it with another, so a creator can see a pack pass in Studio that the game reads differently. Fields outside the fingerprint, such as encounters and the retired world, are never compared.</p>
+    <div class="scrollx"><table>
+      <thead><tr><th>Option</th><th>Size</th><th>Trade-offs</th></tr></thead>
+      <tbody>
+        <tr><td>Add a parity check: parse the default pack and fixture packs with both libraries and compare the resulting <code>ContentPack</code>s field by field.</td><td>S–M</td><td>Catches drift. Needs a Unity-side run for <code>JsonUtility</code>, as the save scenarios do.</td></tr>
+        <tr><td>Normalise after parsing: one post-parse step that fills or rejects every optional field the same way under either library.</td><td>M</td><td>Differences cannot reach the rules. A new field must be added to the normaliser.</td></tr>
+        <tr><td>Use one library everywhere for content: <code>System.Text.Json</code> in Unity too, where the target platforms and stripping allow.</td><td>M</td><td>One behaviour. Adds a dependency to the Unity build and needs IL2CPP and Android proof.</td></tr>
+      </tbody>
+    </table></div>
+    <p><b>Roadmap.</b> None. The relay's headless parse is described in the <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Tools/ExpeditionRelay/README.md#trusted-authority-proof">relay guide</a>.</p>
+  </section>
+
+  <section id="dead-code"><h2><span class="num">06</span>Dead code</h2>
+    <p class="lead">Code with no caller in the game. The first finding is unreachable; the second is toolkit API that only its own checks use, where keeping it is a scope decision.</p>
+
+    <h3 id="f18">F18 · Loaders and a component with no callers <span class="badge low">low</span></h3>
+    <p class="dim"><b>Why this priority:</b> harmless at run time and cheap to remove; one of them would throw if anything called it.</p>
+    <p><b>Evidence.</b></p>
+    <ul>
+      <li><code>ExpeditionContent.Load</code> (guarded by <code>#if !CARDFORGE_HEADLESS</code>) loads <code>Resources/Expedition/expedition-content</code>, which is not in the project; only <code>ExpeditionTheme.asset</code> is under <code>Resources/Expedition</code>. It then calls <code>WorldContent.Load</code>. Neither method has a caller on <code>main</code>; the toolkit's <code>Documentation~/AUTHORING.md</code> describes both as legacy loaders that expect a consumer's own <code>Resources/Expedition</code> assets. The game loads packs with <code>ContentPackFiles.Load</code>.</li>
+      <li><code>WorldContent.cs</code> has an unguarded <code>using UnityEngine</code>, and its <code>Load</code> is the only user of <code>Resources</code> and <code>TextAsset</code> there. That is one reason the tools carry UnityEngine stand-ins (<a href="#f20">F20</a>).</li>
+      <li><code>DuelHoverLift</code>, an internal MonoBehaviour in <code>DuelUi.cs</code>, is never added by any code, and its file name means it cannot be placed in the editor either.</li>
+    </ul>
+    <div class="scrollx"><table>
+      <thead><tr><th>Option</th><th>Size</th><th>Trade-offs</th></tr></thead>
+      <tbody>
+        <tr><td>Delete both <code>Load</code> methods and <code>DuelHoverLift</code>, and guard <code>WorldContent</code>'s Unity use the way <code>ExpeditionContent</code> is guarded.</td><td>S</td><td>Less code and fewer stand-in needs. The two <code>Load</code> methods are public toolkit API, so a package user calling them would break; they already fail without the Resources asset.</td></tr>
+        <tr><td>Mark the two loaders <code>[Obsolete]</code> for one release, then delete them; delete <code>DuelHoverLift</code> now.</td><td>S</td><td>Gentler for package users. Two steps.</td></tr>
+        <tr><td>Leave them.</td><td>none</td><td>No change.</td></tr>
+      </tbody>
+    </table></div>
+    <p><b>Roadmap.</b> None.</p>
+
+    <h3 id="f19">F19 · Toolkit code that only its own checks use <span class="badge low">low</span></h3>
+    <p class="dim"><b>Why this priority:</b> it does no harm in the game; whether CardForge should keep it is a question about the toolkit's scope.</p>
+    <p><b>Evidence.</b> <code>LandmarkRules</code> and <code>ExplorationProgress</code> in <code>CardForge.Exploration</code> (<code>LandmarkRules.cs</code>) are used only by <code>Tools/ExplorationChecks</code>. <code>Content/Exploration/README.md</code> lists <code>LandmarkRules</code> as toolkit code. The retired progression shell in <a href="#f15">F15</a> is the same case at a larger scale.</p>
+    <div class="scrollx"><table>
+      <thead><tr><th>Option</th><th>Size</th><th>Trade-offs</th></tr></thead>
+      <tbody>
+        <tr><td>Keep it as supported toolkit API, and say so in the toolkit README's supported scope.</td><td>S</td><td>Clear status. Code the game never runs is still maintained.</td></tr>
+        <tr><td>Remove it with its checks.</td><td>S</td><td>Smaller package. A breaking change for any package user.</td></tr>
+        <tr><td>Move it into the package samples.</td><td>S–M</td><td>Kept as an example, outside the runtime assemblies.</td></tr>
+      </tbody>
+    </table></div>
+    <p><b>Roadmap.</b> None. The package boundary is owned by the <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Toolkit/Packages/com.catsplat.cardforge/README.md#package-boundary">toolkit README</a>.</p>
+  </section>
+
+  <section id="tooling"><h2><span class="num">07</span>Tooling</h2>
+    <p class="lead">The checks, builds and documentation around the game. Which tool does what is listed in <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Tools/README.md#find-the-right-tool">Tools/README</a>; how to run the rehearsals is in the <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Game/EmberGrove/Assets/Tests/README.md">harness guide</a>.</p>
+
+    <h3 id="f20">F20 · Tools compile game files by path, and one cuts source text <span class="badge medium">medium</span></h3>
+    <p class="dim"><b>Why this priority:</b> the fast suites skip the assembly rules Unity enforces, and one suite depends on how a source file is laid out.</p>
+    <p><b>Evidence.</b></p>
+    <ul>
+      <li>The .NET check projects and the relay under <code>Tools/</code> use <code>&lt;Compile Include&gt;</code> to compile toolkit sources by path, usually several assemblies' folders into one assembly. Only the relay launcher references a project instead. <code>CircuitPersistenceChecks</code> also compiles <code>Game/EmberGrove/Assets/Runtime/Exploration/CircuitPersistence.cs</code> and <code>Game/EmberGrove/Assets/Tests/CircuitPersistenceVerification.cs</code>, and <code>CircuitWorldChecks</code> compiles <code>CircuitWorldLayout.cs</code>.</li>
+      <li><code>Tools/CircuitFieldSetupChecks/Run-Checks.ps1</code> finds <code>internal static class FairMatchSetup</code> inside <code>ExpeditionApp.Session.cs</code>, counts <code>{</code> and <code>}</code> to find its end, and writes it to <code>Temp/CircuitFieldSetupChecks/ActualSetup.cs</code> for the project to compile. A brace inside a string or comment in that class would cut it in the wrong place.</li>
+      <li>Three UnityEngine stand-ins provide <code>TextAsset</code>, <code>Resources</code> and a <code>JsonUtility</code> mapped to <code>System.Text.Json</code>: <code>Tools/ContentStudio/UnityBoundary.cs</code>, <code>Tools/ExpeditionPerformance/UnityBoundaryStub.cs</code>, and a third that <code>Tools/Expedition/check_progression.py</code> writes when it runs.</li>
+    </ul>
+    <p><b>Why it matters.</b> Inside one tool assembly, <code>internal</code> is visible across toolkit assemblies and the asmdef reference lists are not checked. A forbidden reference therefore passes the fast suites and fails only in Unity. Changing how <code>FairMatchSetup</code> is written can break a suite that has nothing to do with its behaviour.</p>
+    <div class="scrollx"><table>
+      <thead><tr><th>Option</th><th>Size</th><th>Trade-offs</th></tr></thead>
+      <tbody>
+        <tr><td>Mirror the asmdefs: one small .NET project per toolkit assembly, with the same references, which the tools reference instead of including files.</td><td>M</td><td>The .NET build enforces the same boundaries as Unity. Tools that reach internals need <code>InternalsVisibleTo</code> (<a href="#f08">F08</a>).</td></tr>
+        <tr><td>Move <code>FairMatchSetup</code> into its own file and compile it by path like the others, so the script stops cutting text.</td><td>S</td><td>Removes the brace counter. FieldSetup still compiles a game file by path.</td></tr>
+        <tr><td>Define <code>CARDFORGE_HEADLESS</code> in every tool and guard <code>WorldContent</code>'s Unity use like <code>ExpeditionContent</code>, so the stand-ins go.</td><td>S–M</td><td>Three stand-ins removed. Tools then always take the <code>System.Text.Json</code> branch, which <a href="#f17">F17</a>'s parity question already covers.</td></tr>
+      </tbody>
+    </table></div>
+    <p><b>Roadmap.</b> None.</p>
+
+    <h3 id="f21">F21 · <code>CircuitSliceChecks</code> is one long, stop-at-first-failure run <span class="badge medium">medium</span></h3>
+    <p class="dim"><b>Why this priority:</b> it is the only proof of most game behaviour, and each run is a build plus minutes of play that report a single failure.</p>
+    <p><b>Evidence.</b></p>
+    <ul>
+      <li>10 partial files in <code>Assets/Tests/Runtime</code>; its size is in the table in <a href="#architecture">§03</a>. The editor-and-test complexity batch (PRs #33 and #34) split its long methods: it had 234 methods at <code>2b99fd4</code>, before that batch, and about three times as many at <code>ca8d41e</code>.</li>
+      <li><code>Install</code> starts the run, and <code>Rehearse</code> runs every stage of the main sequence in a fixed order in one player process. A few switches choose a different run, such as <code>-circuit-world-only</code>, <code>-circuit-palettes</code> and the save-lifecycle phases, but no switch reruns one stage of the main sequence.</li>
+      <li><code>Check</code> throws on the first false condition, so a run reports one failure. The player writes its report and quits with 0 or 1.</li>
+      <li>Some stages need no scene but run in the player anyway. For example, <code>PureTournamentFixture</code> runs pure <code>CircuitRules</code> transitions on the live definition, which only the world can build (<a href="#f14">F14</a>).</li>
+    </ul>
+    <p><b>Why it matters.</b> The feedback loop is long: a fix whose next failure sits in a later stage needs another full build and run. Any rename breaks it at run time (<a href="#f08">F08</a>).</p>
+    <div class="scrollx"><table>
+      <thead><tr><th>Option</th><th>Size</th><th>Trade-offs</th></tr></thead>
+      <tbody>
+        <tr><td>Add a stage filter argument beside the existing switches, so one failing stage can be rerun alone.</td><td>S–M</td><td>Shorter reruns. Stages that depend on state left by earlier stages cannot run alone.</td></tr>
+        <tr><td>Move the checks that need no scene into the portable suites, after <a href="#f14">F14</a> makes the real definition available there.</td><td>M</td><td>Seconds instead of minutes for rule checks. Some checks use Unity types and need stand-ins (<a href="#f20">F20</a>).</td></tr>
+        <tr><td>Split by subject into separate rehearsal classes that share one small runner.</td><td>M–L</td><td>Each subject can run alone. Cleanup step I gave the shared helpers one owner in <code>CircuitSliceChecks.cs</code>, and that owner must stay single.</td></tr>
+      </tbody>
+    </table></div>
+    <p><b>Roadmap.</b> Step I of the <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Release/ROADMAP.md#cleanup-milestone">cleanup milestone</a>, the QA seam in <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Release/ROADMAP.md#menus-on-ui-toolkit">Menus on UI Toolkit</a>, and the intermittent rehearsal failures open in <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Release/ROADMAP.md#menu-ui-cleanup">Menu UI cleanup</a>.</p>
+
+    <h3 id="f22">F22 · <code>IsometricSliceBuild</code> builds, authors scenes and runs Android QA <span class="badge low">low</span></h3>
+    <p class="dim"><b>Why this priority:</b> editor-only and changed mostly in release work, but every job it does shares one class.</p>
+    <p><b>Evidence.</b> One static class in <code>Assets/Editor/IsometricSliceBuild.cs</code>, with 7 nested types and 12 <code>Bloomfire Circuit</code> menu items; its size is in the table in <a href="#architecture">§03</a>. The file also holds <code>AndroidNetworkQaLinker</code>. Its jobs are:</p>
+    <ul>
+      <li>scene and prefab authoring: <code>CreateCircuitScene</code>, <code>CreateLodgeWaybook</code>, the room-set and district tools;</li>
+      <li>content staging: <code>StageCircuitContent</code> and the sidecar list;</li>
+      <li>Windows and macOS builds and rehearsal builds;</li>
+      <li>the Android preflight, build-state capture and restore, and MSAA processing;</li>
+      <li>the private relay QA scope and its checks.</li>
+    </ul>
+    <p><code>Tools/Build-PrivateNetworkPair.ps1</code> and the build commands in <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/MAINTAINING.md#android-development-build">MAINTAINING</a> call its methods by name through <code>-executeMethod</code>.</p>
+    <div class="scrollx"><table>
+      <thead><tr><th>Option</th><th>Size</th><th>Trade-offs</th></tr></thead>
+      <tbody>
+        <tr><td>Split by job into separate static classes in <code>Assets/Editor</code>. Keep today's public methods as one-line forwarders so <code>-executeMethod</code> callers keep working.</td><td>M</td><td>Each job reads alone. The forwarders are a second name for each entry point until callers move.</td></tr>
+        <tr><td>Move only the scene and prefab authoring menu items out; they are not called by the build methods.</td><td>S</td><td>The biggest unrelated job leaves. The build, Android and relay QA code stays together.</td></tr>
+        <tr><td>Leave it.</td><td>none</td><td>No churn in release tooling.</td></tr>
+      </tbody>
+    </table></div>
+    <p><b>Roadmap.</b> Whether the build records what it staged in <code>build-info.json</code> is in <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Release/ROADMAP.md#open-owner-decisions">Open owner decisions</a>.</p>
+
+    <h3 id="f23">F23 · An older wiki and three declaration readers beside this one <span class="badge medium">medium</span></h3>
+    <p class="dim"><b>Why this priority:</b> the roadmap leaves "how it stays in step with the guides" for this moment, and both wikis will drift if nothing is decided.</p>
+    <p><b>Evidence.</b></p>
+    <ul>
+      <li><code>Tools/Documentation/export_wiki.py</code> builds an offline content inventory (<code>Builds/Documentation/index.html</code>, 19 pages) and the Content Studio handbook. <code>check_wiki.cjs</code> requires exactly 19 sections, and its <code>Docs</code> suite is not in the default <code>Portable</code> group.</li>
+      <li>Its code page writes hand-written summaries. The Progression paragraph describes the retired campaign (run transitions, campaign availability, profiles) as current (<a href="#f15">F15</a>).</li>
+      <li>Its guides page globs <code>Docs/*.md</code>, which since the guides moved into subfolders finds only <code>Docs/README.md</code>.</li>
+      <li>Two tools on <code>main</code> read C# declarations: the exporter's <code>source_declarations</code>, and <code>Tools/Package-Toolkit.ps1</code>, which regenerates the tracked <code>Documentation~/API_INDEX.md</code>. This wiki's generated class diagrams need a third. <code>API_INDEX.md</code> was last committed on 2026-09-15 and lists 16 of the toolkit's 25 runtime files; the four Circuit files, the three Exploration files, <code>LessonContracts.cs</code> and <code>LessonRules.cs</code> are missing.</li>
+    </ul>
+    <p><b>Why it matters.</b> Two generated wikis describe the same code with different, partly stale text, and three readers can disagree about what exists.</p>
+    <div class="scrollx"><table>
+      <thead><tr><th>Option</th><th>Size</th><th>Trade-offs</th></tr></thead>
+      <tbody>
+        <tr><td>Split the jobs: <code>export_wiki.py</code> keeps the handbook and the content inventory (cards, decks, voice) and drops its code page; this wiki owns structure. Regenerate or retire <code>API_INDEX.md</code>.</td><td>S–M</td><td>Each wiki has one job. The exporter's check and its section count change.</td></tr>
+        <tr><td>Fold the content inventory into this wiki's build and retire the exporter's full wiki, keeping <code>--handbook-only</code> for Content Studio.</td><td>M</td><td>One site and one declaration reader. The handbook path and its consumers must keep working.</td></tr>
+        <tr><td>Keep both, and state in the documentation README which owns what.</td><td>S</td><td>No tool change. The stale text stays until someone fixes it.</td></tr>
+      </tbody>
+    </table></div>
+    <p><b>Roadmap.</b> The game wiki, sixth in the remaining list of <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Release/ROADMAP.md#menu-ui-cleanup">Menu UI cleanup</a>. The exporter is described in <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Tools/Documentation/README.md#full-inventory">Tools/Documentation</a>.</p>
+
+    <h3 id="f24">F24 · A rehearsal capture can race the result presentation <span class="badge low">low</span></h3>
+    <p class="dim"><b>Why this priority:</b> the checks still pass, but under load the run can photograph the wrong moment and make two runs of the same build differ.</p>
+    <p><b>Evidence.</b></p>
+    <ul>
+      <li><code>RehearseLiveDuelResult</code> in <code>CircuitSliceChecks.cs</code> autoplays the duel until <code>State.IsOver</code>, then calls <code>Capture("11-live-duel-result")</code>, whose only wait is <code>PresentationSettled</code>: a quarter of a second of real time.</li>
+      <li><code>ExpeditionApp.Present</code> sets <code>State</code> before it plays the final events, and <code>ExpeditionView.BattleResult</code> returns early while <code>app.Busy</code>, so the result panel is drawn only once that last animation ends.</li>
+      <li>While the test-code complexity batch was being verified, one rehearsal ran with about a dozen other jobs loading the machine. Its capture showed the board without the result panel, plus a Scroll hint that added three PASS lines. A second run of the same build matched main exactly, pixel for pixel on that capture.</li>
+    </ul>
+    <p><b>Why it matters.</b> A screenshot taken at the wrong moment still passes, so the capture stops proving what its name says. Comparing two rehearsals, as every no-visible-change refactor does, then has to tell this noise apart from a real change.</p>
+    <div class="scrollx"><table>
+      <thead><tr><th>Option</th><th>Size</th><th>Trade-offs</th></tr></thead>
+      <tbody>
+        <tr><td>Before that capture, wait until the hosted app is no longer <code>Busy</code>.</td><td>S</td><td>Fixes this capture. Other captures taken right after a command could have the same race and need the same look.</td></tr>
+        <tr><td>Make <code>PresentationSettled</code> wait for an idle hosted app whenever an encounter is open.</td><td>S–M</td><td>Fixes every capture of this kind at once. It changes the timing of every capture in an encounter, so the whole rehearsal needs a fresh baseline.</td></tr>
+        <tr><td>Leave it, and treat this capture as known run-to-run noise.</td><td>none</td><td>No change; every comparison keeps having to explain it.</td></tr>
+      </tbody>
+    </table></div>
+    <p><b>Roadmap.</b> The intermittent rehearsal failures in <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Release/ROADMAP.md#menu-ui-cleanup">Menu UI cleanup</a>.</p>
+  </section>
+
+  <section id="dropped"><h2><span class="num">08</span>Flags checked and changed</h2>
+    <p class="lead">This page started from a structure map of <code>main</code>. Every flag in it was checked against the code. These were wrong, imprecise or out of date, and were dropped or corrected.</p>
+    <div class="scrollx"><table>
+      <thead><tr><th>Flag in the map</th><th>What the code shows</th><th>Result</th></tr></thead>
+      <tbody>
+        <tr><td>The Teaching asmdef is orphaned</td><td><code>Teaching/LegacyEditor/EmberGrove.Networking.asmdef</code> is a corrected manifest kept as reference material, as <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Teaching/README.md#legacy-editor-assembly-correction">Teaching/README</a> explains. It lies outside the Unity project and is never compiled.</td><td>Dropped</td></tr>
+        <tr><td>Three input-glyph resolvers</td><td>One family detector shared by both stacks; the family-to-prefix mapping and the sprite load are what is written three times</td><td>Corrected in <a href="#f13">F13</a></td></tr>
+        <tr><td>The Circuit state is replaced only through <code>ApplyCircuit</code></td><td>The restore code and one task-selection path assign <code>circuit</code> directly. All production assignments are in <code>IsometricSlice.Circuit.cs</code>.</td><td>Corrected in <a href="#f01">F01</a></td></tr>
+        <tr><td>Member counts (for example "about 590 methods" for <code>ExpeditionView</code>)</td><td>Those were regex estimates. This page uses Roslyn counts, which count only members declared directly on the type.</td><td>Replaced</td></tr>
+        <tr><td>"791 string-keyed accesses, 174 names"</td><td>A different matcher finds about 800 and about 180. The picture is the same, and every name resolves today.</td><td>Restated in <a href="#f08">F08</a></td></tr>
+        <tr><td><code>IsometricSliceBuild</code> has 8 nested types</td><td>7 nested types, plus <code>AndroidNetworkQaLinker</code> beside it in the same file</td><td>Corrected in <a href="#f22">F22</a></td></tr>
+        <tr><td>Editor and test numbers measured at <code>2b99fd4</code></td><td><code>main</code> moved to <code>ca8d41e</code> (PRs #33 and #34) while this page was written; both batches touched only <code>Assets/Editor</code> and <code>Assets/Tests</code></td><td>Re-measured at <code>ca8d41e</code></td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section id="method"><h2><span class="num">09</span>How this page was measured</h2>
+    <p class="lead">Everything here was read from git at <code>main</code> (<code>ca8d41e</code>, 2026-11-07), never from a working checkout. Re-measure before relying on any number.</p>
+    <ul>
+      <li><b>Member counts</b> come from a Roslyn syntax parse (Microsoft.CodeAnalysis.CSharp 4.13) of every <code>.cs</code> file under <code>Game/</code> and <code>Toolkit/</code>, with <code>UNITY_EDITOR</code>, <code>CIRCUIT_QA</code> and <code>EMBERGROVE_QA</code> defined so that QA code is included. Partial parts are summed by full type name. Methods include constructors and operators. Instance fields exclude <code>const</code> and <code>static</code> fields. Parsing with no defines drops the QA-only classes, removes one method and one field from <code>IsometricSlice</code>, and one method from <code>ExpeditionView</code>.</li>
+      <li><b>String-keyed reflection</b> counts calls to <code>Get</code>, <code>Set</code>, <code>SetProperty</code> and <code>Invoke</code> whose member argument is a string literal naming a plain identifier, plus <code>GetField</code>, <code>GetProperty</code>, <code>GetMethod</code> and <code>GetNestedType</code> with such a literal, across <code>Game/EmberGrove/Assets/Tests</code>. Compiler-generated backing-field names are left out of the count. Each name was then looked up in the Runtime, Editor and Toolkit sources.</li>
+      <li><b>References, guards and callers</b> were found with <code>git grep</code> on <code>main</code> and read in context. A "no caller" claim means <code>git grep</code> found no call site in the whole tracked tree, which includes the scene and prefab files.</li>
+      <li><b>Complexity</b> is not measured here; <a href="complexity.html">Complexity</a> owns it.</li>
+    </ul>
+  </section>
+
+  <div class="honest"><h4>Keep this page honest</h4><ul>
+    <li><code>Game/EmberGrove/Assets/Runtime/Exploration/IsometricSlice*.cs</code> — the world class's size, fields, sidecar loading and testing-save hooks (F01, F09, F14)</li>
+    <li><code>Game/EmberGrove/Assets/Runtime/ExpeditionView*.cs</code>, <code>ExpeditionTheme.cs</code> — the hosted view, the render order and the glyph and navigation code (F02, F04, F13)</li>
+    <li><code>Game/EmberGrove/Assets/Runtime/ExpeditionApp*.cs</code>, <code>WorldTableContext.cs</code> — the screen flags, sessions, <code>FairMatchSetup</code> and boss music (F03, F04, F11, F15)</li>
+    <li><code>Game/EmberGrove/Assets/Runtime/Exploration/IsometricCombatBridge.cs</code> — session creation, <code>RuntimePreferences</code> and the public fields (F03, F10)</li>
+    <li><code>Game/EmberGrove/Assets/Runtime/DuelUi.cs</code>, <code>PracticeNarration.cs</code>, <code>Exploration/TravellerPictures.cs</code> — colour statics, the picture resolver, <code>DuelHoverLift</code>, voice (F12, F16, F18)</li>
+    <li><code>Game/EmberGrove/Assets/Tests/Runtime/CircuitSliceChecks*.cs</code>, <code>ExpeditionHarness*.cs</code> — reflection helpers, the runner and the testing save (F08, F09, F21)</li>
+    <li><code>Game/EmberGrove/Assets/Editor/IsometricSliceBuild.cs</code> — build jobs, Android reflection and the harness call (F08, F09, F22)</li>
+    <li><code>Toolkit/Packages/com.catsplat.cardforge/Runtime/</code> — <code>Circuit/CircuitRules.cs</code> and its partials, <code>Networking/ExpeditionNetworkSession.cs</code>, <code>Content/ContentPackFiles.cs</code>, <code>Content/ExpeditionContent.cs</code>, <code>Content/WorldContent.cs</code>, <code>Progression/*.cs</code>, <code>Exploration/LandmarkRules.cs</code> and the asmdefs (F05–F07, F12, F15, F17–F19)</li>
+    <li><code>Tools/*/*.csproj</code>, <code>Tools/CircuitFieldSetupChecks/Run-Checks.ps1</code>, <code>Tools/CircuitContentChecks/Program.cs</code>, <code>Tools/ExpeditionNetworkChecks/Program.cs</code>, <code>Tools/ExpeditionPerformance/WorldFactChecks.cs</code>, the UnityEngine stand-ins — tool coupling (F08, F14, F20)</li>
+    <li><code>Tools/Documentation/export_wiki.py</code>, <code>check_wiki.cjs</code>, <code>Tools/Package-Toolkit.ps1</code> — the older wiki and declaration readers (F23)</li>
+    <li><code>Assets/Tests/Runtime/CircuitSliceChecks.cs</code> (<code>RehearseLiveDuelResult</code>, <code>Capture</code>, <code>PresentationSettled</code>), <code>ExpeditionApp.cs</code> (<code>Present</code>) and <code>ExpeditionView.Journey.cs</code> (<code>BattleResult</code>) — the capture race (F24)</li>
+    <li><code>Docs/Release/ROADMAP.md</code> — every "Roadmap" line; when a step closes, update or remove its finding</li>
+  </ul></div>
+</main>
+<footer>Bloomfire Wiki · page source <code>Docs/Wiki/findings.html</code>, built by <code>Tools/Documentation/structure_wiki.py</code> · Found a mistake? Fix it in the same commit as the code that made it one.</footer>
+</body>
+</html>

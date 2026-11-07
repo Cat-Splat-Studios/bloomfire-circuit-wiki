@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Maintaining — Bloomfire Wiki</title>
+<link rel="stylesheet" href="wiki.css">
+<script src="mermaid.min.js" defer></script>
+<script src="wiki.js" defer></script>
+</head>
+<body>
+<nav class="wiki">
+  <a class="home" href="index.html">🔥 Bloomfire Wiki</a>
+  <div class="grp"><span class="grp-t">Start here</span>
+    <a href="codebase-tour.html">Codebase Tour</a>
+    <a href="glossary.html">Glossary</a>
+  </div>
+  <div class="grp"><span class="grp-t">Game systems</span>
+    <a href="rules.html">Rules Engine</a>
+    <a href="world.html">World &amp; Journal</a>
+    <a href="sessions.html">Hosted Sessions</a>
+    <a href="ui.html">UI &amp; Menus</a>
+    <a href="networking.html">Networking</a>
+    <a href="content.html">Content &amp; Media</a>
+    <a href="saves.html">Saves &amp; Settings</a>
+  </div>
+  <div class="grp"><span class="grp-t">Code health</span>
+    <a href="diagrams.html">Diagrams</a>
+    <a href="complexity.html">Complexity</a>
+    <a href="findings.html">Findings</a>
+  </div>
+  <div class="grp"><span class="grp-t">Ship &amp; maintain</span>
+    <a href="qa.html">QA &amp; Rehearsals</a>
+    <a href="builds.html">Builds &amp; Tools</a>
+    <a class="on" href="maintaining.html">Maintaining</a>
+  </div>
+</nav>
+<header class="page"><h1>Maintaining the <span class="flame">wiki</span></h1><p class="tag">How to build and check this wiki, where its sources are, what is generated, and what to update when the code changes.</p></header>
+<main>
+  <div class="tldr"><h4>In 60 seconds</h4><ul>
+    <li><b>Build:</b> <code>python Tools/Documentation/structure_wiki.py build</code>, then open <code>Builds/Documentation/Wiki/index.html</code> in a browser (<a href="#build">§01</a>).</li>
+    <li><b>Check before you push:</b> <code>python Tools/Documentation/structure_wiki.py check</code> prints <code>PASS</code> or lists every problem by group, and exits 1 if there is any (<a href="#check">§03</a>).</li>
+    <li><b>Edit sources, never output.</b> Pages are hand-written in <code>Docs/Wiki</code>. The nav, <code>diagrams.html</code> and the complexity tables are generated on every build (<a href="#sources">§02</a>).</li>
+    <li><b>Changed code?</b> Find the change in the update matrix (<a href="#matrix">§06</a>) and fix the pages it names in the same commit.</li>
+    <li><b>Complexity comes from <code>Tools/CodeMetrics</code>.</b> Whether its <code>--max 9</code> check becomes a gate is the owner's decision (<a href="#complexity">§07</a>).</li>
+  </ul></div>
+  <div class="prereq"><h4>Before you start</h4><p>You need Python 3 and Git on the path, and a .NET SDK, 10 or later, when the complexity tables have to be measured. Run every command from the repository root. Read <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/AGENTS.md">AGENTS.md</a> once: its one-source-of-truth rule is why these pages link the guides instead of copying them.</p></div>
+
+  <section id="build"><h2><span class="num">01</span>Build and open the wiki</h2>
+    <p class="lead">One standard-library Python tool builds the site from the sources and checks it. The output is plain static HTML that opens from disk with no server.</p>
+    <div class="scrollx"><table>
+      <tr><th>Command</th><th>What it does</th></tr>
+      <tr><td><code>python Tools/Documentation/structure_wiki.py build</code></td><td>Builds into <code>Builds/Documentation/Wiki</code> (ignored by Git) and prints a JSON summary: pages built, NAV pages with no source yet, diagram counts and the measured revisions. It replaces that folder on every build.</td></tr>
+      <tr><td><code>python Tools/Documentation/structure_wiki.py build --out DIR</code></td><td>Builds somewhere else. It refuses to replace a folder that is not empty unless an earlier build wrote it.</td></tr>
+      <tr><td><code>python Tools/Documentation/structure_wiki.py check</code></td><td>Copies <code>Docs/Wiki</code> once to <code>Temp/StructureWiki/check-source</code>, builds that copy into <code>Temp/StructureWiki/check</code> and again into <code>Temp/StructureWiki/check-repeat</code>, compares the two and verifies the result (<a href="#check">§03</a>). Exit 0 means <code>PASS</code>.</td></tr>
+      <tr><td><code>--refresh-metrics</code> (either command)</td><td>Measures every reference revision again instead of reusing the cached complexity results (<a href="#complexity">§07</a>).</td></tr>
+    </table></div>
+    <p>Open <code>Builds/Documentation/Wiki/index.html</code> in any browser. Diagrams render with the vendored <code>mermaid.min.js</code>, so no network is needed. With scripts off you lose the contents list, the previous/next links and the rendered diagrams; the diagram source stays readable as text.</p>
+    <div class="note"><p>Build problems are failures, never silent skips: a missing shell file, a page without its <code>&lt;!-- nav --&gt;</code> line, a missing complexity placeholder, a missing analyzer or .NET SDK, or a C# file the declaration reader cannot balance all stop the build with a message. A NAV page that has no source yet is only a warning on <code>build</code>, and a failure on <code>check</code>.</p></div>
+  </section>
+
+  <section id="sources"><h2><span class="num">02</span>Where the sources live, and what is generated</h2>
+    <p class="lead">Everything you edit is under <code>Docs/Wiki</code> and <code>Tools</code>. Everything under <code>Builds</code> and <code>Temp</code> is output and is rebuilt.</p>
+    <div class="scrollx"><table>
+      <tr><th>Path</th><th>What it is</th><th>Who writes it</th></tr>
+      <tr><td><code>Docs/Wiki/*.html</code></td><td>One hand-written source page per NAV entry, except <code>diagrams.html</code>. The folder is flat and holds only pages and the four shell files; the build fails on anything else.</td><td>People</td></tr>
+      <tr><td><code>Docs/Wiki/wiki.css</code>, <code>Docs/Wiki/wiki.js</code></td><td>The shared shell every page loads: palette and components, and the script that builds the contents list and previous/next links and renders diagrams.</td><td>People, rarely</td></tr>
+      <tr><td><code>Docs/Wiki/mermaid.min.js</code>, <code>Docs/Wiki/mermaid-LICENSE.txt</code></td><td>Mermaid 11.16.1, vendored unchanged with its MIT licence.</td><td>Replaced deliberately, never edited</td></tr>
+      <tr><td><code>Tools/Documentation/structure_wiki.py</code></td><td>The <code>NAV</code> table, the diagram generator, the complexity tables and their <code>REVISIONS</code> list, and the checker.</td><td>People</td></tr>
+      <tr><td><code>Tools/CodeMetrics</code></td><td>The complexity analyzer the build runs (<a href="#complexity">§07</a>).</td><td>People</td></tr>
+      <tr><td><code>Builds/Documentation/Wiki</code></td><td>The built site.</td><td>The build only</td></tr>
+      <tr><td><code>Temp/StructureWiki</code></td><td>Revision snapshots, cached complexity results, the analyzer's build output and the check builds.</td><td>The build and the check</td></tr>
+    </table></div>
+    <h3>What the build generates</h3>
+    <ul>
+      <li><b>The nav.</b> Each source page carries the single line <code>&lt;!-- nav --&gt;</code> right after <code>&lt;body&gt;</code>; the build replaces it with the nav from <code>NAV</code> and marks the current page. No page carries its own copy.</li>
+      <li><b><code>diagrams.html</code>, the whole page.</b> It is drawn from the C# files, <code>.asmdef</code> files and tool <code>.csproj</code> files that <code>git ls-files</code> lists, so a new file appears only after <code>git add</code>, and an ignored file such as <code>PrivateRelayQaSettings.generated.cs</code> is never read. The reader sees declarations only and reads every <code>#if</code> branch as present.</li>
+      <li><b>The complexity tables.</b> <code>complexity.html</code> holds six placeholder lines, <code>&lt;!-- complexity:summary --&gt;</code>, <code>history</code>, <code>areas</code>, <code>bands</code>, <code>types</code> and <code>hotspots</code>; the build replaces each with a table and fails if one is missing, repeated or unknown.</li>
+      <li><b>In the browser,</b> <code>wiki.js</code> adds the “On this page” list and the previous/next links, read off the page's <code>&lt;h2&gt;</code>s and the nav order.</li>
+    </ul>
+    <div class="diagram"><pre class="mermaid">
+flowchart LR
+  pages["Docs/Wiki/*.html&lt;br/&gt;hand-written pages"] --&gt; build
+  shell["wiki.css, wiki.js&lt;br/&gt;mermaid.min.js"] --&gt; build
+  nav["NAV table&lt;br/&gt;in structure_wiki.py"] --&gt; build
+  code["tracked C#, .asmdef, .csproj&lt;br/&gt;from git ls-files"] --&gt; build
+  revs["REVISIONS&lt;br/&gt;git archive snapshots"] --&gt; metrics["Tools/CodeMetrics&lt;br/&gt;dotnet run"]
+  metrics --&gt; cache["Temp/StructureWiki&lt;br/&gt;metrics-SHA.json"]
+  cache --&gt; build
+  build["structure_wiki.py build"] --&gt; out["Builds/Documentation/Wiki"]
+  check["structure_wiki.py check"] --&gt; twice["two builds under Temp/StructureWiki"]
+  twice --&gt; verdict["PASS, or problems by group"]
+</pre></div>
+    <p class="caption">The build pipeline. The check runs the same build twice and then reads the result.</p>
+  </section>
+
+  <section id="check"><h2><span class="num">03</span>What the check verifies</h2>
+    <p class="lead">The check reports every problem it finds, grouped, and exits 1 if there is any. Each group below is a heading in its report.</p>
+    <div class="scrollx"><table>
+      <tr><th>Group</th><th>What fails it</th></tr>
+      <tr><td><code>BUILD</code></td><td>The build itself stopped; the message says why (<a href="#build">§01</a>).</td></tr>
+      <tr><td><code>MISSING PAGES</code></td><td>A NAV page that was not built, with how many pages link to it.</td></tr>
+      <tr><td><code>NOT IN THE NAV</code></td><td>A source page that has no <code>NAV</code> entry.</td></tr>
+      <tr><td><code>PAGE SHELL</code></td><td>A source page without exactly one <code>&lt;!-- nav --&gt;</code> line, without <code>wiki.css</code> or <code>wiki.js</code>, without <code>header.page</code> (<code>header.hero</code> on <code>index.html</code>), <code>main</code> or <code>footer</code>, or without a <code>.honest</code> box (every page but <code>index.html</code>).</td></tr>
+      <tr><td><code>SECTION NUMBERS</code></td><td>A section without an id or a number, or numbers out of order (<a href="#shape">§04</a>). The generated page is checked too.</td></tr>
+      <tr><td><code>BROKEN LINKS</code></td><td>A link to a page or <code>#id</code> that does not exist in the output, a link that leaves the wiki folder, a script or stylesheet that is not in the output, or an id used twice on one page.</td></tr>
+      <tr><td><code>REPOSITORY LINKS</code></td><td>A <code>https://github.com/Cat-Splat-Studios/CardGame/blob/main/…</code> link whose path is not tracked on <code>main</code>, or whose <code>#anchor</code> is not a heading (by GitHub's slug rules) or an explicit <code>&lt;a id&gt;</code> in that Markdown file on <code>main</code>.</td></tr>
+      <tr><td><code>WRONG SECTION LABELS</code></td><td>A <code>§NN</code> inside a link, or right after it, that does not match the number of the section the link lands in.</td></tr>
+      <tr><td><code>MERMAID</code></td><td>A page with a <code>pre.mermaid</code> that does not load <code>mermaid.min.js</code>, a page that loads it for nothing, or a raw <code>&lt;</code> inside a diagram's source.</td></tr>
+      <tr><td><code>PRIVATE KEY PATTERN</code></td><td>Text shaped like the private relay credential: the escaped literal the private build writes, a quoted <code>AccessKey</code> constant, or a value given to <code>BLOOMFIRE_PRIVATE_QA_RELAY_KEY</code>. The match itself is never printed.</td></tr>
+      <tr><td><code>PUBLIC SITE</code></td><td>Text that must not reach the public site (<a href="#publishing">§09</a>): a path on a developer's machine (a drive path with either slash, a Git Bash, Cygwin or WSL path, a Linux or macOS home or volume, or a network share), an email address, an IP address other than loopback, a URL with a user name or password in it, or a link to a host that is neither loopback nor in <code>PUBLIC_HOSTS</code>. A host goes into that list only when it is a public site. For an example in prose, use a placeholder: a <code>.invalid</code> host, or a path whose machine-specific part is written as <code>&lt;folder&gt;</code>, such as <code>&lt;folder&gt;/Tools</code>.</td></tr>
+      <tr><td><code>NOT DETERMINISTIC</code></td><td>The two builds, made from the same copy of the sources, differ: something in the build depends on time, order or the machine.</td></tr>
+    </table></div>
+    <p>The check does not render Mermaid, so a diagram with a syntax error passes it; open the page and look. It does not follow links to other websites, and it cannot tell whether prose matches the code: the “Keep this page honest” box on each page lists the files to reread.</p>
+  </section>
+
+  <section id="shape"><h2><span class="num">04</span>The page shape</h2>
+    <p class="lead">Every page reads the same way, so a reader knows where to look. Copy an existing page rather than starting from nothing.</p>
+<pre><code>&lt;!DOCTYPE html&gt;
+&lt;html lang="en"&gt;
+&lt;head&gt;
+&lt;meta charset="UTF-8"&gt;
+&lt;meta name="viewport" content="width=device-width, initial-scale=1.0"&gt;
+&lt;title&gt;Networking — Bloomfire Wiki&lt;/title&gt;
+&lt;link rel="stylesheet" href="wiki.css"&gt;
+&lt;script src="mermaid.min.js" defer&gt;&lt;/script&gt;   &lt;!-- only on a page with a pre.mermaid --&gt;
+&lt;script src="wiki.js" defer&gt;&lt;/script&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;!-- nav --&gt;
+&lt;header class="page"&gt;&lt;h1&gt;…&lt;/h1&gt;&lt;p class="tag"&gt;One sentence of purpose.&lt;/p&gt;&lt;/header&gt;
+&lt;main&gt;
+  &lt;div class="tldr"&gt;&lt;h4&gt;In 60 seconds&lt;/h4&gt;&lt;ul&gt;…&lt;/ul&gt;&lt;/div&gt;
+  &lt;section id="anatomy"&gt;&lt;h2&gt;&lt;span class="num"&gt;01&lt;/span&gt;Where the pieces live&lt;/h2&gt;…&lt;/section&gt;
+  …
+  &lt;div class="honest"&gt;&lt;h4&gt;Keep this page honest&lt;/h4&gt;&lt;ul&gt;…source files…&lt;/ul&gt;&lt;/div&gt;
+&lt;/main&gt;
+&lt;footer&gt;Bloomfire Wiki · page source &lt;code&gt;Docs/Wiki/….html&lt;/code&gt;, built by …&lt;/footer&gt;
+&lt;/body&gt;
+&lt;/html&gt;</code></pre>
+    <div class="scrollx"><table>
+      <tr><th>Rule</th><th>Detail</th></tr>
+      <tr><td>Section numbers</td><td>Number sections <code>01</code>, <code>02</code>, … in order, each <code>&lt;section id="short-slug"&gt;</code> with <code>&lt;h2&gt;&lt;span class="num"&gt;NN&lt;/span&gt;Title&lt;/h2&gt;</code>. A section added between two others takes a letter instead of renumbering the rest: after <code>07</code> come <code>07b</code>, <code>07c</code>, then <code>08</code>. Ids stay stable because other pages link them.</td></tr>
+      <tr><td>Citing a section</td><td>Write the number in the link: <code>&lt;a href="world.html#boot"&gt;world.html §02&lt;/a&gt;</code>. The check compares it with the target.</td></tr>
+      <tr><td>Repository files</td><td>Link a guide or file as <code>https://github.com/Cat-Splat-Studios/CardGame/blob/main/&lt;path&gt;</code>, with a heading anchor for Markdown. A link only passes once the file is on <code>main</code>, so a file new on your branch is named as <code>&lt;code&gt;</code> text until it merges. Source files named in prose are <code>&lt;code&gt;</code> text.</td></tr>
+      <tr><td>Components</td><td>Use only what <code>wiki.css</code> defines: <code>.grid.c2</code>/<code>.c3</code> with <code>.card.accent-*</code>, tables in <code>div.scrollx</code>, <code>.note</code>, <code>.note.warn</code>, <code>.note.rule</code>, <code>details.why</code>, <code>ol.steps</code>, <code>.kbd</code>, <code>pre code</code>, <code>.badge.*</code>, <code>td.num</code>. No page-local <code>&lt;style&gt;</code>.</td></tr>
+      <tr><td>Diagrams</td><td>Hand-draw only the flows and state machines your page owns, each in <code>div.diagram &gt; pre.mermaid</code> followed by <code>p.caption</code>, and load <code>mermaid.min.js</code>. Escape <code>&lt;</code>, <code>&gt;</code> and <code>&amp;</code> inside the block. Keep one under about 25 nodes. Class diagrams are generated; link <a href="diagrams.html">diagrams.html</a> instead.</td></tr>
+      <tr><td>One source of truth</td><td>Explain structure and how the pieces connect. Rules, procedures and tables a guide already owns get a sentence and a link to that guide's section, and the roadmap's status and decisions are only ever linked.</td></tr>
+      <tr><td>Numbers</td><td>Do not write counts that change routinely (tests, cards, lines) into prose. The generated pages may, because every build recomputes them.</td></tr>
+      <tr><td>Secrets</td><td>Name <code>BLOOMFIRE_PRIVATE_QA_RELAY_KEY</code> and <code>PrivateRelayQaSettings.generated.cs</code> if you must, never a value.</td></tr>
+    </table></div>
+  </section>
+
+  <section id="new-page"><h2><span class="num">05</span>Adding a page</h2>
+    <p class="lead">A page exists for the wiki once it has a NAV entry, a source file and a passing check.</p>
+    <ol class="steps">
+      <li><b>Add the NAV entry.</b> In <code>Tools/Documentation/structure_wiki.py</code>, add <code>("Group", "Label", "file-name.html")</code> to <code>NAV</code> where it belongs in reading order, next to the other entries of its group: the nav opens a new group box wherever the group name changes. The file name is lowercase kebab-case, and <code>diagrams.html</code> is taken by the generated page.</li>
+      <li><b>Write the source page</b> at <code>Docs/Wiki/file-name.html</code> in the shape of <a href="#shape">§04</a>, with its own path in the footer and the files it describes in its honest box.</li>
+      <li><b>Give it a card</b> on the home page, in <a href="index.html#pages">index.html §03</a>, in the same group as the nav, and add its new terms to <a href="glossary.html">the glossary</a>.</li>
+      <li><b>Add a row to the update matrix</b> (<a href="#matrix">§06</a>) for the code the page describes.</li>
+      <li><b>Run the check</b> and fix every group it reports, then build and read the page in a browser.</li>
+    </ol>
+    <p>Retiring a page is the same in reverse: remove the NAV entry, the source, its card and its matrix rows, and fix the links the check then reports.</p>
+  </section>
+
+  <section id="matrix"><h2><span class="num">06</span>The update matrix — “I changed X, what do I touch?”</h2>
+    <p class="lead">Find your change on the left and update what the right column names, in the same commit. Diagrams and complexity tables follow the code by themselves; prose does not. Where a guide owns the rule, update the guide first and keep the wiki's sentence pointing at it.</p>
+    <div class="scrollx"><table>
+      <tr><th>You changed…</th><th>Update</th></tr>
+      <tr><th colspan="2" id="m-rules">Rules</th></tr>
+      <tr><td>A combat rule in <code>CombatRules</code> or a type in <code>CombatContracts.cs</code> (toolkit <code>Runtime/Core</code>)</td><td><a href="rules.html#combat-rules">rules.html §04</a> and <a href="rules.html#core-state">§03</a>. A rule a player sees belongs in <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/GAME_RULES.md">GAME_RULES.md</a>.</td></tr>
+      <tr><td><code>Result&lt;T&gt;</code> or <code>RuleError</code> (<code>Runtime/Functional/Result.cs</code>)</td><td><a href="rules.html#functional">rules.html §02</a>. The convention is owned by <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CODE_ARCHITECTURE_GUIDE.md#functional-composition-and-the-small-monad">the developer guide</a>.</td></tr>
+      <tr><td>A Circuit definition or a <code>CircuitRules</code> transition (toolkit <code>Runtime/Circuit</code>)</td><td><a href="rules.html#circuit">rules.html §08</a>; if the game calls it differently, <a href="rules.html#apply-circuit">rules.html §09</a> and <a href="world.html#rules">world.html §07</a>.</td></tr>
+      <tr><th colspan="2" id="m-world">World and journal</th></tr>
+      <tr><td>Boot order or the frame loop in <code>IsometricSlice.cs</code></td><td><a href="world.html#boot">world.html §02</a> and <a href="world.html#frame">§03</a>.</td></tr>
+      <tr><td>A journal page: <code>CircuitPage</code>, <code>ShowCircuit</code> or a <code>Draw*</code> page method</td><td><a href="world.html#journal">world.html §06</a>.</td></tr>
+      <tr><td><code>CircuitWorldLayout</code> or <code>IsometricSectorVisuals.*</code></td><td><a href="world.html#layout">world.html §08</a> and <a href="world.html#visuals">§09</a>.</td></tr>
+      <tr><th colspan="2" id="m-sessions">Hosted sessions</th></tr>
+      <tr><td><code>HostedSessionKind</code>, <code>IsometricCombatBridge</code> or <code>ExpeditionApp.Session.cs</code></td><td><a href="sessions.html#kinds">sessions.html §02</a>, <a href="sessions.html#start">§03</a> and <a href="sessions.html#result">§05</a>.</td></tr>
+      <tr><td>How an <code>ExpeditionApp</code> decides which screen to show</td><td><a href="sessions.html#screens">sessions.html §06</a>.</td></tr>
+      <tr><td>Practice, lessons or <code>PracticeNarration</code></td><td><a href="sessions.html#practice">sessions.html §07</a>.</td></tr>
+      <tr><th colspan="2" id="m-ui">UI and menus</th></tr>
+      <tr><td><code>DuelUi</code>, a menu role or a palette</td><td><a href="ui.html#duelui">ui.html §04</a>. The role list is owned by <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CIRCUIT_PRESENTATION.md#menu-roles">CIRCUIT_PRESENTATION.md</a>.</td></tr>
+      <tr><td>Input routing (<code>ExpeditionView.Navigation.cs</code>) or focus</td><td><a href="ui.html#input">ui.html §06</a> and <a href="ui.html#focus">§07</a>.</td></tr>
+      <tr><td>The UI Toolkit title (<code>IsometricSlice.WaybookMenu.cs</code>)</td><td><a href="ui.html#title">ui.html §05</a>.</td></tr>
+      <tr><th colspan="2" id="m-networking">Networking</th></tr>
+      <tr><td>A protocol constant or wire type (<code>NetworkContracts.cs</code>)</td><td><a href="networking.html#protocol">networking.html §03</a> and <a href="networking.html#wire">§10</a>. Authority rules are owned by <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/NETWORKING.md#current-authority-boundaries">NETWORKING.md</a>.</td></tr>
+      <tr><td><code>ExpeditionAuthority</code> or <code>ExpeditionNetworkSession</code></td><td><a href="networking.html#authority">networking.html §04</a> and <a href="networking.html#session">§05</a>.</td></tr>
+      <tr><td>The relay or the trusted service (<code>Tools/ExpeditionRelay</code>)</td><td><a href="networking.html#relay">networking.html §07</a> and <a href="networking.html#trusted">§08</a>; the private pair in <a href="builds.html#private">builds.html §09</a>.</td></tr>
+      <tr><th colspan="2" id="m-content">Content and media</th></tr>
+      <tr><td>The pack format or its loader (<code>ContentPackFiles.cs</code>, <code>ExpeditionContent.cs</code>, <code>WorldContent.cs</code>)</td><td><a href="content.html#pack">content.html §03</a>, <a href="content.html#loader">§04</a> and <a href="content.html#limits">§05</a>. The pack contract is owned by <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Tools/ContentStudio/PACK_CONTRACT.md">PACK_CONTRACT.md</a>.</td></tr>
+      <tr><td>A Circuit sidecar under <code>Content/Circuit</code>, or how it is staged into StreamingAssets</td><td><a href="content.html#sidecars">content.html §06</a> and <a href="content.html#staging">§07</a>.</td></tr>
+      <tr><td>Media, artwork or audio loading</td><td><a href="content.html#media">content.html §08</a>.</td></tr>
+      <tr><th colspan="2" id="m-saves">Saves and settings</th></tr>
+      <tr><td><code>CircuitPersistence</code>, <code>CircuitSave</code> or a save version</td><td><a href="saves.html#wrapper">saves.html §03</a>, <a href="saves.html#restore">§05</a> and <a href="saves.html#save">§06</a>. The supported upgrades are owned by <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/MAINTAINING.md#supported-circuit-deck-upgrades">MAINTAINING.md</a>.</td></tr>
+      <tr><td><code>PlayerSettings</code></td><td><a href="saves.html#settings">saves.html §08</a>.</td></tr>
+      <tr><th colspan="2" id="m-qa">QA</th></tr>
+      <tr><td>A rehearsal stage in <code>CircuitSliceChecks.*</code> or the network harness <code>ExpeditionHarness.*</code></td><td><a href="qa.html#rehearsal">qa.html §03</a>, <a href="qa.html#partials">§04</a> and <a href="qa.html#network">§09</a>.</td></tr>
+      <tr><td>A portable suite in <code>Tools/Run-Checks.ps1</code></td><td><a href="qa.html#suites">qa.html §02</a>. The suite list is owned by <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Tools/README.md">Tools/README.md</a>.</td></tr>
+      <tr><td>Production code that now calls QA code, or stops calling it</td><td><a href="qa.html#seams">qa.html §10</a>.</td></tr>
+      <tr><th colspan="2" id="m-builds">Builds and tools</th></tr>
+      <tr><td>An entry point or define in <code>IsometricSliceBuild.cs</code></td><td><a href="builds.html#entries">builds.html §02</a> and <a href="builds.html#defines">§04</a>.</td></tr>
+      <tr><td><code>build-info.json</code> or what a build records about itself</td><td><a href="builds.html#identity">builds.html §05</a>.</td></tr>
+      <tr><td>A tool <code>.csproj</code>: what it compiles, its defines or its references</td><td>Nothing by hand for the diagrams (<a href="diagrams.html#tools">diagrams.html §02</a> regenerates). If the tool's purpose changed, <a href="codebase-tour.html#tools">codebase-tour.html §05</a> and <a href="builds.html#tools">builds.html §11</a>.</td></tr>
+      <tr><th colspan="2" id="m-structure">Code structure</th></tr>
+      <tr><td>A C# file, type or <code>.asmdef</code> reference added, moved or renamed</td><td>Run <code>git add</code> so the diagrams see it. Search <code>Docs/Wiki</code> for the old path or name, because honest boxes and prose name files; the tour's <a href="codebase-tour.html#map">codebase-tour.html §01</a> and <a href="codebase-tour.html#partials">§06</a> name many.</td></tr>
+      <tr><td>A structural problem fixed, or a new one found</td><td><a href="findings.html">findings.html</a>.</td></tr>
+      <tr><td>Complexity lowered or raised</td><td>Nothing by hand for the tables; reread the prose on <a href="complexity.html">complexity.html</a>.</td></tr>
+      <tr><th colspan="2" id="m-wiki">The wiki itself</th></tr>
+      <tr><td>A page added, renamed or retired</td><td><a href="#new-page">§05</a>.</td></tr>
+      <tr><td><code>wiki.css</code> or <code>wiki.js</code></td><td><a href="#shape">§04</a> if a component changed, and every page that uses it.</td></tr>
+      <tr><td>The build, the check or the diagram generator in <code>structure_wiki.py</code></td><td><a href="#build">§01</a>, <a href="#sources">§02</a> and <a href="#check">§03</a>.</td></tr>
+    </table></div>
+  </section>
+
+  <section id="complexity"><h2><span class="num">07</span>How complexity is measured</h2>
+    <p class="lead"><code>Tools/CodeMetrics</code> parses C# with the Roslyn parser that ships in the .NET SDK, so it downloads no package. The definitions of every metric and its default preprocessor symbols are in the header comment of <code>Tools/CodeMetrics/Program.cs</code> and nowhere else; <a href="complexity.html">complexity.html</a> explains the results.</p>
+    <h3>Run it yourself</h3>
+<pre><code>dotnet run --project Tools/CodeMetrics/CodeMetrics.csproj -c Release --artifacts-path Temp/CodeMetrics/build -- --root . --out Temp/CodeMetrics/metrics.json
+dotnet run --project Tools/CodeMetrics/CodeMetrics.csproj -c Release --artifacts-path Temp/CodeMetrics/build -- --root . --out Temp/CodeMetrics/metrics.json --max 9</code></pre>
+    <div class="scrollx"><table>
+      <tr><th>Option</th><th>Meaning</th></tr>
+      <tr><td><code>--root DIR</code></td><td>The checkout to measure. It scans <code>Toolkit</code>, <code>Tools</code>, <code>Teaching</code> and <code>Game/EmberGrove/Assets</code> below it, skipping <code>bin</code>, <code>obj</code>, <code>Library</code>, <code>Temp</code> and <code>Builds</code> folders. On your working tree that includes files Git does not track.</td></tr>
+      <tr><td><code>--out FILE</code></td><td>Where the JSON array of member records goes: file, area, type, member, line, cyclomatic complexity, cognitive complexity, nesting and lines.</td></tr>
+      <tr><td><code>--define NAME</code></td><td>A preprocessor symbol, repeatable. Giving any replaces the default set.</td></tr>
+      <tr><td><code>--max N</code></td><td>Prints every member body whose cyclomatic complexity is over <code>N</code> and exits 1. <code>--max 9</code> is the “below 10” check.</td></tr>
+    </table></div>
+    <h3>What the wiki measures</h3>
+    <p>The build measures committed revisions, not your working tree. For each entry in <code>REVISIONS</code> in <code>structure_wiki.py</code> (three reference revisions and <code>HEAD</code>) it extracts <code>git archive &lt;revision&gt; -- Toolkit Tools Teaching Game/EmberGrove/Assets</code> into <code>Temp/StructureWiki/snapshots/&lt;sha&gt;</code>, runs the analyzer there with its default symbols, and caches the result as <code>Temp/StructureWiki/metrics-&lt;sha&gt;.json</code>. A cached result is reused until the commit or the analyzer's source changes; <code>--refresh-metrics</code> measures again regardless. Each build deletes the snapshots and results of revisions it did not measure, such as an earlier <code>HEAD</code>. There is no fallback: without <code>Tools/CodeMetrics</code> or the .NET SDK the build fails rather than leaving tables out.</p>
+    <div class="note rule"><p><b>Not a gate yet.</b> Nothing runs <code>--max 9</code> automatically. Whether it becomes a required check is the owner's decision, recorded in the roadmap's <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Release/ROADMAP.md#open-owner-decisions">open owner decisions</a>.</p></div>
+  </section>
+
+  <section id="content-wiki"><h2><span class="num">08</span>This wiki and the content wiki</h2>
+    <p class="lead">There are two generated wikis, built by two tools for different readers. Both stay until the owner decides otherwise.</p>
+    <div class="scrollx"><table>
+      <tr><th></th><th>This structure wiki</th><th>The content wiki and handbook</th></tr>
+      <tr><td>Tool</td><td><code>Tools/Documentation/structure_wiki.py</code></td><td><code>Tools/Documentation/export_wiki.py</code>, checked by <code>Tools/Documentation/check_wiki.cjs</code> (the <code>Docs</code> suite)</td></tr>
+      <tr><td>Output</td><td><code>Builds/Documentation/Wiki</code></td><td><code>index.html</code>, <code>handbook.html</code> and the chapter files in <code>Builds/Documentation</code></td></tr>
+      <tr><td>Reader</td><td>A programmer deciding what to change in the code</td><td>Creators and maintainers reading the guides offline (<code>handbook.html</code>), and anyone browsing the content and source inventory (<code>index.html</code>)</td></tr>
+      <tr><td>Sources</td><td>Hand-written pages in <code>Docs/Wiki</code>, plus generated diagrams and complexity tables</td><td>The content pack, the guides it renders and the source tree</td></tr>
+    </table></div>
+    <p>The two do not write to the same files: this wiki owns only the <code>Wiki</code> subfolder. They overlap in one place, the content wiki's code chapter, which lists public declarations that <a href="diagrams.html">diagrams.html</a> also draws. This wiki is the one published to the public site (<a href="#publishing">§09</a>). Whether it replaces the content wiki is the owner's call; the roadmap item is in <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Release/ROADMAP.md#menu-ui-cleanup">Menu UI cleanup</a>. How the content wiki is built is owned by <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Tools/Documentation/README.md">Tools/Documentation/README.md</a>.</p>
+  </section>
+
+  <section id="publishing"><h2><span class="num">09</span>Publishing the public site</h2>
+    <p class="lead">The wiki is public, at <a href="https://cat-splat-studios.github.io/bloomfire-circuit-wiki/">cat-splat-studios.github.io/bloomfire-circuit-wiki</a>. The sources stay in this private repository, and a GitHub Actions workflow pushes the built site to the public repository <a href="https://github.com/Cat-Splat-Studios/bloomfire-circuit-wiki">Cat-Splat-Studios/bloomfire-circuit-wiki</a>, whose Pages site serves it. The Sentinels of Gleamwood wiki is published the same way.</p>
+    <div class="note rule"><p><b>Everything on a page is public the next time it is published.</b> Do not write credentials, private hosts, addresses or machine paths, people's names, or plans that have not been announced. The check fails on the shapes it can recognise (<code>PUBLIC SITE</code> and <code>PRIVATE KEY PATTERN</code>, <a href="#check">§03</a>); the rest is up to the author.</p></div>
+    <div class="scrollx"><table>
+      <tr><th>When</th><th>What <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/.github/workflows/publish-wiki.yml"><code>.github/workflows/publish-wiki.yml</code></a> does</th></tr>
+      <tr><td>Every push to <code>main</code></td><td>Runs <code>structure_wiki.py check</code> on Linux, with the .NET SDK for the complexity tables. A red mark on the commit means a page, a link or a generated table broke; fix it in the next commit. A push publishes nothing.</td></tr>
+      <tr><td>Run by hand on <code>main</code> (a run started on another branch does nothing)</td><td>Runs the same check, and when it passes pushes the checked output to the public repository's <code>gh-pages</code> branch as one commit titled <code>Sync wiki from &lt;sha&gt;</code>. Start it from <span class="kbd">Actions ▸ Publish Wiki ▸ Run workflow</span>, or with <code>gh workflow run publish-wiki.yml --ref main</code>. Pages takes a minute or two to serve the new copy.</td></tr>
+    </table></div>
+    <p>Publishing is manual so that pages can change over several commits and the site keeps the last set somebody chose to publish. The earlier revisions' complexity measurements are cached between runs, so once one run has passed, a run measures only the current commit. A new cache entry is saved when the analyzer or <code>structure_wiki.py</code> changes, and the build deletes the measurements of revisions it no longer uses.</p>
+    <h3>The one-time setup, and rotating the key</h3>
+    <ol class="steps">
+      <li>The public repository <code>Cat-Splat-Studios/bloomfire-circuit-wiki</code> exists. It has only the <code>gh-pages</code> branch the workflow writes.</li>
+      <li>An SSH deploy key with write access is on that repository (<span class="kbd">Settings ▸ Deploy keys</span>). It can write to that one repository and nothing else.</li>
+      <li>The private half of that key is the Actions secret <code>WIKI_DEPLOY_KEY</code> on this repository.</li>
+      <li>Pages on the public repository serves the <code>gh-pages</code> branch from <code>/</code>.</li>
+    </ol>
+    <p>To rotate the key, make a new key pair, replace the deploy key (step 2) and the secret (step 3), delete the old deploy key, and run the workflow once to prove it.</p>
+  </section>
+
+  <div class="honest"><h4>Keep this page honest</h4><ul>
+    <li><code>Tools/Documentation/structure_wiki.py</code> — the commands and options in <a href="#build">§01</a>, <code>NAV</code>, the generated parts in <a href="#sources">§02</a>, the check groups in <a href="#check">§03</a>, the section-number rule in <a href="#shape">§04</a>, and <code>REVISIONS</code> and the snapshot and cache paths in <a href="#complexity">§07</a></li>
+    <li><code>Docs/Wiki/wiki.css</code> and <code>Docs/Wiki/wiki.js</code> — the components listed in <a href="#shape">§04</a> and what the browser adds</li>
+    <li><code>Tools/CodeMetrics/Program.cs</code> — its usage line and options in <a href="#complexity">§07</a></li>
+    <li><code>Tools/Documentation/export_wiki.py</code> and <code>Tools/Documentation/README.md</code> — the content wiki's outputs in <a href="#content-wiki">§08</a></li>
+    <li>The section ids of every page the matrix in <a href="#matrix">§06</a> cites; the check catches a renumbered one, not a section whose subject moved</li>
+    <li><code>.github/workflows/publish-wiki.yml</code> — the triggers, the public repository, the secret's name and the cache in <a href="#publishing">§09</a></li>
+  </ul></div>
+</main>
+<footer>Bloomfire Wiki · page source <code>Docs/Wiki/maintaining.html</code>, built by <code>Tools/Documentation/structure_wiki.py</code> · Found a mistake? Fix it in the same commit as the code that made it one.</footer>
+</body>
+</html>

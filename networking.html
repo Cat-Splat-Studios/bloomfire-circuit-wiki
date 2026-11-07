@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Networking — Bloomfire Wiki</title>
+<link rel="stylesheet" href="wiki.css">
+<script src="mermaid.min.js" defer></script>
+<script src="wiki.js" defer></script>
+</head>
+<body>
+<nav class="wiki">
+  <a class="home" href="index.html">🔥 Bloomfire Wiki</a>
+  <div class="grp"><span class="grp-t">Start here</span>
+    <a href="codebase-tour.html">Codebase Tour</a>
+    <a href="glossary.html">Glossary</a>
+  </div>
+  <div class="grp"><span class="grp-t">Game systems</span>
+    <a href="rules.html">Rules Engine</a>
+    <a href="world.html">World &amp; Journal</a>
+    <a href="sessions.html">Hosted Sessions</a>
+    <a href="ui.html">UI &amp; Menus</a>
+    <a class="on" href="networking.html">Networking</a>
+    <a href="content.html">Content &amp; Media</a>
+    <a href="saves.html">Saves &amp; Settings</a>
+  </div>
+  <div class="grp"><span class="grp-t">Code health</span>
+    <a href="diagrams.html">Diagrams</a>
+    <a href="complexity.html">Complexity</a>
+    <a href="findings.html">Findings</a>
+  </div>
+  <div class="grp"><span class="grp-t">Ship &amp; maintain</span>
+    <a href="qa.html">QA &amp; Rehearsals</a>
+    <a href="builds.html">Builds &amp; Tools</a>
+    <a href="maintaining.html">Maintaining</a>
+  </div>
+</nav>
+<header class="page"><h1>How players <span class="flame">connect</span></h1><p class="tag">The three multiplayer routes in Bloomfire Circuit (LAN, the WebSocket relay and the trusted loopback service), the one authority they share, the wire format, and the checks that exercise them.</p></header>
+<main>
+
+<div class="tldr">
+  <h4>In 60 seconds</h4>
+  <ul>
+    <li><b>One authority type.</b> <code>ExpeditionAuthority</code> holds the full <code>CombatState</code> of a two-player match. <code>ViewFor(seat)</code> is the only way state leaves it, as a redacted <code>WireView</code>, and <code>Receive(seat, packet)</code> is the only way a command enters it. <a href="#authority">§04</a>.</li>
+    <li><b>One client type.</b> <code>ExpeditionNetworkSession</code> implements every route. Socket and HTTP work runs on background tasks and only queues notices; <code>Poll()</code> on the Unity main thread applies them and raises <code>SnapshotChanged</code>. <a href="#session">§05</a>.</li>
+    <li><b>Three routes.</b> LAN TCP on port 47777, where the host's session runs the authority (<a href="#lan">§06</a>); the WebSocket relay in <code>Tools/ExpeditionRelay</code>, which forwards bytes and never simulates (<a href="#relay">§07</a>); and the trusted service (the same executable started with <code>--authority</code>), which runs the authority for matches, quickmatch and the table lobby (<a href="#trusted">§08</a>, <a href="#lobby">§09</a>).</li>
+    <li><b>Admission is a content check.</b> LAN and relay peers compare <code>ExpeditionFingerprint</code> in a <code>Hello</code> packet. The trusted service also compares the protocol, rules version, content version and content SHA-256, and for the lobby the SHA-256 of <code>Content/Circuit/locations.json</code>.</li>
+    <li><b>Wire format.</b> <code>ExpeditionWireCodec</code> uses <code>DataContractJsonSerializer</code> with a 64 KiB cap per packet. The relay and the trusted service read their own envelopes with <code>System.Text.Json</code>. <a href="#wire">§10</a>.</li>
+  </ul>
+</div>
+
+<div class="prereq">
+  <h4>Before you start</h4>
+  <ul>
+    <li>Know how a battle resolves a command: <a href="rules.html">Rules Engine</a> (<code>CombatRules</code>, <code>CombatState</code>, <code>CombatCommand</code>).</li>
+    <li>Know what a hosted <code>ExpeditionApp</code> is: <a href="sessions.html">Hosted Sessions</a>. The connection menus are drawn by <code>ExpeditionView.Connection.cs</code> (<a href="ui.html">UI &amp; Menus</a>).</li>
+    <li>The rules, procedures and limits belong to the guides. This page explains how the code fits together and links them: <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/NETWORKING.md">NETWORKING.md</a>, the <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Tools/ExpeditionRelay/README.md">relay tool guide</a> and the toolkit's <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Toolkit/Packages/com.catsplat.cardforge/Documentation~/NETWORKING.md">multiplayer integration notes</a>.</li>
+  </ul>
+</div>
+
+<section id="anatomy">
+  <h2><span class="num">01</span>Where the pieces live</h2>
+  <p class="lead">Networking code lives in three places. The CardForge toolkit's networking assembly holds the contract, the authority and the client. The game's partial classes start sessions and draw them. <code>Tools/ExpeditionRelay</code> is one .NET server that runs either as the relay or, with <code>--authority</code>, as the trusted service. The same authority and contract source files compile into the Unity game, the server and the .NET checks.</p>
+  <div class="scrollx">
+  <table>
+    <tr><th>Area</th><th>File</th><th>Main types</th><th>Job</th></tr>
+    <tr><td rowspan="4">Toolkit assembly <code>EmberGrove.Expedition.Networking</code><br>(<code>Toolkit/Packages/com.catsplat.cardforge/Runtime/Networking/</code>)</td><td><code>NetworkContracts.cs</code></td><td><code>ExpeditionProtocol</code>, the <code>Wire*</code> DTOs, <code>RelayRoomSetup</code>/<code>RelayRoomInfo</code>/<code>RelayRoomList</code>, <code>RelayRoomRules</code>, the <code>Trusted*</code> DTOs, <code>ExpeditionSnapshot</code>, <code>ExpeditionWireCodec</code>, <code>ExpeditionProjection</code></td><td>The wire contract, its codec, and the projection from a received view to a renderable snapshot</td></tr>
+    <tr><td><code>ExpeditionAuthority.cs</code></td><td><code>ExpeditionFingerprint</code>, <code>ExpeditionAuthority</code></td><td>The content fingerprint, and the authority that owns a match</td></tr>
+    <tr><td><code>ExpeditionNetworkSession.cs</code></td><td><code>ExpeditionNetworkSession</code>, <code>NetworkLink</code>, <code>TcpNetworkLink</code>, <code>WebSocketNetworkLink</code>, <code>RelayReadinessPolicy</code>, <code>RelayReadinessException</code></td><td>The client for every route</td></tr>
+    <tr><td><code>link.xml</code></td><td>—</td><td>Keeps the serializer's reflective types in stripped IL2CPP players (<a href="#wire">§10</a>)</td></tr>
+    <tr><td rowspan="4">Game<br>(<code>Game/EmberGrove/Assets/Runtime/</code>)</td><td><code>ExpeditionApp.Network.cs</code></td><td><code>ExpeditionApp</code> (partial)</td><td>Creates the session (<code>StartNetwork</code>), polls it each frame (<code>PollNetwork</code>), queues and presents snapshots (<code>QueueNetworkSnapshot</code>, <code>PresentNetwork</code>), lists relay rooms</td></tr>
+    <tr><td><code>ExpeditionView.Connection.cs</code></td><td><code>ExpeditionView</code> (partial)</td><td>The <b>SAME NETWORK</b>, <b>RELAY</b> and <b>SERVER</b> controls</td></tr>
+    <tr><td><code>Exploration/IsometricSlice.Versus.cs</code></td><td><code>IsometricSlice</code> (partial)</td><td>The table lobby: its session, room, travellers and HUD (<a href="#lobby">§09</a>)</td></tr>
+    <tr><td><code>Exploration/IsometricCombatBridge.cs</code></td><td><code>IsometricCombatBridge</code></td><td>Hosts the battle and hands it the lobby's match (<code>AttachLobbyMatch</code>)</td></tr>
+    <tr><td rowspan="5">Server<br>(<code>Tools/ExpeditionRelay/</code>)</td><td><code>Program.cs</code></td><td>top-level statements</td><td>First argument <code>--authority</code> runs <code>TrustedMatchApplication.RunAsync</code>; anything else runs <code>RelayConsole.RunAsync</code></td></tr>
+    <tr><td><code>RelayApplication.cs</code></td><td><code>RelayApplication</code> and its nested <code>RelayService</code>; <code>RelaySetup</code>, <code>RelayDirectory</code>, <code>RelayAccess</code>, <code>RelayAdmission</code>, <code>RelayBucket</code>, <code>RelayRoom</code>, <code>RelayPeer</code></td><td>The WebSocket relay (<a href="#relay">§07</a>)</td></tr>
+    <tr><td><code>RelayRuntime.cs</code></td><td><code>RelayRuntime</code>, <code>RelayEndpoint</code>, <code>RelayOptions</code>, <code>RelayConsole</code></td><td>Start/stop, listen addresses, command-line options, the console host</td></tr>
+    <tr><td><code>TrustedMatchApplication.cs</code></td><td><code>TrustedMatchApplication</code>, <code>TrustedMatches</code>, <code>TrustedMatchRuntime</code>, <code>TrustedIdentityMode</code>, <code>ITrustedIdentityVerifier</code></td><td>The trusted loopback service (<a href="#trusted">§08</a>)</td></tr>
+    <tr><td><code>Launcher/</code></td><td><code>RelayLauncherForm</code>, <code>RelayPreferences</code> (<code>EmberGroveRelay.exe</code>)</td><td>The Windows relay companion. It calls <code>RelayApplication.Create</code>; <code>--headless</code> runs <code>RelayConsole.RunAsync</code></td></tr>
+    <tr><td>Checks</td><td><code>Tools/ExpeditionNetworkChecks/</code></td><td><code>Program.cs</code>, <code>SessionSafetyChecks.cs</code>, <code>TrustedServiceChecks.cs</code>, <code>Run-SocketChecks.ps1</code></td><td>.NET checks of the real session, relay and service (<a href="#qa">§11</a>)</td></tr>
+    <tr><td>Player QA</td><td><code>Game/EmberGrove/Assets/Tests/Runtime/ExpeditionHarness.Network.cs</code></td><td><code>ExpeditionHarness</code> (partial)</td><td>Network rehearsals inside a real player (<a href="#qa">§11</a>)</td></tr>
+  </table>
+  </div>
+
+  <h3>How one source compiles three ways</h3>
+  <ul>
+    <li><b>Unity.</b> <code>EmberGrove.Expedition.Networking.asmdef</code> references <code>CardForge.Functional</code>, <code>EmberGrove.Expedition</code> and <code>EmberGrove.Expedition.Progression</code>, with <code>noEngineReferences: true</code>. Nothing in the assembly touches UnityEngine.</li>
+    <li><b>Server.</b> <code>Tools/ExpeditionRelay/ExpeditionRelay.csproj</code> (Web SDK, <code>net10.0</code>, define <code>CARDFORGE_HEADLESS</code>) compiles toolkit files directly: <code>Functional/Result.cs</code>, <code>Core/*.cs</code>, <code>Exploration/SectorDefinition.cs</code>, <code>Exploration/SectorNavigation.cs</code>, <code>Progression/*.cs</code>, <code>Networking/ExpeditionAuthority.cs</code>, <code>Networking/NetworkContracts.cs</code> and <code>Content/ExpeditionContent.cs</code>. It does not compile the client session.</li>
+    <li><b>Checks.</b> <code>Tools/ExpeditionNetworkChecks/ExpeditionNetworkChecks.csproj</code> references the relay project and compiles <code>Networking/ExpeditionNetworkSession.cs</code>, so the checks drive the production client.</li>
+  </ul>
+  <p>Class diagrams of these assemblies are generated on <a href="diagrams.html">Diagrams</a>.</p>
+
+  <div class="diagram"><pre class="mermaid">
+flowchart LR
+  subgraph Game["Game/EmberGrove (Unity)"]
+    V["ExpeditionView.Connection"] --&gt; A["ExpeditionApp.Network"]
+    W["IsometricSlice.Versus (table lobby)"]
+  end
+  subgraph Kit["EmberGrove.Expedition.Networking"]
+    S["ExpeditionNetworkSession"]
+    TL["TcpNetworkLink"]
+    WL["WebSocketNetworkLink"]
+    HC["HttpClient (trusted)"]
+    AU["ExpeditionAuthority (LAN or relay host)"]
+  end
+  subgraph Srv["Tools/ExpeditionRelay"]
+    RA["RelayApplication: /health, /relay"]
+    TM["TrustedMatchApplication: /authority/..."]
+    TR["TrustedMatches"]
+    AU2["ExpeditionAuthority (one per match)"]
+  end
+  A --&gt; S
+  W --&gt; S
+  S --&gt; TL
+  S --&gt; WL
+  S --&gt; HC
+  S --&gt;|host only| AU
+  TL --&gt;|TCP 47777| P1["peer session"]
+  WL --&gt; RA
+  RA --&gt;|forwards bytes| P2["peer session"]
+  HC --&gt; TM
+  TM --&gt; TR
+  TR --&gt; AU2
+</pre></div>
+  <p class="caption">Who talks to whom. On LAN and the relay the host's own session runs the authority; on the trusted route the server does, one <code>ExpeditionAuthority</code> per match.</p>
+</section>
+
+<section id="routes">
+  <h2><span class="num">02</span>Three routes, one authority</h2>
+  <p class="lead">Every route ends in the same <code>ExpeditionAuthority</code>, and every client consumes the same <code>WireView</code>. The routes differ in who runs the authority, how a peer is admitted, and what happens after a lost connection. <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/NETWORKING.md#current-authority-boundaries">NETWORKING.md · Current authority boundaries</a> owns the trust and seat rules; this table maps them to code.</p>
+  <div class="scrollx">
+  <table>
+    <tr><th>Route</th><th>Menu</th><th>Session methods</th><th>Transport</th><th>Runs the authority</th><th>Admission</th><th>After a lost connection</th></tr>
+    <tr><td>LAN</td><td><b>SAME NETWORK</b>: CREATE LAN ROOM / JOIN LAN</td><td><code>HostLan</code>, <code>JoinLan</code></td><td>TCP, <code>TcpNetworkLink</code></td><td>Host session, seat 0; guest is seat 1</td><td><code>Hello</code> with the same fingerprint and a known preset ID</td><td>The session ends; create a new room</td></tr>
+    <tr><td>Relay, named room</td><td><b>RELAY</b>: PUBLIC ROOMS / CREATE ROOM / PRIVATE ROOM</td><td><code>HostNamedRelay</code>, <code>JoinNamedRelay</code>, static <code>ListRelayRoomsAsync</code></td><td>WebSocket to <code>/relay</code>, room protocol 3</td><td>Host session, seat 0</td><td>Relay access gate and room name/password, then the same <code>Hello</code></td><td>The room ends; create a new one</td></tr>
+    <tr><td>Relay, invitation</td><td>No menu control on main (see below)</td><td><code>HostRelay</code>, <code>JoinRelay</code></td><td>WebSocket to <code>/relay</code>, relay protocol 2</td><td>Host session, seat 0</td><td>Access gate and a 32-character invitation, then <code>Hello</code></td><td>The room ends</td></tr>
+    <tr><td>Trusted match</td><td><b>SERVER</b>: CREATE MATCH / JOIN MATCH</td><td><code>CreateTrusted</code>, <code>JoinTrusted</code></td><td>HTTP(S) to a loopback address</td><td>The service (<code>TrustedMatches</code>); the creator's seat is random</td><td><code>TrustedAdmission</code>: protocol, rules version, content version, content SHA-256, fingerprint, preset</td><td><code>SuspendTrusted</code>/<code>ReconnectTrusted</code> resume the same match</td></tr>
+    <tr><td>Quickmatch</td><td><b>SERVER</b>: QUICKMATCH / CANCEL SEARCH</td><td><code>QuickmatchTrusted</code>, <code>CancelQuickmatch</code></td><td>HTTP(S), loopback</td><td>The service; both seats random</td><td><code>TrustedQueueAdmission</code> wrapping <code>TrustedAdmission</code></td><td>Resume the same queue entry or match</td></tr>
+    <tr><td>Table lobby</td><td><b>SERVER</b>: TABLE LOBBY</td><td><code>JoinLobbyTrusted</code>, <code>SubmitLobby</code></td><td>HTTP(S), loopback</td><td>The service</td><td><code>TrustedLobbyAdmission</code>: also the locations file SHA-256</td><td>Resume the same visitor, and its match</td></tr>
+  </table>
+  </div>
+  <p>All three trusted rows share one client path and one server registry; <a href="#trusted">§08</a> and <a href="#lobby">§09</a> cover them. The shared-screen PvP game uses no network code (<code>ExpeditionApp.LocalDuel</code>).</p>
+  <div class="note">The RELAY tab on main builds only named rooms. <code>ExpeditionApp.HostRelay</code> and <code>JoinRelay</code>, the invitation route, are called only by <code>ExpeditionHarness.Network</code>; the .NET checks call the session's <code>HostRelay</code> and <code>JoinRelay</code> directly. The relay server still accepts protocol-2 invitation rooms. <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/NETWORKING.md#named-public-and-private-rooms">NETWORKING.md · Named public and private rooms</a> says which retained builds still use them.</div>
+</section>
+
+<section id="protocol">
+  <h2><span class="num">03</span>The protocol constants</h2>
+  <p class="lead"><code>ExpeditionProtocol</code> in <code>NetworkContracts.cs</code> is the one owner of the numbers both sides must agree on. Each protocol has its own version, so the relay's admission can change without touching gameplay packets.</p>
+  <div class="scrollx">
+  <table>
+    <tr><th>Constant</th><th>Value on main</th><th>Used for</th></tr>
+    <tr><td><code>Version</code></td><td class="num">1</td><td>Gameplay <code>WirePacket.Protocol</code> and <code>TrustedAdmission.Protocol</code>. <code>ExpeditionWireCodec.Decode</code> rejects any other value. The relay forwards only envelopes whose <code>Protocol</code> is 1.</td></tr>
+    <tr><td><code>RulesVersion</code></td><td><code>bloomfire-network-2-progress</code></td><td>Fingerprint input and a trusted admission field. A frozen identifier (<a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CODE_ARCHITECTURE_GUIDE.md#product-names">product names</a>)</td></tr>
+    <tr><td><code>MaxPacketBytes</code></td><td class="num">65536</td><td>Encode and decode cap for every codec call, the client's TCP frame and WebSocket message caps, the trusted HTTP body cap on both sides</td></tr>
+    <tr><td><code>MaxHandles</code></td><td class="num">4096</td><td>Card handles one seat may ever be issued in a match; also the cap on <code>WireView.HandleCapacity</code></td></tr>
+    <tr><td><code>MaxEvents</code></td><td class="num">128</td><td>Events carried in one view</td></tr>
+    <tr><td><code>DefaultPort</code></td><td class="num">47777</td><td>The LAN port</td></tr>
+    <tr><td><code>RelayVersion</code>, <code>RelayInviteLength</code>, <code>RelayAlphabet</code></td><td>2, 32, <code>ABCDEFGHJKLMNPQRSTUVWXYZ23456789</code></td><td>Invitation rooms: protocol header value, invitation length, invitation characters (no I, O, 0 or 1)</td></tr>
+    <tr><td><code>RelayAccessMaxLength</code></td><td class="num">256</td><td>Longest tester access value the client will send</td></tr>
+    <tr><td><code>NamedRelayVersion</code>, <code>RelaySetupMaxBytes</code>, <code>RelayListMaxBytes</code>, <code>RelayRoomListMax</code></td><td>3, 2048, 16384, 64</td><td>Named rooms: protocol header value, setup message cap, room list cap, rows per list</td></tr>
+    <tr><td><code>RelayProtocolHeader</code>, <code>RelayInviteHeader</code>, <code>RelayAccessHeader</code></td><td><code>X-Bloomfire-Relay-Protocol</code>, <code>X-Bloomfire-Relay-Invite</code>, <code>X-Bloomfire-Relay-Access</code></td><td>WebSocket upgrade headers. Invitations and access values travel only in headers, never in the URL</td></tr>
+    <tr><td><code>QuickmatchVersion</code>, <code>LobbyVersion</code>, <code>IdentityVersion</code></td><td>1, 1, 1</td><td>Trusted queue, lobby and identity protocols. <code>LobbyVersion</code> must also equal the <code>Version</code> of the <code>Lobby</code> object in <code>Content/Circuit/locations.json</code></td></tr>
+  </table>
+  </div>
+  <p>Other code also writes some of these numbers itself; <a href="#rough-edges">§12</a> lists where.</p>
+</section>
+
+<section id="authority">
+  <h2><span class="num">04</span>The authority and its views</h2>
+  <p class="lead"><code>ExpeditionAuthority</code> is a plain class with no transport. Its constructor takes a catalog, a preset dictionary, the two preset IDs, a seed, an optional <code>CombatConfig</code> and an optional match ID, then calls <code>CombatRules.NewMatch</code>. The full state stays in a private field. Seat 0 plays the first deck and seat 1 the second.</p>
+
+  <h3>The fingerprint</h3>
+  <p><code>ExpeditionFingerprint.Compute(catalog, presets, config)</code> is a lowercase SHA-256 over a binary stream of: <code>ExpeditionProtocol.Version</code>, <code>RulesVersion</code>, <code>CombatRules.Version</code>, the <code>CombatConfig</code> fields, every card sorted by ID (title, rules text, kind, cost, attack, health, art index, range, target and each effect), and every preset sorted by ID. The finite-deck settings (<code>OpeningHandSize</code>, <code>SpentCardsStayDiscarded</code>, <code>EmptyDrawDamage</code>) are written only when one of them differs from its default, so the default byte stream matches earlier releases. <code>ValidatePresets</code> requires 1 to 32 presets of equal size, at least 5 cards each, and no upgraded cards.</p>
+
+  <h3><code>ViewFor(seat)</code>: what a player may see</h3>
+  <p>A <code>WireView</code> holds the public board, the side totals (<code>WireSide</code>: life, shield, pulse and zone counts), the viewer's own hand, the cards the viewer may see (<code>WireCard</code>), the legal commands (only on the viewer's turn), the last command and events, and that seat's public progress facts. Cards are addressed by <b>viewer-local handles</b>, never by simulation IDs. Each seat keeps its own handle maps; <code>RefreshHandles</code> issues handles for cards the seat can see (board, own hand, discards) and retires the rest. When an accepted command draws cards, the drawn cards' old handles are retired for both seats, so a card that was public cannot be tracked back into a shuffled deck. <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Toolkit/Packages/com.catsplat.cardforge/Documentation~/NETWORKING.md#render-a-private-player-view">Toolkit NETWORKING · Render a private player view</a> and the <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CODE_ARCHITECTURE_GUIDE.md#multiplayer-authority-and-privacy">architecture guide</a> own the privacy rules.</p>
+
+  <h3><code>Receive(seat, packet)</code>: the order of checks</h3>
+  <p>The seat argument comes from the connection (the host's own input is seat 0, the LAN or relay guest is seat 1, a trusted ticket names its seat), never from the packet. Checks run in this order, and the first failure answers with a code:</p>
+  <div class="scrollx">
+  <table>
+    <tr><th>Step</th><th>Method</th><th>Failure code</th></tr>
+    <tr><td>Seat is 0 or 1</td><td><code>Receive</code></td><td><code>seat</code></td></tr>
+    <tr><td>Kind is <code>Command</code>, a command is present, protocol is 1</td><td><code>ReceiveMalformed</code></td><td><code>packet</code></td></tr>
+    <tr><td>Match ID and fingerprint match</td><td><code>ReceiveScreened</code></td><td><code>mismatch</code></td></tr>
+    <tr><td><code>Command.Player</code> equals the connection's seat</td><td><code>ReceiveScreened</code></td><td><code>ownership</code></td></tr>
+    <tr><td>Sequence and revision in range</td><td><code>ReceiveBadSequence</code></td><td><code>sequence</code></td></tr>
+    <tr><td>Same sequence as the last accepted one: an identical envelope returns the current view; a changed one fails</td><td><code>ReceiveReplayed</code></td><td><code>sequence-conflict</code></td></tr>
+    <tr><td>Sequence is last + 1 and revision is current</td><td><code>ReceiveReplayed</code></td><td><code>stale</code></td></tr>
+    <tr><td>Handles map to visible cards the seat may use</td><td><code>Translate</code></td><td><code>command</code>, <code>ownership</code>, <code>target</code></td></tr>
+    <tr><td>The rules accept the command</td><td><code>CombatRules.Resolve</code></td><td>the rules' own code</td></tr>
+  </table>
+  </div>
+  <p>On success <code>ReceiveCommit</code> builds each seat's progress facts from the full transition (before handles are retired), stores the new state, increments <code>Revision</code>, records the seat's sequence and a copy of the packet for retry detection, and refreshes handles.</p>
+
+  <h3>From view to screen: <code>ExpeditionProjection</code></h3>
+  <p><code>ExpeditionProjection.ToSnapshot(view, catalog, initial)</code> first runs <code>Validate</code>: header bounds, the config, array sizes, turn bounds, then the hand limit, the side totals, each card, the own hand, every command, event and progress fact. Only then does it build an <code>ExpeditionSnapshot</code>: a <code>CombatState</code> whose hidden zone entries are <code>-1</code>, whose unseen handles are empty placeholder cards, and whose <code>RngState</code> is 0, plus the legal commands, events, progress facts, last command, revision, viewer seat and match ID. That state is for drawing only; the game submits commands from <code>LegalCommands</code> and must never pass the snapshot state to <code>CombatRules</code> or the AI.</p>
+  <p><code>Samples~/MinimalTactics/MinimalNetwork.cs</code> exercises the authority, the codec and the projection without a socket.</p>
+</section>
+
+<section id="session">
+  <h2><span class="num">05</span>The session: one class, every route</h2>
+  <p class="lead"><code>ExpeditionNetworkSession</code> is built once per connection attempt from a catalog, the preset dictionary, the player's preset ID, a host seed and the match rules, plus two optional <code>HttpMessageHandler</code> seams for tests. It computes the fingerprint in its constructor. One entry method starts it; a second call throws "Create a new session before connecting again."</p>
+
+  <h3>Threading: background I/O, main-thread <code>Poll</code></h3>
+  <ul>
+    <li>Accepts, connects, read loops and HTTP requests run as tasks and never apply their results to session state themselves. Each result becomes a private <code>Notice</code> pushed onto a <code>ConcurrentQueue</code>.</li>
+    <li><code>Poll()</code> drains at most 32 notices per call and applies them. The snapshots, status changes and errors those notices carry, and the <code>SnapshotChanged</code> event, are applied only inside <code>Poll</code>. On the trusted route, control state (tickets, pending commands) is committed before the event fires, so a handler that disposes or suspends the session cannot be undone by the rest of that notice.</li>
+    <li><code>Submit(command)</code> builds a <code>Command</code> packet with the next sequence and the current revision. A LAN or relay host queues its own command for the next <code>Poll</code>; a guest sends it; a trusted client stores it as the pending envelope. Only one command can be pending.</li>
+    <li><code>Dispose()</code> cancels everything and releases the listener, link and HTTP client.</li>
+  </ul>
+  <p><a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Toolkit/Packages/com.catsplat.cardforge/Documentation~/NETWORKING.md#transport-lifecycle">Toolkit NETWORKING · Transport lifecycle</a> states the same contract for package users.</p>
+
+  <h3>The two links</h3>
+  <p><code>NetworkLink</code> serializes sends with a semaphore, allows at most 32 outstanding sends and rejects empty or oversized payloads. <code>TcpNetworkLink</code> frames each packet with a 4-byte big-endian length and sets <code>NoDelay</code>. <code>WebSocketNetworkLink</code> sends text messages and accepts only text messages up to a byte cap (64 KiB by default, smaller during named-room setup).</p>
+
+  <h3>Client-side bounds on LAN and relay</h3>
+  <p>These live in <code>Push</code>, <code>Poll</code>, <code>PollNotice</code>, <code>PollTimers</code> and <code>PollDeadlines</code>. The queue limit applies to every session; the others apply to LAN and relay only, because a trusted session leaves <code>Poll</code> through <code>PollTrusted</code> before the rate check and timers run.</p>
+  <div class="scrollx">
+  <table>
+    <tr><th>Bound</th><th>Value</th><th>When it trips</th></tr>
+    <tr><td>Notices waiting in the queue</td><td class="num">128</td><td>The session fails: "The peer exceeded the incoming queue limit."</td></tr>
+    <tr><td>Peer messages per one-second window</td><td class="num">40</td><td>The session fails as an invalid peer message</td></tr>
+    <tr><td><code>Ping</code> interval</td><td>10 s</td><td>Sent while a link exists. A LAN peer answers <code>Pong</code>; the relay answers it itself</td></tr>
+    <tr><td>Silence while connected</td><td>35 s</td><td>"The other player stopped responding."</td></tr>
+    <tr><td>Not connected after starting</td><td>3 min</td><td>"The multiplayer lobby timed out."</td></tr>
+    <tr><td>Command not acknowledged</td><td>12 s</td><td>"The action was not acknowledged."</td></tr>
+    <tr><td>LAN connect, relay WebSocket connect</td><td>10 s each</td><td>Connection failure</td></tr>
+  </table>
+  </div>
+  <p>Any failure calls <code>Fail</code>, which ends the session for good (<code>Ended</code>). LAN and relay have no resume; <code>ExpeditionApp.ConnectionLost</code> reports that case, so the match no longer counts as in progress and Back leaves it at once (<code>BackTakesOnlyExit</code>).</p>
+
+  <h3>How the game uses it</h3>
+  <ol class="steps">
+    <li><code>ExpeditionApp.StartNetwork</code> builds the session from <code>Content.DeckPresets</code>, <code>ChosenDeckId</code>, <code>Environment.TickCount</code> as the seed and <code>Content.MatchRules</code>, subscribes <code>QueueNetworkSnapshot</code>, then calls the chosen entry method. In the editor and QA players it also passes <code>ExpeditionHarness</code> handlers.</li>
+    <li><code>ExpeditionApp.Update</code> calls <code>PollNetwork</code>, which calls <code>network.Poll()</code>, mirrors status and errors to the view, and starts <code>PresentNetwork</code> for the next queued snapshot with a higher revision.</li>
+    <li>When the player acts, <code>ExpeditionApp</code> calls <code>network.Submit(command)</code> instead of resolving locally.</li>
+    <li><code>DisconnectNetwork</code> unsubscribes and disposes the session, unless the session is borrowed from the table lobby (<a href="#lobby">§09</a>).</li>
+  </ol>
+</section>
+
+<section id="lan">
+  <h2><span class="num">06</span>LAN: host, join and the Hello</h2>
+  <p class="lead"><code>HostLan(port)</code> opens a <code>TcpListener</code> on <code>IPAddress.Any</code> with a backlog of one, accepts a single client and stops listening. <code>JoinLan(address, port)</code> connects with a 10-second timeout. Neither side compares the content file's SHA-256: the fingerprint is the whole admission check.</p>
+  <ul>
+    <li>The guest sends <code>Hello</code> (its fingerprint and preset ID) as soon as its link opens. On the relay it waits for the relay's <code>PeerReady</code> instead.</li>
+    <li><code>ProcessHello</code> on the host rejects a second <code>Hello</code>, a different fingerprint or an unknown preset by sending <code>Error</code> with code <code>content</code> and failing its own session.</li>
+    <li>On a match the host constructs <code>new ExpeditionAuthority(catalog, presets, ownDeckId, packet.DeckId, seed, config)</code>, delivers <code>ViewFor(0)</code> to itself and sends <code>View</code> with <code>ViewFor(1)</code> to the guest.</li>
+    <li>After each accepted command the host delivers its own view and sends the guest's. A rejected guest command gets <code>Error</code> with the code and a fresh <code>ViewFor(1)</code>; the guest shows fixed local text for the code and never displays the host's message text (<code>RejectionMessage</code>).</li>
+    <li>The guest checks every view: seat, fingerprint and agreed <code>CombatConfig</code> (<code>DeliverConfigMismatch</code>), match ID and revision never moving backwards (<code>DeliverMovedBackwards</code>), then <code>ExpeditionProjection</code> validation.</li>
+  </ul>
+  <p><code>ExpeditionApp.HostLan</code> also adds a "Host address" hint listing up to three local IPv4 addresses. The player procedure for a real two-device test is in <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/NETWORKING.md#first-physical-android-windows-lan-test">NETWORKING.md · First physical Android-Windows LAN test</a>.</p>
+
+  <div class="diagram"><pre class="mermaid">
+sequenceDiagram
+  participant HA as Host ExpeditionApp
+  participant HS as Host session
+  participant GS as Guest session
+  participant GA as Guest ExpeditionApp
+  HA-&gt;&gt;HS: HostLan(47777)
+  Note over HS: TcpListener on IPAddress.Any, AcceptLan()
+  GA-&gt;&gt;GS: JoinLan(address, 47777)
+  GS-&gt;&gt;HS: TCP connect (ConnectLan, 10 s timeout)
+  Note over HS,GS: both wrap the socket in TcpNetworkLink and queue an Opened notice
+  GS-&gt;&gt;HS: Hello (Fingerprint, DeckId)
+  Note over HS: ProcessHello compares the fingerprint and looks up the preset
+  HS-&gt;&gt;HS: new ExpeditionAuthority(host deck, guest deck, seed)
+  HS--&gt;&gt;HA: SnapshotChanged (projection of ViewFor(0))
+  HS-&gt;&gt;GS: View (ViewFor(1))
+  GS--&gt;&gt;GA: SnapshotChanged (ExpeditionProjection.ToSnapshot)
+  GA-&gt;&gt;GS: Submit(command)
+  GS-&gt;&gt;HS: Command (MatchId, Fingerprint, Sequence, Revision)
+  HS-&gt;&gt;HS: authority.Receive(1, packet)
+  HS--&gt;&gt;HA: SnapshotChanged (ViewFor(0)), only if accepted
+  HS-&gt;&gt;GS: View, or Error with ViewFor(1)
+</pre></div>
+  <p class="caption">LAN match setup and one guest command. Every network message into a session is handled in that session's <code>Poll()</code>, on the Unity main thread.</p>
+</section>
+
+<section id="relay">
+  <h2><span class="num">07</span>The relay server</h2>
+  <p class="lead">The relay pairs two WebSocket peers in a room and forwards their game packets. It never decodes a command or a view. The host's session is still the authority, exactly as on LAN; the relay only fixes who may send which packet kind.</p>
+
+  <h3>Startup and hosting</h3>
+  <ul>
+    <li><code>RelayApplication.Create(args)</code> builds an ASP.NET Core <code>WebApplication</code> with Kestrel limits, maps <code>GET /health</code> and <code>/relay</code>, starts a housekeeping loop (every 10 seconds it removes expired rooms and prunes the address limiter) and returns a <code>RelayRuntime</code>.</li>
+    <li><code>RelayRuntime</code> wraps start, stop and dispose, and <code>Endpoints()</code> lists the addresses players can use ("This computer", a configured address, and each active IPv4 address when the listener is a wildcard).</li>
+    <li><code>RelayOptions.Parse</code> reads <code>--port</code> (default 5078), <code>--bind lan|local</code> (default <code>lan</code>), <code>--urls</code>, <code>--interactive</code> and <code>--help</code>. <code>RelayConsole.RunAsync</code> is the console host; the Windows companion and its <code>--headless</code> mode use the same pieces.</li>
+  </ul>
+  <p>Kestrel limits, rate buckets and room lifetimes are owned by the <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Tools/ExpeditionRelay/README.md#cross-platform-source-host">relay guide · Cross-platform source host</a>. The companion's operator steps are in <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/NETWORKING.md#start-the-windows-relay-companion">NETWORKING.md · Start the Windows relay companion</a>.</p>
+
+  <h3><code>/health</code></h3>
+  <p>Returns <code>status</code>, gameplay <code>protocol</code>, <code>relayProtocol</code>, <code>roomProtocol</code>, <code>sourceRevision</code> (the <code>RENDER_GIT_COMMIT</code> environment value if it is a 40-character hex commit, otherwise empty) and aggregate counters: <code>activeRooms</code>, <code>activeConnections</code>, <code>rejectedRequests</code>, <code>rejectedMessages</code>, <code>expiredRooms</code>. Before any non-loopback relay connection or room listing, the client's <code>WaitForRelayReadyAsync</code> probes <code>/health</code> (over <code>https</code> for a <code>wss</code> endpoint) and checks those protocol numbers. One process-wide worker runs the probe so a stuck platform call stays off the player thread. The waiting budget and retry rules belong to <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/NETWORKING.md#named-public-and-private-rooms">NETWORKING.md · Named public and private rooms</a>.</p>
+
+  <h3><code>/relay</code>: admission</h3>
+  <p><code>RelayService.Relay</code> handles each upgrade. The query is only <code>role=host</code>, <code>role=join</code> or <code>role=list</code>. <code>Admit</code> runs its gates in this order:</p>
+  <ol class="steps">
+    <li><b>Access gate</b> (<code>RelayAccess.Allows</code>). The server reads two environment variables, <code>BLOOMFIRE_RELAY_ACCESS_HASH</code> and <code>BLOOMFIRE_RELAY_ACCESS_EXPIRES_UTC</code>; setting one without the other, or a malformed value, stops startup. With a gate configured, the <code>X-Bloomfire-Relay-Access</code> header must match it before the expiry. With no gate, only ungated local QA is admitted: every configured listener and the remote address must be loopback (<code>LocalQa</code>). <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Tools/ExpeditionRelay/README.md#closed-test-runtime-access">Relay guide · Closed-test runtime access</a> owns the setup.</li>
+    <li><b>Request budget</b> (<code>RelayAdmission.Browse</code> for lists, <code>Attempt</code> otherwise).</li>
+    <li><b>Request shape</b>: a WebSocket request, one <code>role</code>, one protocol header of <code>2</code> or <code>3</code> (listing needs <code>3</code>), and an invitation header only on a protocol-2 join.</li>
+    <li><b>Create or join budget</b>, then <b>a connection slot</b> for the address.</li>
+  </ol>
+
+  <h3>Two room kinds</h3>
+  <div class="grid c2">
+    <div class="card accent-cyan"><h4>Invitation rooms (protocol 2)</h4><p>A host gets <code>RoomCreated</code> carrying a random 32-character <code>RoomCode</code>. A guest sends that code in <code>X-Bloomfire-Relay-Invite</code>; a join to an unknown code gets HTTP 404 before the upgrade. Both peers then get <code>PeerReady</code>. These rooms are never listed.</p></div>
+    <div class="card accent-ember"><h4>Named rooms (protocol 3)</h4><p>After the upgrade the client sends one <code>RelayRoomSetup</code> text message (<code>HostRoom</code>, <code>JoinRoom</code> or <code>ListRooms</code>) within five seconds. <code>RelaySetup.Read</code> accepts only known fields. Private room passwords become a PBKDF2 verifier on a single worker. A host gets <code>RoomCreated</code> (room ID and name) before the room is published; a guest gets <code>RoomJoined</code>, then both get <code>PeerReady</code>. A list request gets one <code>RoomList</code> of waiting public rooms and the socket closes. Setup failures answer <code>RoomRejected</code> with a code. <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Tools/ExpeditionRelay/README.md#named-room-protocol-3">Relay guide · Named-room protocol 3</a> owns the name, password and listing rules.</p></div>
+  </div>
+
+  <h3>Forwarding</h3>
+  <p><code>Forward</code> reads each message with a 35-second timeout and per-peer message and byte buckets. A message must be a JSON object with exactly one numeric <code>Protocol</code> equal to 1 and one string <code>Kind</code> (<code>EnvelopeKind</code>). <code>Ping</code> is answered by the relay with <code>Pong</code> and goes no further. <code>RelayRoom.Allow</code> then fixes direction: nothing is forwarded until the guest's single <code>Hello</code>; after it the guest may send only <code>Command</code>, and the host only <code>View</code> or <code>Error</code>. Anything else ends the room. When either peer leaves, <code>EndRoom</code> removes the room and tells the other peer <code>PeerLeft</code>; the client then fails with "The other player left the room."</p>
+
+  <div class="diagram"><pre class="mermaid">
+sequenceDiagram
+  participant H as Host session
+  participant R as RelayApplication
+  participant G as Guest session
+  H-&gt;&gt;R: GET /health (WaitForRelayReadyAsync)
+  H-&gt;&gt;R: upgrade /relay?role=host, protocol 3, access header
+  H-&gt;&gt;R: RelayRoomSetup HostRoom (Name, IsPrivate, Password)
+  R--&gt;&gt;H: RoomCreated (RoomId, RoomName), then the room is published
+  G-&gt;&gt;R: upgrade /relay?role=list, then ListRooms
+  R--&gt;&gt;G: RoomList (waiting public rooms only)
+  G-&gt;&gt;R: upgrade /relay?role=join, then JoinRoom (Name, RoomId)
+  R--&gt;&gt;G: RoomJoined
+  R--&gt;&gt;H: PeerReady
+  R--&gt;&gt;G: PeerReady
+  G-&gt;&gt;R: Hello (Fingerprint, DeckId)
+  R-&gt;&gt;H: Hello, forwarded once
+  H-&gt;&gt;R: View (ViewFor(1))
+  R-&gt;&gt;G: View, forwarded
+</pre></div>
+  <p class="caption">Named public room. A private join skips the list and sends the room name and password instead of a room ID. After <code>View</code>, play continues exactly as in the LAN diagram, with the relay in the middle.</p>
+
+  <p>In the game, <code>ExpeditionApp.BrowseRelayRooms</code> starts <code>ListRelayRoomsAsync</code> as a task that <code>PollRelayRooms</code> checks each frame, and tags each request with a generation number; <code>CancelRelayRoomBrowse</code> and every new request bump it, so a late result for an old request is dropped in <code>PollRelayRooms</code>.</p>
+</section>
+
+<section id="trusted">
+  <h2><span class="num">08</span>The trusted authority</h2>
+  <p class="lead">Started with <code>--authority --content FILE [--port 5079] [--lobby locations.json]</code>, the same executable runs <code>TrustedMatchApplication</code>: an HTTP service where the server, not a player, owns every match. It binds <code>IPAddress.Loopback</code> only, ignores listener URLs from the environment and clears all logging providers. The client refuses any endpoint that is not loopback <code>http</code> or <code>https</code> with path <code>/</code>.</p>
+  <div class="note warn">Loopback-only is deliberate on both sides. The trusted route is a local proof; how it was exercised across devices, and what is still missing, is in <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/NETWORKING.md#trusted-service-proof-and-remaining-online-work">NETWORKING.md · Trusted service proof and remaining online work</a>.</div>
+
+  <h3>The registry: <code>TrustedMatches</code></h3>
+  <ul>
+    <li>Built once from the content file text: <code>ExpeditionContent.Parse</code>, then the catalog, presets and <code>MatchRules</code>. It pins the content version, the SHA-256 of the file's UTF-8 text, and <code>ExpeditionFingerprint</code>. With <code>--lobby</code> it also reads the file's <code>Lobby</code> object, requires exactly one <code>cardtable</code> landmark, and pins that file's SHA-256.</li>
+    <li>All matches, queue entries, visitors and tables sit behind one lock. <code>TrustedMatchRuntime</code> runs <code>Sweep</code> every 500 ms (expiry, silent seats, queue pairing).</li>
+    <li>Each participant is a <code>Player</code> object: a random 64-hex token, a session generation starting at 1, and a resume ID. A resume with a fresh <code>X-Match-Resume-ID</code> increments the generation, which fences the old connection; repeating the same resume ID is accepted as a retry. The same <code>Player</code> carries a participant from queue or lobby into the match, so the match ticket reuses the queue or lobby token.</li>
+    <li><code>AdmissionError</code> is the one admission check: protocol, rules version, content version, content SHA-256 and fingerprint must match (else <code>mismatch</code>), and the preset must be known (else <code>deck</code>).</li>
+    <li>Commands go through the same <code>ExpeditionAuthority.Receive</code>. The first accepted command that produces a winner records a result ID, returned in the <code>X-Match-Result</code> header.</li>
+  </ul>
+
+  <h3>Routes</h3>
+  <div class="scrollx">
+  <table>
+    <tr><th>Route</th><th>Request</th><th>Reply</th><th>Server method</th></tr>
+    <tr><td><code>GET /authority/health</code></td><td>—</td><td>Protocols, rules version, identity mode and instance, content version and SHA-256, fingerprint, lobby protocol and SHA-256, aggregate counts</td><td><code>Health</code></td></tr>
+    <tr><td><code>POST /authority/matches</code></td><td><code>TrustedAdmission</code></td><td><code>TrustedTicket</code> (match ID, random seat, token, session)</td><td><code>Admit</code></td></tr>
+    <tr><td><code>POST /authority/matches/{id}/join</code></td><td><code>TrustedAdmission</code></td><td><code>TrustedTicket</code> for the other seat; the authority is created now</td><td><code>Admit</code></td></tr>
+    <tr><td><code>GET /authority/matches/{id}/view</code></td><td>bearer + session</td><td><code>WirePacket</code> <code>View</code>; 409 <code>waiting</code> until the second seat joins</td><td><code>View</code></td></tr>
+    <tr><td><code>POST /authority/matches/{id}/command</code></td><td><code>WirePacket</code> <code>Command</code></td><td><code>Ack</code> or <code>Error</code>, both carrying <code>ViewFor(seat)</code></td><td><code>Command</code></td></tr>
+    <tr><td><code>POST /authority/matches/{id}/resume</code></td><td>bearer + session + resume ID</td><td><code>TrustedTicket</code> with the new session</td><td><code>Reattach</code></td></tr>
+    <tr><td><code>POST /authority/matches/{id}/disconnect</code></td><td>bearer + session</td><td>204; starts the seat's grace period</td><td><code>Reattach</code></td></tr>
+    <tr><td><code>POST /authority/quickmatch</code></td><td><code>TrustedQueueAdmission</code></td><td><code>TrustedQueueTicket</code>, state <code>created</code></td><td><code>Queue</code></td></tr>
+    <tr><td><code>POST /authority/quickmatch/{id}/enqueue</code>, <code>/poll</code>, <code>/cancel</code>, <code>/resume</code></td><td>bearer + session (enqueue repeats the admission without identity)</td><td><code>TrustedQueueTicket</code>; once matched it carries the match <code>TrustedTicket</code></td><td><code>Queue</code></td></tr>
+    <tr><td><code>POST /authority/lobby</code></td><td><code>TrustedLobbyAdmission</code></td><td><code>TrustedLobbyTicket</code> (members, tables, own match ticket if any)</td><td><code>Lobby</code></td></tr>
+    <tr><td><code>POST /authority/lobby/{id}/view</code>, <code>/command</code>, <code>/resume</code></td><td>bearer + session; <code>TrustedLobbyCommand</code> for commands</td><td><code>TrustedLobbyTicket</code></td><td><code>Lobby</code></td></tr>
+  </table>
+  </div>
+  <p>Credentials travel only in headers: <code>Authorization: Bearer</code>, <code>X-Match-Session</code> and <code>X-Match-Resume-ID</code>. Every response carries <code>X-Match-Identity</code> (<code>local-proof</code> or <code>verified-v1</code>). Lifetimes and caps are owned by <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Tools/ExpeditionRelay/README.md#trusted-authority-proof">Relay guide · Trusted authority proof</a>. The optional identity seam (<code>TrustedIdentityMode.Required</code> with an <code>ITrustedIdentityVerifier</code>, chosen only through <code>TrustedMatchApplication.Create</code>; the console is always local proof) is owned by <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Tools/ExpeditionRelay/README.md#shared-identity-contract">Shared identity contract</a> and <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/NETWORKING.md#shared-identity-admission-preparation">NETWORKING.md · Shared identity admission preparation</a>.</p>
+
+  <h3>The client side of the trusted route</h3>
+  <ul>
+    <li><code>BeginTrusted</code> validates the endpoint and content hash, builds one <code>TrustedAdmission</code> (protocol, rules version, content version, content SHA-256, fingerprint, preset, optional identity) and starts the first request. The game passes <code>Content.Version</code> and <code>LoadedPack.CombatHash</code> (<code>ExpeditionApp.TrustedCombatHash</code>).</li>
+    <li>At most one request is in flight (<code>trustedBusy</code>). <code>StartTrustedRequest</code> maps an operation name (<code>create</code>, <code>join</code>, <code>view</code>, <code>command</code>, <code>resume</code>, <code>queue-create</code>, <code>queue-enqueue</code>, <code>queue-poll</code>, <code>queue-cancel</code>, <code>queue-resume</code>, <code>lobby-create</code>, <code>lobby-view</code>, <code>lobby-command</code>, <code>lobby-resume</code>) to a route and body. Each request cancels itself after 10 seconds. Polling runs every 250 ms for a match or queue and every 100 ms in the lobby.</li>
+    <li>Replies are checked before use: ticket shape and continuity (same match, seat and token, session never lower), queue and lobby state names, and a result ID present exactly when the view has a winner. Older or duplicate views are validated and then ignored, never applied backwards.</li>
+    <li><code>SuspendTrusted</code> bumps an epoch and cancels the request; notices from an older epoch are dropped in <code>PollTrusted</code>. <code>ReconnectTrusted</code> keeps one resume ID until a resume reply arrives, so a lost reply can be retried without fencing itself. A pending command envelope is kept and resent unchanged.</li>
+    <li>Transport failures, HTTP 408, 429, any 5xx, a 409 <code>session</code>, and in the lobby a 401 on a match route mark the session interrupted, which is the state <b>RECONNECT</b> uses (<code>CanReconnect</code>). Other HTTP rejections and undecodable replies end it (<code>TrustedRequestProblemFatal</code>, <code>TrustedRequestFatal</code>).</li>
+  </ul>
+
+  <div class="diagram"><pre class="mermaid">
+sequenceDiagram
+  participant App as ExpeditionApp
+  participant S as ExpeditionNetworkSession
+  participant T as TrustedMatchApplication
+  participant M as TrustedMatches
+  App-&gt;&gt;S: QuickmatchTrusted(endpoint, Content.Version, CombatHash)
+  S-&gt;&gt;T: POST /authority/quickmatch (TrustedQueueAdmission)
+  T-&gt;&gt;M: Queue(create), AdmissionError compares versions, hashes, preset
+  T--&gt;&gt;S: TrustedQueueTicket, state created, token, session
+  S-&gt;&gt;T: POST /authority/quickmatch/{id}/enqueue (Bearer, X-Match-Session)
+  T-&gt;&gt;M: Enqueue sets state queued, then PairWaiting()
+  loop every 250 ms until matched
+    S-&gt;&gt;T: POST /authority/quickmatch/{id}/poll
+    T--&gt;&gt;S: TrustedQueueTicket, state queued
+  end
+  Note over M: PairWaiting takes the two oldest queued entries, picks random seats, creates ExpeditionAuthority
+  T--&gt;&gt;S: state matched, with TrustedTicket (MatchId, Seat)
+  S-&gt;&gt;T: GET /authority/matches/{id}/view
+  T-&gt;&gt;M: View returns authority.ViewFor(seat)
+  T--&gt;&gt;S: WirePacket View
+  S--&gt;&gt;App: SnapshotChanged, inside Poll()
+  App-&gt;&gt;S: Submit(command)
+  S-&gt;&gt;T: POST /authority/matches/{id}/command (WirePacket)
+  T-&gt;&gt;M: Command calls authority.Receive(seat, packet)
+  T--&gt;&gt;S: Ack or Error with ViewFor(seat), X-Match-Result once there is a winner
+</pre></div>
+  <p class="caption">A trusted quickmatch from search to the first command. Both players run this same sequence; the server pairs them inside <code>PairWaiting</code>.</p>
+
+  <div class="diagram"><pre class="mermaid">
+stateDiagram-v2
+  [*] --&gt; created: POST /authority/quickmatch
+  created --&gt; queued: enqueue
+  created --&gt; cancelled: cancel
+  queued --&gt; cancelled: cancel
+  queued --&gt; matched: PairWaiting
+  created --&gt; expired: never enqueued
+  queued --&gt; expired: idle or waited too long
+  matched --&gt; expired: match removed
+  cancelled --&gt; [*]: record swept
+  expired --&gt; [*]: record swept
+  matched --&gt; [*]: record swept
+</pre></div>
+  <p class="caption">Server-side states of one quickmatch queue entry (<code>QueueEntry.State</code>), as returned in <code>TrustedQueueTicket.State</code>. Cancelling after assignment leaves the entry <code>matched</code>. The time limits are in the relay guide.</p>
+  <p><code>ExpeditionApp.CloseNetwork</code> calls <code>CancelQuickmatch</code> while a search is running, so leaving the menu resolves the cancellation first and a pairing that won the race stays playable.</p>
+</section>
+
+<section id="lobby">
+  <h2><span class="num">09</span>The in-game table lobby</h2>
+  <p class="lead">The table lobby is a small shared room served by the trusted service when it runs with <code>--lobby</code>. The world (<code>IsometricSlice</code>), not the hosted battle, owns the lobby's session; a battle borrows it for the length of a match. <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/NETWORKING.md#table-lobby-prototype">NETWORKING.md · Table lobby prototype</a> owns how to start and play it.</p>
+
+  <h3>The path through the code</h3>
+  <ol class="steps">
+    <li>In the hosted Versus app, <b>TABLE LOBBY</b> calls <code>ExpeditionApp.EnterTableLobby(endpoint)</code>, which finds the world with <code>FindAnyObjectByType&lt;IsometricSlice&gt;()</code> and calls <code>OpenTableLobby(endpoint, ChosenDeckId)</code>.</li>
+    <li><code>OpenTableLobbySession</code> checks the lobby data (version, valid navigation, one <code>cardtable</code> landmark), builds a session from the Circuit content and calls <code>JoinLobbyTrusted(endpoint, circuitContent.Version, circuitPack.CombatHash, lobbyContentHash)</code>. <code>lobbyContentHash</code> is the SHA-256 of the <code>Circuit/locations.json</code> text, computed when <code>LoadCircuit</code> reads it.</li>
+    <li>If the Versus battle is still open it is cancelled; when it closes, <code>ShowWorldVersus</code> sees <code>LobbyActive</code> and calls <code>InitializeTableLobby</code>, which swaps in the lobby sector, builds the authored room and checks that its navigation and table position match the pinned data.</li>
+    <li>Every frame <code>IsometricSlice.Update</code> calls <code>TickTableLobby</code>: poll the session (only while no battle owns it), place every member's traveller, send <code>move</code> commands while walking, rebuild the HUD when its signature changes.</li>
+    <li>When the lobby ticket carries a match and its first view has arrived (<code>TickTableLobbyMatchReady</code>), <code>PlayLobbyMatch</code> seats both travellers, sets <code>IsometricCombatBridge.LobbySession</code> and plays a Versus session. Once the hosted app has a view, the bridge calls <code>ExpeditionApp.AttachLobbyMatch(session)</code>, which subscribes to the borrowed session (<code>borrowedNetwork</code>) instead of creating one.</li>
+    <li>After the battle, if the match is over, <code>PlayLobbyMatch</code> sends <code>return</code>. The reply has no match ticket, so the session clears its match state (<code>PollTrustedLobbyLeaveMatch</code>) and the player walks again.</li>
+  </ol>
+  <p>While borrowed, <code>ExpeditionApp.LeaveNetwork</code> suspends the session instead of disposing it, and <code>DisconnectNetwork</code> leaves it alone; once the lobby is open, only <code>ReleaseTableLobby</code> disposes it.</p>
+
+  <h3>Lobby state and commands</h3>
+  <p>A member's state is not stored; <code>TrustedMatches.LobbyState</code> derives it on every reply, checking in this order. The HUD (<code>DrawTableLobbyHudActions</code>) offers buttons by state. Each table, search or return button sends a <code>TrustedLobbyCommand</code> through <code>SubmitLobby</code>; <b>Walk to table</b> only plans a route, and the walk then sends <code>move</code>. Table commands carry the table ID and the table revision the player saw; a stale revision is rejected.</p>
+  <div class="scrollx">
+  <table>
+    <tr><th>State</th><th>Derived when</th><th>HUD buttons</th><th>Command kinds</th></tr>
+    <tr><td><code>left</code></td><td>The visitor left or is gone</td><td>—</td><td>—</td></tr>
+    <tr><td><code>matched</code></td><td>Its assigned match still exists</td><td>(the battle)</td><td><code>return</code> once the match is over</td></tr>
+    <tr><td><code>aborted</code></td><td>Its assigned match no longer exists</td><td>Return after interrupted match</td><td><code>return</code></td></tr>
+    <tr><td><code>queued</code></td><td>It has a queued quickmatch entry</td><td>Cancel search</td><td><code>cancel-search</code></td></tr>
+    <tr><td><code>challenging</code></td><td>It is a table's challenger</td><td>Withdraw challenge</td><td><code>withdraw</code></td></tr>
+    <tr><td><code>seated</code></td><td>It owns a table</td><td>Accept / Decline challenge (when challenged), Stand up</td><td><code>accept</code>, <code>decline</code>, <code>withdraw</code></td></tr>
+    <tr><td><code>walking</code></td><td>None of the above</td><td>Walk to table, Sit and wait or Challenge player (near a free table), Find preset quickmatch</td><td><code>move</code>, <code>sit</code>, <code>challenge</code>, <code>quickmatch</code></td></tr>
+  </table>
+  </div>
+  <p><b>Leave lobby</b> sends <code>leave</code> when connected and not in a match; otherwise it releases the lobby locally. <code>AcceptChallenge</code> creates the match with a random seat for the owner and a new <code>ExpeditionAuthority</code>. A lobby <code>quickmatch</code> adds an entry to the same queue that menu quickmatch uses, and <code>PairWaiting</code> does not tell them apart. The server checks every <code>move</code> against the walkable layout (<code>SectorNavigation.PointWalkable</code>) and a speed budget.</p>
+
+  <div class="diagram"><pre class="mermaid">
+sequenceDiagram
+  participant W as IsometricSlice (table owner)
+  participant S as Lobby session
+  participant M as TrustedMatches
+  participant C as Challenger
+  W-&gt;&gt;S: OpenTableLobby, then JoinLobbyTrusted(..., lobbyContentHash)
+  S-&gt;&gt;M: POST /authority/lobby (TrustedLobbyAdmission)
+  M--&gt;&gt;S: TrustedLobbyTicket (members, tables)
+  W-&gt;&gt;S: SubmitLobby(move) while walking, in TickTableLobby
+  W-&gt;&gt;S: SubmitLobby(sit, tableId, tableRevision)
+  S-&gt;&gt;M: POST /authority/lobby/{id}/command
+  C-&gt;&gt;M: command challenge
+  S-&gt;&gt;M: POST /authority/lobby/{id}/view
+  M--&gt;&gt;S: table shows the challenger
+  W-&gt;&gt;S: SubmitLobby(accept)
+  Note over M: AcceptChallenge picks seats and creates ExpeditionAuthority
+  M--&gt;&gt;S: TrustedLobbyTicket with this member's match TrustedTicket
+  S-&gt;&gt;M: GET /authority/matches/{id}/view
+  Note over W: TickTableLobbyMatchReady, then PlayLobbyMatch
+  W-&gt;&gt;W: IsometricCombatBridge.Play calls ExpeditionApp.AttachLobbyMatch(session)
+  W-&gt;&gt;S: SubmitLobby(return) after the match is over
+</pre></div>
+  <p class="caption">A table challenge, seen from the owner who sat down first. The challenger runs the same session code and receives its own match ticket in its next lobby reply.</p>
+</section>
+
+<section id="wire">
+  <h2><span class="num">10</span>The wire format</h2>
+  <p class="lead">Every packet is UTF-8 JSON. The game side reads and writes it with <code>DataContractJsonSerializer</code> through <code>ExpeditionWireCodec</code>; the server reads its own envelopes with <code>System.Text.Json</code>. The two meet on field names, so the names in <code>NetworkContracts.cs</code> are part of the protocol.</p>
+
+  <h3>The codec</h3>
+  <ul>
+    <li><code>Encode</code>/<code>Decode</code> handle <code>WirePacket</code>; <code>EncodeTrusted&lt;T&gt;</code>/<code>DecodeTrusted&lt;T&gt;</code> handle every other DTO. All four refuse more than <code>MaxPacketBytes</code>, and the decoders refuse empty input.</li>
+    <li><code>Decode</code> also requires <code>Protocol == 1</code> and a non-empty <code>Kind</code> of at most 32 characters. <code>WirePacket.Protocol</code> and <code>Kind</code> are <code>[DataMember(IsRequired = true)]</code>, so a packet missing them fails to deserialize.</li>
+    <li>Two DTO styles exist. <code>[DataContract]</code> types (<code>WirePacket</code>, the relay room types, the <code>Trusted*</code> types) serialize only the members marked <code>[DataMember]</code>; the <code>Trusted*</code> types also set camelCase names to match the ASP.NET service. The payload types (<code>WireView</code>, <code>WireCommand</code>, <code>WireCard</code>, <code>WireSide</code>, <code>WireEvent</code>, <code>NetworkProgressFact</code>) are plain <code>[Serializable]</code> classes whose public fields serialize under their own names.</li>
+    <li><code>DataContractJsonSerializer</code> writes enums (<code>ActionKind</code>, <code>Zone</code>, <code>Rank</code>, <code>CombatEventKind</code>, <code>TerrainKind</code>) as numbers, so enum order is part of the wire contract.</li>
+    <li>The serializer reports malformed JSON as <code>SerializationException</code> or <code>System.Xml.XmlException</code>, because it reads JSON through an XML reader. The client's filters that treat received data as invalid list both (<code>PeerDataRejected</code>, <code>TrustedRequestFatal</code>, <code>RelayReadinessWorkerDecode</code>). On the trusted service, <code>CommandAction</code> catches <code>SerializationException</code> and the <code>IdentityHeader</code> middleware turns an <code>XmlException</code> into 400 <code>packet</code>.</li>
+    <li>Size is not the only bound: <code>ExpeditionProjection.Validate</code> caps a view's cards, own hand, legal commands, events and progress facts, and checks every value range, before anything reaches the screen.</li>
+  </ul>
+
+  <h3>Who writes and reads what</h3>
+  <div class="scrollx">
+  <table>
+    <tr><th>Message</th><th>Written by</th><th>Read by</th></tr>
+    <tr><td>Game packets on LAN and relay (<code>Hello</code>, <code>Command</code>, <code>View</code>, <code>Error</code>, <code>Ping</code>, <code>Pong</code>)</td><td><code>ExpeditionWireCodec.Encode</code></td><td>The peer's <code>Decode</code>. The relay only parses <code>Protocol</code> and <code>Kind</code> with <code>JsonDocument</code> and forwards the original bytes</td></tr>
+    <tr><td>Relay controls (<code>RoomCreated</code>, <code>RoomJoined</code>, <code>PeerReady</code>, <code>PeerLeft</code>, <code>Pong</code>, <code>Error</code>, <code>RoomRejected</code>)</td><td><code>RelayPeer</code>, as anonymous objects through <code>JsonSerializer</code></td><td>The client's <code>Decode</code>, as a <code>WirePacket</code></td></tr>
+    <tr><td><code>RelayRoomSetup</code></td><td>Client <code>EncodeTrusted</code></td><td><code>RelaySetup.Read</code> (<code>JsonDocument</code>, known fields only)</td></tr>
+    <tr><td><code>RoomList</code></td><td>Relay <code>JsonSerializer</code></td><td>Client <code>DecodeTrusted&lt;RelayRoomList&gt;</code></td></tr>
+    <tr><td>Relay <code>/health</code></td><td><code>Results.Json</code></td><td>Client <code>DecodeTrusted&lt;RelayReadinessHealth&gt;</code></td></tr>
+    <tr><td>Trusted admissions and lobby commands</td><td>Client <code>EncodeTrusted</code></td><td>Service <code>JsonSerializer.Deserialize</code>, case-insensitive</td></tr>
+    <tr><td>Trusted tickets and errors</td><td>Service <code>WriteAsJsonAsync</code></td><td>Client <code>DecodeTrusted&lt;T&gt;</code></td></tr>
+    <tr><td>Trusted <code>Command</code>; <code>View</code>, <code>Ack</code>, <code>Error</code></td><td>Client <code>Encode</code>; service <code>Encode</code></td><td>Service <code>Decode</code>; client <code>Decode</code></td></tr>
+  </table>
+  </div>
+
+  <h3>IL2CPP</h3>
+  <p><code>DataContractJsonSerializer</code> finds members by reflection, which IL2CPP stripping can remove. <code>Runtime/Networking/link.xml</code> preserves <code>System.Runtime.Serialization</code>, the whole networking assembly, <code>ProgressFact</code> and <code>CombatConfig</code>. Unity does not pick up a package-local <code>link.xml</code> on its own; the toolkit's <code>Editor/CardForgeLinkerProcessor.cs</code> registers it through <code>IUnityLinkerProcessor</code>. <code>IsometricSliceBuild.cs</code> has its own <code>AndroidNetworkQaLinker</code> for the Android QA build.</p>
+</section>
+
+<section id="qa">
+  <h2><span class="num">11</span>Network QA at a glance</h2>
+  <p class="lead">Networking is checked at three levels: .NET checks that drive the real session against the real relay and service, a socket runner that starts separate peer processes, and rehearsals inside a built player. <a href="qa.html">QA &amp; Rehearsals</a> covers the whole QA system; the commands and evidence rules belong to the guides linked here.</p>
+  <div class="grid c3">
+    <div class="card accent-cyan"><h4><code>Tools/ExpeditionNetworkChecks</code></h4><p>A .NET 10 console that compiles <code>ExpeditionNetworkSession.cs</code> and references the relay project. With no arguments it runs the default <code>Network</code> suite (protocol rules, LAN safety probes, relay readiness and the trusted service, including synthetic identity cases). Named modes include <code>trusted-checks</code>, <code>relay-rooms</code>, <code>relay-security</code>, <code>relay-cold-start</code>, <code>compare-player-reports</code>. <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Tools/ExpeditionNetworkChecks/README.md">Checks README</a>.</p></div>
+    <div class="card accent-ember"><h4><code>Run-SocketChecks.ps1</code></h4><p>Builds the checks and the relay, then starts owned processes: a LAN host and guest (<code>peer lan</code>), a loopback relay, invitation, public-room and private-room peer pairs, and the <code>guards</code>, <code>relay-security</code> and <code>relay-rooms</code> probes. It removes the relay access variables from the child processes and refuses a non-empty output folder. <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Tools/ExpeditionRelay/README.md#verification">Relay guide · Verification</a>.</p></div>
+    <div class="card accent-gold"><h4><code>ExpeditionHarness.Network</code></h4><p>Inside an editor or QA player: <code>-expedition-net-verify &lt;output&gt; &lt;host|guest&gt; &lt;mode&gt; &lt;endpoint&gt;</code> with mode <code>lan</code>, <code>relay</code>, <code>relay-public</code>, <code>relay-private</code>, <code>trusted</code>, <code>quickmatch</code> or <code>lobby</code>. <code>-expedition-net-detached</code> runs without a shared desktop folder and <code>-expedition-net-faults</code> drops accepted replies through the session's HTTP handler seam (<code>CreateRehearsalHandler</code>); both are for quickmatch and lobby only. On Android, <code>ParseAndroidNetworkLaunch</code> builds these arguments from the <code>bloomfire.qa</code> launch extra, for quickmatch or lobby only. It writes <code>network-capture.json</code>, plus <code>named-room-capture.json</code> for named rooms. <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Tools/ExpeditionNetworkChecks/README.md#independent-unity-player-captures">Independent Unity player captures</a>.</p></div>
+  </div>
+  <ul>
+    <li><code>compare-player-reports FIRST SECOND HEALTH [--require-android]</code> compares two players' captures with the authority's saved health. A single client's PASS does not pass a pair.</li>
+    <li>The harness reaches into production code only behind <code>#if UNITY_EDITOR || EMBERGROVE_QA</code> (for example in <code>ExpeditionApp.StartNetwork</code> and <code>BrowseRelayRooms</code>).</li>
+    <li>The private QA pair is built by <code>Tools/Build-PrivateNetworkPair.ps1</code> with the environment variable <code>BLOOMFIRE_PRIVATE_QA_RELAY_KEY</code> and the ignored file <code>Game/EmberGrove/Assets/Tests/Runtime/PrivateRelayQaSettings.generated.cs</code>. Never paste their contents anywhere. <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/MAINTAINING.md#android-development-build">MAINTAINING · Android development build</a> owns that build.</li>
+    <li>Two-device procedures: <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/NETWORKING.md#mixed-windowsandroid-test-plan">NETWORKING.md · Mixed Windows–Android test plan</a> and <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/NETWORKING.md#internet-prototype-relay">Internet prototype relay</a>. What has been observed on which candidate is recorded in <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Release/ROADMAP.md#network-and-android-candidate-evidence">ROADMAP · Network and Android candidate evidence</a>.</li>
+  </ul>
+</section>
+
+<section id="rough-edges">
+  <h2><span class="num">12</span>Rough edges seen while writing this page</h2>
+  <p class="lead">These are small, verified facts about main that a maintainer may want to fix. The ranked list of structural problems is on <a href="findings.html">Findings</a>.</p>
+  <div class="scrollx">
+  <table>
+    <tr><th>What</th><th>Where</th><th>Why it matters</th></tr>
+    <tr><td>Three status strings contain a double-encoded ellipsis: the bytes are the UTF-8 for <code>â€¦</code>, not <code>…</code></td><td><code>ExpeditionNetworkSession.cs</code>: <code>JoinLan</code>, <code>PollNoticeOpened</code>, <code>ProcessPeerReady</code></td><td>The menu shows <code>Status</code> through <code>ExpeditionApp.NetworkStatus</code>, so a player can see "Connecting to the LAN hostâ€¦"</td></tr>
+    <tr><td>Protocol numbers written again outside <code>ExpeditionProtocol</code></td><td><code>RelayService.Health</code> writes <code>protocol = 1, relayProtocol = 2, roomProtocol = 3</code>; <code>RelayPeer</code> writes <code>Protocol = 1</code>; <code>RelaySetup</code> compares with <code>3</code>; <code>RelayRoom.Alphabet</code> copies <code>RelayAlphabet</code>; <code>ExpeditionApp.HostLan</code>/<code>JoinLan</code> default to <code>47777</code></td><td>A protocol bump in <code>ExpeditionProtocol</code> would not reach these copies</td></tr>
+    <tr><td>One class for every route</td><td><code>ExpeditionNetworkSession</code> keeps LAN/relay fields and trusted, queue and lobby fields side by side; <code>IsTrusted</code>, <code>IsQuickmatch</code>, <code>IsLobby</code> and <code>IsNamedRelay</code> choose behaviour, and trusted operations are strings that also build routes (<code>operation.Substring(6)</code>)</td><td>Changing one route means reading all of them. The many small <code>PollTrusted*</code> helpers here, like the <code>Validate*</code> helpers in <code>ExpeditionProjection</code>, came from the <a href="complexity.html">complexity work</a> and keep the original check order</td></tr>
+    <tr><td>A server route the game never calls</td><td><code>POST /authority/matches/{id}/disconnect</code> is used only by <code>TrustedServiceChecks.cs</code>; <code>SuspendTrusted</code> only stops locally</td><td>A suspended player's seat detaches through the server's silence window, not at once</td></tr>
+    <tr><td>Checks read private fields by name</td><td><code>Tools/ExpeditionNetworkChecks/Program.cs</code> and <code>Tools/ExpeditionPerformance/WorldFactChecks.cs</code> read <code>ExpeditionAuthority</code>'s <code>state</code>, <code>lastCommand</code>, <code>lastEvents</code> and <code>RelayAdmission</code>'s maps by reflection</td><td>A rename still compiles and fails only when the checks run</td></tr>
+    <tr><td>The hosted app finds the world by search</td><td><code>ExpeditionApp.EnterTableLobby</code> uses <code>FindAnyObjectByType&lt;IsometricSlice&gt;()</code></td><td>The battle layer depends on the world layer at runtime with no compile-time link</td></tr>
+  </table>
+  </div>
+</section>
+
+<div class="honest">
+  <h4>Keep this page honest</h4>
+  <ul>
+    <li><code>Toolkit/Packages/com.catsplat.cardforge/Runtime/Networking/NetworkContracts.cs</code> — <code>ExpeditionProtocol</code> values (§03), DTO styles and the codec (§10), <code>ExpeditionProjection</code> (§04).</li>
+    <li><code>Toolkit/Packages/com.catsplat.cardforge/Runtime/Networking/ExpeditionAuthority.cs</code> — fingerprint inputs, <code>ViewFor</code>, the <code>Receive</code> check order and codes (§04).</li>
+    <li><code>Toolkit/Packages/com.catsplat.cardforge/Runtime/Networking/ExpeditionNetworkSession.cs</code> — Poll/notice model, client bounds, links (§05); LAN Hello (§06); relay client and readiness (§07); trusted client operations and failure rules (§08); lobby client (§09); the status strings (§12).</li>
+    <li><code>Toolkit/Packages/com.catsplat.cardforge/Runtime/Networking/link.xml</code>, <code>EmberGrove.Expedition.Networking.asmdef</code> and <code>Toolkit/Packages/com.catsplat.cardforge/Editor/CardForgeLinkerProcessor.cs</code> — §01, §10.</li>
+    <li><code>Tools/ExpeditionRelay/Program.cs</code>, <code>RelayApplication.cs</code>, <code>RelayRuntime.cs</code>, <code>ExpeditionRelay.csproj</code> — relay startup, <code>/health</code>, admission order, room kinds, forwarding (§01, §07).</li>
+    <li><code>Tools/ExpeditionRelay/TrustedMatchApplication.cs</code> — routes, <code>TrustedMatches</code>, queue states, lobby state and commands (§08, §09).</li>
+    <li><code>Game/EmberGrove/Assets/Runtime/ExpeditionApp.Network.cs</code>, <code>ExpeditionView.Connection.cs</code>, <code>Exploration/IsometricSlice.Versus.cs</code>, <code>Exploration/IsometricSlice.Circuit.cs</code> (<code>lobbyContentHash</code>), <code>Exploration/IsometricCombatBridge.cs</code> — the game side (§02, §05, §09).</li>
+    <li><code>Tools/ExpeditionNetworkChecks/</code> (<code>Program.cs</code>, <code>Run-SocketChecks.ps1</code>, the <code>.csproj</code>) and <code>Game/EmberGrove/Assets/Tests/Runtime/ExpeditionHarness.Network.cs</code> — QA modes and flags (§11).</li>
+    <li><code>Content/Circuit/locations.json</code> (<code>Lobby</code>) — lobby version and the one card table (§03, §09).</li>
+  </ul>
+</div>
+</main>
+<footer>Bloomfire Wiki · page source <code>Docs/Wiki/networking.html</code>, built by <code>Tools/Documentation/structure_wiki.py</code> · Found a mistake? Fix it in the same commit as the code that made it one.</footer>
+</body>
+</html>

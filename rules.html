@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rules Engine — Bloomfire Wiki</title>
+<link rel="stylesheet" href="wiki.css">
+<script src="mermaid.min.js" defer></script>
+<script src="wiki.js" defer></script>
+</head>
+<body>
+<nav class="wiki">
+  <a class="home" href="index.html">🔥 Bloomfire Wiki</a>
+  <div class="grp"><span class="grp-t">Start here</span>
+    <a href="codebase-tour.html">Codebase Tour</a>
+    <a href="glossary.html">Glossary</a>
+  </div>
+  <div class="grp"><span class="grp-t">Game systems</span>
+    <a class="on" href="rules.html">Rules Engine</a>
+    <a href="world.html">World &amp; Journal</a>
+    <a href="sessions.html">Hosted Sessions</a>
+    <a href="ui.html">UI &amp; Menus</a>
+    <a href="networking.html">Networking</a>
+    <a href="content.html">Content &amp; Media</a>
+    <a href="saves.html">Saves &amp; Settings</a>
+  </div>
+  <div class="grp"><span class="grp-t">Code health</span>
+    <a href="diagrams.html">Diagrams</a>
+    <a href="complexity.html">Complexity</a>
+    <a href="findings.html">Findings</a>
+  </div>
+  <div class="grp"><span class="grp-t">Ship &amp; maintain</span>
+    <a href="qa.html">QA &amp; Rehearsals</a>
+    <a href="builds.html">Builds &amp; Tools</a>
+    <a href="maintaining.html">Maintaining</a>
+  </div>
+</nav>
+<header class="page"><h1>How the rules <span class="flame">decide</span></h1><p class="tag">The CardForge rules layer: the result type, the combat reducer, the Circuit adventure rules, the retired progression shell and grid navigation, and how the game calls each of them.</p></header>
+<main>
+  <div class="tldr"><h4>In 60 seconds</h4><ul>
+    <li><b>The rules are plain C# with no Unity.</b> The five rules assemblies under <code>Toolkit/Packages/com.catsplat.cardforge/Runtime</code> set <code>noEngineReferences</code>. They take values in and give values out. The game owns the live state, the saves and everything on screen. <a href="#anatomy">§01</a></li>
+    <li><b><code>Result&lt;T&gt;</code> carries rule rejections.</b> A failure holds a <code>RuleError</code> with a <code>Code</code> and a player-facing <code>Message</code>. <code>Bind</code> stops at the first failure. Match setup and catalog building throw instead. <a href="#functional">§02</a></li>
+    <li><b>Combat is one reducer.</b> <code>CombatRules.Resolve(state, command, catalog)</code> validates the command, runs it on a deep copy and returns the new <code>CombatState</code> plus ordered <code>CombatEvent</code>s. The local player, the AI and the network host all call it. <a href="#accepted-command">§05</a></li>
+    <li><b>The Circuit adventure is a second reducer.</b> Every <code>CircuitRules</code> transition returns <code>Result&lt;CircuitState&gt;</code>. On the game side, <code>IsometricSlice.ApplyCircuit</code> swaps in the new state and saves it. Duels carry a receipt, so a result can be applied only once, however many places report it. <a href="#apply-circuit">§09</a>, <a href="#duel-receipt">§10</a></li>
+    <li><b>Most of Progression is retired.</b> The game still uses <code>ContentPack</code>, its encounters and deck presets. <code>RunRules</code>, <code>ProfileRules</code>, <code>StoryRules</code> and <code>CampaignRules</code> have no game callers; only the toolkit sample and some check suites still use them. <a href="#progression">§07</a></li>
+  </ul></div>
+  <div class="prereq"><h4>Before you start</h4><p>Read the <a href="codebase-tour.html">Codebase Tour</a> for how the game and the toolkit fit together. The toolkit's own <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Toolkit/Packages/com.catsplat.cardforge/README.md#package-boundary">package boundary table</a> and the <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CODE_ARCHITECTURE_GUIDE.md#product-names">product names</a> section explain why some namespaces say <code>EmberGrove</code> and others say <code>CardForge</code>. This page describes structure only. The match rules themselves are in <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/GAME_RULES.md">GAME_RULES.md</a>, and the adventure rules are in the <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Toolkit/Packages/com.catsplat.cardforge/Runtime/Circuit/README.md">Circuit module guide</a>.</p></div>
+
+  <section id="anatomy"><h2><span class="num">01</span>Where the pieces live</h2>
+    <p class="lead">The rules layer has five assemblies. All five are Unity-independent, and the arrows below are their real asmdef references. Two more toolkit runtime assemblies sit on top of them. Content, which loads packs through Unity, is covered on <a href="content.html">Content &amp; Media</a>. Networking, the match authority and transports, is covered on <a href="networking.html">Networking</a>. The game has no asmdefs, so <code>Assembly-CSharp</code> sees every toolkit runtime assembly.</p>
+    <div class="scrollx"><table>
+      <tr><th>Module</th><th>Assembly</th><th>Namespace</th><th>References</th><th>What the game uses it for</th></tr>
+      <tr><td>Functional</td><td><code>CardForge.Functional</code></td><td><code>EmberGrove</code></td><td>none</td><td><code>Result&lt;T&gt;</code> from rule calls</td></tr>
+      <tr><td>Core</td><td><code>EmberGrove.Expedition</code></td><td><code>EmberGrove.Expedition</code>, plus <code>CardForge.Lessons</code></td><td>Functional</td><td>Every match, the AI, card lists, lessons</td></tr>
+      <tr><td>Progression</td><td><code>EmberGrove.Expedition.Progression</code></td><td><code>EmberGrove.Expedition</code></td><td>Core only</td><td><code>ContentPack</code>, encounters, deck presets</td></tr>
+      <tr><td>Circuit</td><td><code>CardForge.Circuit</code></td><td><code>CardForge.Circuit</code></td><td>Functional, Core</td><td>The whole adventure: collection, days, districts, duels, rewards, story</td></tr>
+      <tr><td>Exploration</td><td><code>CardForge.Exploration</code></td><td><code>CardForge.Exploration</code></td><td>Functional</td><td>Sector data, grid paths and footprint checks for walking</td></tr>
+    </table></div>
+    <div class="diagram"><pre class="mermaid">
+flowchart LR
+  F["CardForge.Functional&lt;br/&gt;Runtime/Functional"]
+  C["EmberGrove.Expedition&lt;br/&gt;Runtime/Core"]
+  P["EmberGrove.Expedition.Progression&lt;br/&gt;Runtime/Progression"]
+  CI["CardForge.Circuit&lt;br/&gt;Runtime/Circuit"]
+  E["CardForge.Exploration&lt;br/&gt;Runtime/Exploration"]
+  CO["CardForge.Content&lt;br/&gt;see Content and Media"]
+  N["EmberGrove.Expedition.Networking&lt;br/&gt;see Networking"]
+  C --&gt; F
+  P --&gt; C
+  CI --&gt; F
+  CI --&gt; C
+  E --&gt; F
+  CO -.-&gt; F
+  CO -.-&gt; C
+  CO -.-&gt; P
+  CO -.-&gt; CI
+  N -.-&gt; F
+  N -.-&gt; C
+  N -.-&gt; P
+</pre></div>
+    <p class="caption">An arrow means "references". Solid arrows are the five rules assemblies on this page. Dotted arrows are the two toolkit assemblies covered on other pages. Exploration does not reference Core or Circuit; the game code that joins them is <code>CircuitWorldLayout</code> (<a href="#exploration">§11</a>).</p>
+    <div class="note"><b>The names do not line up with the assemblies.</b> <code>Result&lt;T&gt;</code> lives in namespace <code>EmberGrove</code>, not <code>CardForge.Functional</code>. The lesson types use namespace <code>CardForge.Lessons</code> but compile into the Core assembly <code>EmberGrove.Expedition</code>. The Progression types share Core's namespace. The <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CODE_ARCHITECTURE_GUIDE.md#product-names">product names</a> table explains why these identifiers stay frozen.</div>
+    <p>Class diagrams of each assembly are generated on <a href="diagrams.html">Diagrams</a>. The toolkit's <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Toolkit/Packages/com.catsplat.cardforge/Documentation~/ARCHITECTURE.md#file-responsibilities">ARCHITECTURE.md file table</a> describes the Functional, Core, Progression, Content and Networking files. It does not list the Circuit, Exploration or lesson files; the sections below cover those.</p>
+  </section>
+
+  <section id="functional"><h2><span class="num">02</span><code>Result&lt;T&gt;</code> and <code>RuleError</code></h2>
+    <p class="lead"><code>Runtime/Functional/Result.cs</code> is one small file with two types. <code>RuleError</code> is a sealed class holding a <code>Code</code> (for checks and logs) and a <code>Message</code> (for the player). <code>Result&lt;T&gt;</code> is a readonly struct that holds either a value or a <code>RuleError</code>.</p>
+    <div class="scrollx"><table>
+      <tr><th>Member</th><th>What it does</th></tr>
+      <tr><td><code>Ok(value)</code>, <code>Fail(code, message)</code>, <code>Fail(error)</code></td><td>The only constructors.</td></tr>
+      <tr><td><code>IsSuccess</code>, <code>Value</code>, <code>Error</code></td><td><code>Value</code> on a failure throws <code>InvalidOperationException</code>. <code>Error</code> on a default-constructed result returns an <code>"uninitialized"</code> error instead of null.</td></tr>
+      <tr><td><code>Map(f)</code></td><td>Transforms a success. It does not run on a failure.</td></tr>
+      <tr><td><code>Bind(f)</code></td><td>Chains another step that can fail and stops at the first failure.</td></tr>
+      <tr><td><code>Match(ok, fail)</code></td><td>Runs one of two handlers. The game does not call it; it tests <code>IsSuccess</code> directly.</td></tr>
+    </table></div>
+    <p>The combat entry points show the whole pattern in two lines (<code>CombatRules.cs</code>):</p>
+<pre><code>public static Result&lt;CombatCommand&gt; Validate(CombatState state, CombatCommand command, Catalog catalog) =&gt;
+    ValidateTurn(state, command, catalog).Bind(c =&gt; ValidateOwnership(state, c)).Bind(c =&gt; ValidateAction(state, c, catalog));
+
+public static Result&lt;CombatResolution&gt; Resolve(CombatState before, CombatCommand command, Catalog catalog) =&gt;
+    Validate(before, command, catalog).Bind(valid =&gt; Simulate(before, valid, catalog));</code></pre>
+    <p>Who returns <code>Result&lt;T&gt;</code>: <code>CombatRules.Validate</code> and <code>Resolve</code>; <code>LessonRules.Prepare</code> and <code>Command</code>; every <code>CircuitRules</code> transition, plus <code>NewProfile</code>, <code>Validate</code>, <code>ValidateDefinition</code>, <code>Recover</code> and <code>PreviewDistrict</code>; <code>LandmarkRules.Complete</code>; and <code>ExpeditionAuthority.Receive</code> on the network side.</p>
+    <div class="note warn"><b>There are three result types, not one.</b> Progression does not reference Functional. Its <code>RunResult&lt;T&gt;</code> (in <code>ExpeditionRun.cs</code>) and <code>WorldResult&lt;T&gt;</code> (in <code>WorldProfile.cs</code>) have the same <code>Map</code>/<code>Bind</code> shape but a plain <code>string</code> error, and the three types do not convert into each other.</div>
+    <p>The reasoning behind the type and its limits (delegates can allocate, so hot query loops stay direct) is in <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CODE_ARCHITECTURE_GUIDE.md#functional-composition-and-the-small-monad">Functional composition and the small monad</a>. <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Toolkit/Packages/com.catsplat.cardforge/Documentation~/FUNCTIONAL.md#functional-core-imperative-application">FUNCTIONAL.md</a> covers the "functional core, imperative application" split and the runnable samples.</p>
+  </section>
+
+  <section id="core-state"><h2><span class="num">03</span>Core data: definitions, catalog and match state</h2>
+    <p class="lead">Every combat data type is in <code>Runtime/Core/CombatContracts.cs</code>. Authored definitions are copied into a <code>Catalog</code>, and a match is one <code>CombatState</code> value. Cards in a match are entries in a list, identified by their index, not by Unity objects.</p>
+    <div class="scrollx"><table>
+      <tr><th>Type</th><th>Kind</th><th>Role</th></tr>
+      <tr><td><code>CardDefinition</code>, <code>EffectDefinition</code></td><td>serializable classes</td><td>The authored card: <code>Id</code>, <code>Title</code>, <code>Rules</code>, <code>Kind</code>, <code>Cost</code>/<code>Attack</code>/<code>Health</code>, <code>Ranged</code>, <code>Target</code> and an <code>Effects</code> array of data rows (trigger, operation, selector, amount, terrain, condition). Both have <code>Copy()</code>.</td></tr>
+      <tr><td><code>Catalog</code></td><td>sealed class</td><td>Copies the definitions, runs <code>CombatRules.ValidateDefinitions</code> and throws <code>ArgumentException</code> if any fail. After that it is a read-only lookup: <code>Get(id)</code>, the indexer and <code>Contains</code>. Later edits to the source objects cannot change a running catalog.</td></tr>
+      <tr><td><code>DeckEntry</code>, <code>CombatConfig</code></td><td>struct, class</td><td>A deck slot (definition ID plus upgrade level). <code>CombatConfig</code> holds the match numbers and the opt-in draw rules (<code>OpeningHandSize</code>, <code>EmptyDrawDamage</code>, <code>SpentCardsStayDiscarded</code>). Packs supply theirs as <code>ContentPack.MatchRules</code>.</td></tr>
+      <tr><td><code>CombatState</code></td><td>sealed class</td><td>The whole match: <code>Players</code> (two <code>SideState</code>s), <code>Cards</code> (a <code>List&lt;CardState&gt;</code>), <code>Terrain</code> per lane, <code>Config</code>, <code>ActivePlayer</code>, <code>Turn</code>, <code>Round</code>, <code>Winner</code> and <code>RngState</code>. <code>Winner</code> is −1 while play goes on, 0 or 1 for a winner, and 2 for a draw. <code>DeepCopy()</code> copies everything mutable.</td></tr>
+      <tr><td><code>SideState</code></td><td>sealed class</td><td>One player's life, shield, Pulse and per-turn counters, plus <code>Deck</code>, <code>Hand</code> and <code>Discard</code> as lists of card instance IDs.</td></tr>
+      <tr><td><code>CardState</code></td><td>struct</td><td>One card instance: <code>Id</code> (its index in <code>CombatState.Cards</code>), <code>Owner</code>, <code>DefinitionId</code>, <code>Zone</code>, <code>Lane</code>, <code>Rank</code>, <code>Health</code>, <code>Shield</code>, <code>Ready</code>, <code>UpgradeLevel</code>.</td></tr>
+      <tr><td><code>CombatCommand</code></td><td>readonly struct</td><td>One action: <code>Kind</code> (Play, Attack, Move, EndTurn, Concede), <code>Player</code>, <code>SourceId</code>, <code>TargetId</code>, <code>Lane</code>, <code>Rank</code>. It has factory methods for each kind. A hero target is the negative handle from <code>HeroTarget(player)</code>; <code>HeroPlayer(target)</code> reverses it.</td></tr>
+      <tr><td><code>CombatEvent</code>, <code>CombatResolution</code></td><td>sealed classes</td><td>An event is one thing that happened (Draw, Play, Damage, Death, Terrain, Bloomfire, Turn, Victory and more) with its text and handles. A resolution is the new state plus the read-only event list.</td></tr>
+    </table></div>
+    <details class="why"><summary>Why the state is mutable if the rules are "functional"</summary>
+      <p>The snapshot types use public fields and mutable lists for compact, predictable storage. Immutability is an ownership rule, not a language guarantee: <code>Resolve</code> works on <code>before.DeepCopy()</code> and returns a different object. The caller keeps the old one, for example to animate from it. Code that edits a live snapshot behind the renderer or the AI breaks this. The toolkit states the rule in <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Toolkit/Packages/com.catsplat.cardforge/Documentation~/ARCHITECTURE.md#runtime-flow">ARCHITECTURE.md, Runtime flow</a>, and the data layout is explained in <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CODE_ARCHITECTURE_GUIDE.md#data-layout-and-measured-optimization">Data layout and measured optimization</a>.</p>
+    </details>
+  </section>
+
+  <section id="combat-rules"><h2><span class="num">04</span><code>CombatRules</code>: the reducer</h2>
+    <p class="lead"><code>CombatRules</code> (<code>Runtime/Core/CombatRules.cs</code>) is a static class. Its doc comment calls it the "deterministic functional boundary": every accepted action resolves on one owned snapshot. It also owns the match-deck rule that packs, Circuit decks and the game share.</p>
+    <div class="scrollx"><table>
+      <tr><th>Entry point</th><th>Returns</th><th>Notes</th></tr>
+      <tr><td><code>NewMatch(catalog, deck0, deck1, seed, config, …lives)</code></td><td><code>CombatState</code></td><td>Validates the config and both decks, builds and shuffles both decks, then runs the first <code>BeginTurn</code>. Invalid input <b>throws</b> <code>ArgumentException</code>; it does not return a <code>Result</code>. A zero seed is replaced with a fixed constant.</td></tr>
+      <tr><td><code>LegalCommands(state, catalog)</code></td><td><code>List&lt;CombatCommand&gt;</code></td><td>Every legal action for the active player, in a stable order, ending with <code>EndTurn</code>. <code>Concede</code> is never listed. Empty once the match is over. The order is observable: it settles AI ties.</td></tr>
+      <tr><td><code>Validate(state, command, catalog)</code></td><td><code>Result&lt;CombatCommand&gt;</code></td><td>Three checks joined with <code>Bind</code>: <code>ValidateTurn</code> (match running, player, kind, whose turn), <code>ValidateOwnership</code> (the card is yours and in the right zone), <code>ValidateAction</code> (Pulse, placement, target, readiness, lane defence). Error codes include <code>wrong-turn</code>, <code>not-owner</code>, <code>pulse</code>, <code>occupied-cell</code> and <code>lane-defense</code>.</td></tr>
+      <tr><td><code>Resolve(before, command, catalog)</code></td><td><code>Result&lt;CombatResolution&gt;</code></td><td><code>Validate</code>, then <code>Simulate</code> on a deep copy. A chain of more than 1024 queued effect operations fails as <code>effect-limit</code> instead of returning a partial state.</td></tr>
+      <tr><td><code>ValidateConfig</code>, <code>ValidateDeck</code>, <code>ValidateDefinitions</code>, <code>ValidateSnapshot</code></td><td><code>List&lt;string&gt;</code></td><td>Boundary checks. <code>Catalog</code> calls <code>ValidateDefinitions</code>. <code>FairMatchSetup.CreateFairMatch</code> calls <code>ValidateSnapshot</code> after its opening bonuses.</td></tr>
+      <tr><td><code>MaximumCopies</code>, <code>LegacyDeckSize</code>, <code>StandardDeckSize</code>, <code>IsMatchDeckSize</code>, <code>LegalMatchDeck</code></td><td>constants, <code>bool</code></td><td>The one match-deck rule. Used by <code>ContentPack.Validate</code>, <code>CircuitRules</code>, <code>FairMatchSetup</code>, the session-deck check in <code>PrepareTable</code> and the game's rival-deck check in <code>LoadCircuitCheckRivals</code>. The deck screens read <code>MaximumCopies</code>.</td></tr>
+      <tr><td><code>UnitAt</code>, <code>HandLimit</code>, <code>Units</code>, <code>AttackValue</code>, <code>MaxHealth</code>, <code>Cost</code>, <code>SpellAmount</code></td><td>queries</td><td>Read-only helpers for the view and the AI, so a stat such as attack or cost is worked out in one place.</td></tr>
+    </table></div>
+    <p>The work happens in a private nested class, <code>CombatRules.Simulation</code>. <code>Apply(command)</code> pays the Pulse and runs Play, Move, Attack, EndTurn or Concede. Card effects are queued as <code>PendingEffect</code> values and run by <code>Drain()</code> in authored order, with <code>CleanupDeaths()</code> after each one. Death queues the OnDeath effects. <code>BeginTurn</code> and <code>EndTurn</code> handle Pulse, readiness, drawing and the end of a round. <code>CheckVictory()</code> sets <code>Winner</code>. Randomness is an xorshift step on <code>CombatState.RngState</code>, so the same state, command and catalog always give the same result. A small internal struct, <code>BoardOccupancy</code> (<code>BoardOccupancy.cs</code>), packs the twelve board cells into a bit mask for repeated placement queries; it is never stored on a snapshot.</p>
+    <div class="note">The private helpers are named after the public method they serve: <code>ValidateSnapshotSide</code>, <code>LegalCommandsMoves</code>, <code>NewMatchDealSide</code>. The complexity pass introduced that naming when it split these methods with no change in behaviour (commit "Bring the CardForge core rules under complexity 10"); see <a href="complexity.html">Complexity</a>.</div>
+    <p>To add a mechanic, follow <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Toolkit/Packages/com.catsplat.cardforge/Documentation~/AUTHORING.md#add-a-new-mechanic">AUTHORING.md, Add a new mechanic</a> and <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CODE_ARCHITECTURE_GUIDE.md#adding-a-reusable-feature">Adding a reusable feature</a>. A new card that uses existing effect rows needs no code.</p>
+  </section>
+
+  <section id="accepted-command"><h2><span class="num">05</span>One accepted command</h2>
+    <p class="lead">This is the path one player action takes in a local hosted match: from the view, through the reducer, back to the animation. The screen guard <code>ExpeditionApp.CanAct</code> blocks input while a menu or animation is open or the turn is not yours. It is not the legality check. That is the reducer's own <code>Validate</code>, which runs even if the guard is bypassed.</p>
+    <div class="diagram"><pre class="mermaid">
+sequenceDiagram
+  autonumber
+  participant V as ExpeditionView
+  participant A as ExpeditionApp
+  participant R as CombatRules
+  participant S as CombatRules.Simulation
+  V-&gt;&gt;A: SelectSlot / SelectLane / SelectHero / EndTurn / drag release
+  A-&gt;&gt;A: Submit(command), usually a SelectionCommands entry
+  Note over A: guard: CanAct, command.Player == Viewer, PracticeAllows
+  A-&gt;&gt;A: ResolveLocal(command) when not Networked
+  A-&gt;&gt;R: Resolve(State, command, Catalog)
+  R-&gt;&gt;R: Validate: ValidateTurn, Bind ValidateOwnership, Bind ValidateAction
+  alt command is legal
+    R-&gt;&gt;S: Simulate: new Simulation(before.DeepCopy())
+    S-&gt;&gt;S: Apply(command), Drain(), CheckVictory()
+    S--&gt;&gt;R: new State and Events
+    R--&gt;&gt;A: Result.Ok(CombatResolution)
+    A-&gt;&gt;A: StartCoroutine(Present(command, resolution))
+    A-&gt;&gt;V: AnimateCommand(before, command)
+    A-&gt;&gt;A: State = resolution.State, Sound(command, Events)
+    A-&gt;&gt;V: Render()
+    A-&gt;&gt;V: AnimateEvents(before, Events)
+    A-&gt;&gt;A: PresentFinish(command)
+  else rejected
+    R--&gt;&gt;A: Result.Fail(RuleError)
+    A-&gt;&gt;A: Notify(Error.Message), State unchanged
+  end
+</pre></div>
+    <p class="caption"><code>ExpeditionApp.Submit</code>, <code>ResolveLocal</code>, <code>Present</code> and <code>PresentFinish</code> are in <code>ExpeditionApp.cs</code>. <code>SelectionCommands</code> filters the cached <code>CombatRules.LegalCommands</code> list (<code>CachedLegalActions</code> in <code>ExpeditionApp.Queries.cs</code>). <code>AnimateCommand</code> and <code>AnimateEvents</code> are in <code>ExpeditionView.Motion.cs</code>.</p>
+    <div class="grid c3">
+      <div class="card accent-cyan"><h4>The rival's turn</h4><p><code>ExpeditionApp.Update</code> plans with <code>CombatAi.Choose</code>, waits, then calls the same <code>ResolveLocal</code>. A practice tutorial substitutes its scripted <code>PracticeOpponentCommand</code>.</p></div>
+      <div class="card accent-violet"><h4>A networked match</h4><p><code>Submit</code> hands the command to <code>network.Submit</code>. The host's <code>ExpeditionAuthority.Receive</code> checks seat, sequence and fingerprint, then calls the same <code>CombatRules.Resolve</code>. See <a href="networking.html">Networking</a>.</p></div>
+      <div class="card accent-green"><h4>Where the match starts</h4><p>A Circuit table goes through <code>PrepareTable</code> (<code>ExpeditionApp.Session.cs</code>). It calls <code>BeginEncounter</code>, whose <code>NewMatch</code> state it then replaces with <code>FairMatchSetup.CreateFairMatch</code>, which wraps a second <code>NewMatch</code>. Practice and lesson sessions run the same <code>PrepareTable</code>; its last step, <code>PreparePracticeTutorial</code>, replaces that state with <code>LessonRules.Prepare</code> for a lesson or its own <code>NewMatch</code> for the practice tutorial. Local Versus (<code>NewLocalDuel</code>) calls <code>NewMatch</code> directly. See <a href="sessions.html">Hosted Sessions</a>.</p></div>
+    </div>
+    <p>The guide's version of this flow, with the rules for handles, effects and turn order, is <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CODE_ARCHITECTURE_GUIDE.md#one-accepted-command">One accepted command</a>.</p>
+  </section>
+
+  <section id="ai-queries-lessons"><h2><span class="num">06</span>AI, card queries and lessons</h2>
+    <p class="lead">Three smaller parts of Core sit beside the reducer and use it rather than duplicate it.</p>
+    <div class="scrollx"><table>
+      <tr><th>Type</th><th>File</th><th>What it does</th><th>Game callers</th></tr>
+      <tr><td><code>CombatAi</code></td><td><code>CombatAi.cs</code></td><td><code>Choose(state, catalog)</code> takes every <code>LegalCommands</code> entry, runs it through the internal <code>CombatRules.ResolveForPlanning</code> (the same simulation, with no events recorded) and keeps the best score. Its doc comment says the opponent's hand, deck and seed never enter the evaluation. <code>DescribeIntent</code> describes the chosen command as text, which the game shows as the rival's intent.</td><td><code>ExpeditionApp.cs</code> (rival turn), <code>ExpeditionApp.Queries.cs</code> (move help)</td></tr>
+      <tr><td><code>CardQuery</code></td><td><code>CombatContracts.cs</code></td><td>The one card order and search: <code>Compare</code> (cost, then title ignoring case, then ID), <code>TextRank</code>, <code>Select</code> with cost and kind bit masks, <code>PageCount</code>, and <code>Traits</code> (Hit, Heal, Draw, Shield, Ranged worked out from a card's effects and its <code>Ranged</code> flag).</td><td><code>IsometricSlice.DeckBuilder.cs</code>, <code>IsometricSlice.Waybook.cs</code></td></tr>
+      <tr><td><code>LessonRules</code> and the lesson DTOs</td><td><code>LessonRules.cs</code>, <code>LessonContracts.cs</code></td><td>Namespace <code>CardForge.Lessons</code>. <code>Validate</code> and <code>ValidateLesson</code> check a <code>LessonLibrary</code> against a catalog. <code>Prepare</code> builds the scenario through <code>NewMatch</code> and returns a <code>PreparedLesson</code> (state plus alias bindings). <code>Command</code> turns an authored <code>LessonAction</code> into a <code>CombatCommand</code>, and <code>Matches</code> compares it with what the player did. <code>HasScenario</code> handles Unity's empty-object deserialization.</td><td><code>ExpeditionApp.Lessons.cs</code>, <code>IsometricSlice.Lessons.cs</code>, <code>IsometricSlice.Onboarding.cs</code> (<code>HasScenario</code>)</td></tr>
+    </table></div>
+    <p>A lesson step advances only after the real reducer accepts the expected command. The lesson guide owns the details: <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CIRCUIT_LESSONS.md#integration-and-teaching-architecture">Integration and teaching architecture</a>.</p>
+  </section>
+
+  <section id="progression"><h2><span class="num">07</span>Progression: what is still live and what is retired</h2>
+    <p class="lead"><code>EmberGrove.Expedition.Progression</code> was the rules for the standalone Expedition campaign. The campaign shell is gone, but the assembly still holds the content-pack type the whole game loads. A search of <code>Game/EmberGrove/Assets</code> on main finds no use of the campaign rules.</p>
+    <div class="grid c2">
+      <div class="card accent-green"><h4>Still used by the game</h4><ul>
+        <li><code>ContentPack</code> (<code>ExpeditionRun.cs</code>): <code>Cards</code>, <code>MatchRules</code>, <code>MatchDeckSize</code>, <code>Encounters</code>, <code>DeckPresets</code>, <code>World</code>; <code>CreateCatalog()</code>, <code>Encounter(id)</code>, <code>Card(id)</code>, <code>DeckPreset(id)</code>, <code>Validate()</code>.</li>
+        <li><code>EncounterDefinition</code>: an opponent's ID, title, intent hint, life and deck. Each Circuit opponent names one through <code>CircuitOpponent.EncounterId</code>.</li>
+        <li><code>DeckPresetDefinition</code>: the Versus and network deck choices.</li>
+        <li><code>WorldDefinition</code> and <code>RouteKind</code>: at runtime, read only by <code>ExpeditionApp.Media.cs</code> (<code>TickMediaBossEncounter</code>) to pick boss music. <code>IsometricSliceBuild</code> also parses and validates the world when it stages content.</li>
+        <li><code>CombatProgressFacts</code>: built by <code>ExpeditionAuthority</code> after each accepted network command. The game does not read the facts.</li>
+      </ul></div>
+      <div class="card accent-red"><h4>Retired campaign shell (no game callers)</h4><ul>
+        <li><code>RunState</code>, <code>RunRules</code>, <code>RunResult&lt;T&gt;</code>, <code>RouteNode</code>, <code>RelicDefinition</code>, <code>RunPhase</code> (<code>ExpeditionRun.cs</code>).</li>
+        <li><code>ProfileState</code>, <code>ProfileRules</code>, <code>StoryRules</code>, <code>WorldResult&lt;T&gt;</code>, progress envelopes and receipts (<code>WorldProfile.cs</code>).</li>
+        <li><code>CampaignRules</code> (<code>CampaignRules.cs</code>) and most of <code>WorldDefinitions.cs</code> (campaigns, story scenes, codex, tutorials, achievements, unlocks).</li>
+        <li>Callers left: the package sample <code>Samples~/MinimalTactics/MinimalProgression.cs</code>, <code>Tools/Expedition/CampaignChecks.cs</code> and <code>WorldChecks.cs</code> (the <code>LegacyProgression</code> suite), and <code>Tools/ExpeditionPerformance/WorldFactChecks.cs</code>.</li>
+      </ul></div>
+    </div>
+    <div class="note warn"><b>The retired data is still loaded and validated.</b> <code>ExpeditionContent.Parse</code> runs <code>ContentPack.Validate()</code>, which still requires a starter deck of at least five cards, the four route encounter IDs (<code>OpeningEncounterId</code> … <code>BossEncounterId</code>) and valid relics. The game never reads the route IDs or relics. <code>StarterDeck</code> survives only as the last fallback deck in <code>PrepareTable</code> and <code>SelectedDeck</code>. <code>ContentPackFiles</code> then parses <code>world-content.json</code> with <code>WorldContent.Parse</code> and runs <code>pack.World.Validate(pack)</code> on every pack load. So the current pack has to carry campaign-era data to load at all. See <a href="findings.html">Findings</a>.</div>
+    <p>The guide's own account of what <code>RunRules</code> and <code>ProfileRules</code> did, and that they are not the Circuit save model, is <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CODE_ARCHITECTURE_GUIDE.md#run-and-profile-state">Run and profile state</a>. The second flow in <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Toolkit/Packages/com.catsplat.cardforge/Documentation~/ARCHITECTURE.md#runtime-flow">ARCHITECTURE.md, Runtime flow</a> (<code>CombatProgressFacts</code> into <code>ProfileRules.ApplyBatch</code>) describes the retired campaign, not the current game.</p>
+  </section>
+
+  <section id="circuit"><h2><span class="num">08</span>Circuit: definitions, state and one static class over three files</h2>
+    <p class="lead"><code>CardForge.Circuit</code> holds the rules of the Circuit adventure: the permanent collection, saved decks, seeded days, the district graph, duels, rewards, tournaments, learning gates, events, episodes, visits and tasks. The game builds one <code>CircuitDefinition</code> at load and keeps one <code>CircuitState</code>. Every rule is a static function on <code>CircuitRules</code>.</p>
+    <h3>The data</h3>
+    <div class="scrollx"><table>
+      <tr><th>Type (all in <code>CircuitDefinition.cs</code>)</th><th>Role</th></tr>
+      <tr><td><code>CircuitDefinition</code></td><td>Authoring input: <code>Cards</code> (ID, archetype, tier), <code>Starters</code>, <code>Opponents</code> (each with an <code>EncounterId</code>), <code>Mentors</code>, <code>Learning</code>, <code>SoloPerks</code>, <code>DeckSize</code> and <code>Dialogue</code>. <code>IsometricSlice.LoadCircuit</code> builds it from the card guide, the journey sidecar, the dialogue document and <code>ContentPack.MatchDeckSize</code>.</td></tr>
+      <tr><td><code>CircuitDialogue</code> and its parts</td><td>Speakers and entries, plus optional events, episodes, visits and tasks, each with its record type (<code>CircuitEventRecord</code>, <code>CircuitEpisodeRecord</code>, <code>CircuitVisitRecord</code>, <code>CircuitTaskStatus</code>).</td></tr>
+      <tr><td><code>CircuitState</code></td><td>The pair <code>Profile</code> + <code>Run</code>, so an unlock and a run reward are committed together.</td></tr>
+      <tr><td><code>CircuitProfile</code> (schema <code>CurrentProfileVersion</code>)</td><td>What survives every day: collection, seen dialogue, event and episode records, selected task, lifetime counters, tutorial evidence and up to <code>MaximumDecks</code> saved <code>CircuitDeck</code>s.</td></tr>
+      <tr><td><code>CircuitRun</code> (schema <code>CurrentRunVersion</code>)</td><td>One day: seed, number, stage, <code>ActiveDeck</code>, the retained <code>Locations</code>, visit records, <code>PendingDuel</code>, <code>PendingReward</code>, <code>AppliedReceipts</code>, <code>Ended</code>/<code>Ending</code>, rule flags and the <code>DeckId</code> it came from.</td></tr>
+      <tr><td><code>CircuitLocation</code>, <code>CircuitDuel</code>, <code>CircuitReward</code></td><td>A node of the district graph (kind, stage, X/Y, links, room ID and revision, completed). A pending duel (receipt, location, opponent, encounter, episode, tournament or champion). A pending reward (receipt, offered cards, chosen card, whether it advances the stage).</td></tr>
+      <tr><td><code>CircuitLocationKind</code>, <code>CircuitDuelOutcome</code></td><td>Entrance, Duel, Mentor, Workshop, Reward, Tournament. Won = 0, Lost = 1, Abandoned = 2, Interrupted = 3, Drawn = 4; the values are serialized, so new outcomes are appended.</td></tr>
+    </table></div>
+    <h3>The three partial files</h3>
+    <div class="scrollx"><table>
+      <tr><th>File</th><th>What part of <code>CircuitRules</code> it holds</th></tr>
+      <tr><td><code>CircuitRules.cs</code></td><td>Version constants and room IDs; <code>NewProfile</code>, <code>Start</code>, <code>StartFromDeck</code>, <code>StartNextRun</code>; saved-deck commands (<code>CreateDeck</code>, <code>CopyDeck</code>, <code>RenameDeck</code>, <code>SetDeckCards</code>, <code>DeleteDeck</code>, <code>SaveRunDeck</code>) with their <code>Editable</code> guard, and the <code>FillDeck</code> helper; <code>SelectLocation</code>, <code>BeginDuel</code>, <code>BeginEpisodeDuel</code>, <code>ResolveDuel</code>, <code>AbandonRun</code>; rewards (<code>ChooseReward</code>, <code>ReplaceDeckSlot</code>, <code>SkipDeckReplacement</code>), <code>EditDeck</code>, <code>RecordDialogue</code>, <code>ChooseSoloPerk</code>, <code>LearningStatus</code>; events, episodes, visits and tasks. The private <code>Ready</code> guard, <code>GrantReward</code> and the receipt helpers sit at the end.</td></tr>
+      <tr><td><code>CircuitValidation.cs</code></td><td><code>ValidateDialogue</code>, <code>ValidateDialogueMedia</code>, <code>ValidateDefinition</code>, <code>Validate(definition, state)</code> and <code>Recover(definition, saved)</code> with all the save-schema migrations.</td></tr>
+      <tr><td><code>CircuitGraph.cs</code></td><td>District generation (<code>GenerateStage</code>, <code>AppendDistrict</code>, <code>CreateDistrict…</code>), <code>PreviewDistrict</code>, <code>PickOpponent</code>, the seeded <code>CircuitRandom</code> and <code>Mix</code>, lookups (<code>Location</code>, <code>FindLocation</code>…), and the deep <code>Clone</code> helpers every transition uses.</td></tr>
+    </table></div>
+    <p>The transitions share one shape. Most start with <code>Ready</code> (or <code>Editable</code> for saved decks), which runs the full <code>Validate(definition, state)</code> and deep-clones the state; <code>ResolveDuel</code>, <code>AbandonRun</code>, <code>CommitEvent</code> and <code>SelectTask</code> do the same two steps inline, and <code>Start</code>, <code>StartFromDeck</code> and <code>StartNextRun</code> build a new state. The rule then changes only the copy and returns <code>Result&lt;CircuitState&gt;.Ok(copy)</code>, or a failure whose code starts with <code>circuit.</code>. The caller's object is never touched, so a failed command needs no rollback. The module guide owns the rules themselves: <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Toolkit/Packages/com.catsplat.cardforge/Runtime/Circuit/README.md#state-and-content">state and content</a>, <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Toolkit/Packages/com.catsplat.cardforge/Runtime/Circuit/README.md#core-transitions">core transitions</a>, <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Toolkit/Packages/com.catsplat.cardforge/Runtime/Circuit/README.md#world-and-tournaments">world and tournaments</a>, <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Toolkit/Packages/com.catsplat.cardforge/Runtime/Circuit/README.md#rewards-and-progression">rewards</a> and <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Toolkit/Packages/com.catsplat.cardforge/Runtime/Circuit/README.md#saves-and-recovery">saves and recovery</a>.</p>
+  </section>
+
+  <section id="apply-circuit"><h2><span class="num">09</span>The <code>ApplyCircuit</code> pattern on the game side</h2>
+    <p class="lead">The game keeps the adventure in one field, <code>IsometricSlice.circuit</code>. During play it changes that field through one method, <code>ApplyCircuit(EmberGrove.Result&lt;CircuitState&gt; result, bool requireSaved = false, bool restoreAtArrival = false)</code> in <code>IsometricSlice.Circuit.cs</code>. Every caller passes it the result of a <code>CircuitRules</code> transition. <code>StartCircuitFromDeck</code> shows why that is a <code>Result</code>: it passes <code>AbandonRun(…).Bind(left =&gt; StartFromDeck(…))</code>, so leaving the old day and starting the new one are saved together or not at all.</p>
+<pre><code>// IsometricSlice.Circuit.cs, PlayCircuitDuel
+if (!ApplyCircuit(episode == null ? CircuitRules.BeginDuel(circuitDefinition, circuit)
+    : CircuitRules.BeginEpisodeDuel(circuitDefinition, circuit, episode.Id), requireSaved: episode != null)) yield break;</code></pre>
+    <ol class="steps">
+      <li><b>Failure:</b> the <code>RuleError.Message</code> becomes <code>circuitNotice</code>, an open journal page is redrawn, and the method returns false. The state is unchanged.</li>
+      <li><b>Success:</b> the old state is kept as <code>previous</code> and <code>circuit</code> becomes <code>result.Value</code>. <code>ApplyCircuitAdvanceTask</code> moves the selection to the next task when the selected task has just finished.</li>
+      <li><b>Save:</b> <code>SaveCircuit</code> writes the whole <code>CircuitSave</code> through <code>CircuitPersistence</code> (see <a href="saves.html">Saves &amp; Settings</a>). With <code>requireSaved</code>, a failed write puts <code>previous</code> back, so a story choice stays retryable until it is on disk. <code>restoreAtArrival</code> saves a new day without the world position.</li>
+      <li><b>Refresh:</b> the objective text, landmarks and prompt are updated.</li>
+    </ol>
+    <p>Callers are in <code>IsometricSlice.Circuit.cs</code>, <code>.CircuitUi.cs</code>, <code>.DeckBuilder.cs</code>, <code>.Learning.cs</code> and <code>.World.cs</code>. The world, journal and HUD around it are described on <a href="world.html">World &amp; Journal</a>.</p>
+    <div class="note"><b>Where <code>circuit</code> is assigned without <code>ApplyCircuit</code>.</b> <code>RestoreCircuit</code> (load time) sets it from the restored save, a fresh <code>NewProfile</code>, the first <code>Start</code>/<code>StartFromDeck</code>, a <code>ResolveDuel(…Interrupted)</code> safety net, and in editor or QA builds the testing top-up <code>CircuitSliceChecks.TopUpTestingSave</code>. <code>ApplyCircuitAdvanceTask</code> sets it from <code>SelectTask</code> inside <code>ApplyCircuit</code>. The rule calls among them read <code>.Value</code> without checking <code>IsSuccess</code>, so a failure there throws instead of showing a notice.</div>
+    <p>The guide states the ownership split, rules in <code>CircuitRules</code> and disk in <code>CircuitPersistence</code>, in <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CODE_ARCHITECTURE_GUIDE.md#run-and-profile-state">Run and profile state</a>. <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/MAINTAINING.md#change-behavior-at-its-owner">MAINTAINING, Change behavior at its owner</a> is the rule against computing rewards or damage a second time in a menu.</p>
+  </section>
+
+  <section id="duel-receipt"><h2><span class="num">10</span>A duel receipt, from begin to resolved</h2>
+    <p class="lead">A Circuit duel crosses the boundary twice: out into a hosted battle, and back with a result. The receipt makes the return safe. <code>BeginDuel</code> issues a deterministic <code>ReceiptId</code> on the pending duel. <code>ResolveDuel</code> applies an outcome only for that exact receipt. Once applied, the receipt is remembered, and a repeat returns an equal copy that grants nothing.</p>
+    <div class="diagram"><pre class="mermaid">
+stateDiagram-v2
+  direction LR
+  [*] --&gt; Pending : BeginDuel or BeginEpisodeDuel
+  Pending : Pending - Run.PendingDuel holds ReceiptId
+  Pending --&gt; Pending : ResolveDuel with another receipt fails (circuit.receipt)
+  Pending --&gt; Applied : ResolveDuel(receipt, outcome)
+  Pending --&gt; Applied : AbandonRun
+  Pending --&gt; Applied : Recover on load clears it
+  Applied : Applied - PendingDuel is null, receipt in Run.AppliedReceipts
+  Applied --&gt; Applied : ResolveDuel(same receipt) returns an equal copy
+  Applied --&gt; Dropped : 64 newer receipts
+  Dropped : Dropped - ResolveDuel fails
+  Dropped --&gt; [*]
+</pre></div>
+    <p class="caption">The receipt is <code>r{Number}-{Seed}-s{Stage}-duel-{DuelNumber}</code> (<code>Receipt</code> in <code>CircuitRules.cs</code>). <code>RememberReceipt</code> keeps the last 64. A story-match receipt also stays matched through its <code>CircuitEpisodeRecord</code>, which <code>ResolveDuelApplied</code> checks too.</p>
+    <p>What an applied outcome changes depends on the duel. A story duel (one with an <code>EpisodeId</code>) records its first Won or Lost result as an episode record and nothing else. For an ordinary duel, Won counts the win, advances the qualifying or tournament count and calls <code>GrantReward</code>, which sets <code>PendingReward</code>; Lost and Abandoned end the run; Interrupted and Drawn only clear the duel so the table can be replayed. The rules for each outcome are in <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Toolkit/Packages/com.catsplat.cardforge/Runtime/Circuit/README.md#outcomes-and-receipts">Outcomes and receipts</a>.</p>
+    <h3>Who calls what in the game</h3>
+    <div class="scrollx"><table>
+      <tr><th>Moment</th><th>Game code</th><th>Rule call</th></tr>
+      <tr><td>Player starts a table match</td><td><code>IsometricSlice.PlayCircuitDuel</code></td><td><code>ApplyCircuit(BeginDuel)</code> or <code>BeginEpisodeDuel</code>, then <code>IsometricCombatBridge.Play(duel.EncounterId, callback, duel.ReceiptId)</code></td></tr>
+      <tr><td>Each frame of the encounter, including while the result screen shows</td><td><code>UpdateFrameEncounter</code> → <code>CommitFinishedCircuitDuel</code></td><td>When the bridge's <code>ReceiptId</code> matches the pending duel and the outcome is not Interrupted: <code>ApplyCircuit(ResolveDuel(receipt, outcome))</code>. The outcome is <code>Session.BattleOutcome</code> once the hosted match is over, otherwise the bridge's own <code>Outcome</code>. This records the result before the player presses Continue.</td></tr>
+      <tr><td>The bridge returns</td><td>the rest of <code>PlayCircuitDuel</code></td><td><code>ApplyCircuit(ResolveDuel(duel.ReceiptId, outcome))</code> again. After the frame commit this is a repeat and changes nothing. If the battle never finished, the outcome is <code>Interrupted</code> or <code>Abandoned</code>.</td></tr>
+      <tr><td>Pause, save-and-quit, quit</td><td><code>SaveProgress</code>, <code>SaveBeforeQuit</code> (<code>IsometricSlice.Progress.cs</code>)</td><td><code>CommitFinishedCircuitDuel</code> first, otherwise a plain <code>SaveCircuit</code></td></tr>
+      <tr><td>The game starts with a duel still pending in the save</td><td><code>CircuitPersistence.Restore</code> → <code>CircuitRules.Recover</code></td><td>Recover remembers the receipt and clears the duel, so no result is invented. <code>RestoreCircuit</code> also resolves any duel still pending as <code>Interrupted</code>.</td></tr>
+    </table></div>
+    <p><code>ExpeditionApp.BattleOutcome</code> (<code>ExpeditionApp.Session.cs</code>) maps <code>CombatState.Winner</code> to an outcome: 0 is Won, 1 is Lost, 2 is Drawn, and an unfinished match is Interrupted. How the bridge hosts the battle is on <a href="sessions.html">Hosted Sessions</a>.</p>
+  </section>
+
+  <section id="exploration"><h2><span class="num">11</span>Exploration: sectors and navigation</h2>
+    <p class="lead"><code>CardForge.Exploration</code> is a small module. It describes a walkable grid and answers path and footprint questions. It knows nothing about cards or the Circuit.</p>
+    <div class="scrollx"><table>
+      <tr><th>Type</th><th>File</th><th>Role</th></tr>
+      <tr><td><code>SectorDefinition</code></td><td><code>SectorDefinition.cs</code></td><td>A sector: ID, title, objective, cell size, move speed, camera settings, start cell, <code>Rows</code> (the walkable grid; navigation reads only these and <code>Landmarks</code>), optional <code>VisualRows</code>, <code>Decorations</code>, <code>Landmarks</code> and colours.</td></tr>
+      <tr><td><code>LandmarkDefinition</code>, <code>LobbyDefinition</code>, <code>GridPoint</code></td><td><code>SectorDefinition.cs</code></td><td>A placed point of interest (with an optional room binding). The social lobby room, which wraps a <code>SectorDefinition</code> layout. An integer cell coordinate.</td></tr>
+      <tr><td><code>SectorNavigation</code></td><td><code>SectorNavigation.cs</code></td><td><code>Validate(sector)</code> returns error strings (grids up to <code>MaximumDimension</code> cells a side). <code>IsWalkable(sector, x, z)</code>. <code>FindPath(sector, from, to)</code> returns a shortest four-neighbour path including both ends, or an empty array. <code>PointWalkable(sector, x, z, radius)</code> tests a circular footprint against blocked tiles.</td></tr>
+      <tr><td><code>LandmarkRules</code>, <code>ExplorationProgress</code></td><td><code>LandmarkRules.cs</code></td><td>One-time landmark completion with a <code>Result&lt;ExplorationProgress&gt;</code>. <b>The game does not use these</b>; only the <code>Exploration</code> check suite does.</td></tr>
+    </table></div>
+    <p>The game calls <code>SectorNavigation</code> in a few places. <code>IsometricSlice</code> validates <code>StreamingAssets/Exploration/sector.json</code> in <code>StartReadSector</code>, uses <code>IsWalkable</code> and <code>FindPath</code> in <code>WalkTo</code>, and uses <code>PointWalkable</code> in <code>CanStand</code>. <code>LoadCircuitCheckTables</code> validates every layout from <code>Circuit/locations.json</code>. <code>IsometricSlice.Versus</code> validates the lobby layout and walks to the cell beside its card table. <code>IsometricSectorVisuals.Authored</code> (<code>Validate</code> and <code>FindPath</code>) and <code>AuthoredCircuitRoom</code> (<code>FindPath</code>) reject authored rooms that would cut off a landmark or a walkable cell.</p>
+    <p>The joining piece is game code, not toolkit code. <code>CircuitWorldLayout</code> (<code>Game/EmberGrove/Assets/Runtime/Exploration/CircuitWorldLayout.cs</code>, namespace <code>EmberGrove.Exploration</code>) is a pure static class. Its <code>Build(state, definition, template, …)</code> projects the retained Circuit districts into one <code>SectorDefinition</code> window, and <code>IsometricSlice.MakeCircuitSector</code> calls it. The <code>World</code> check suite compiles that file straight from the game folder.</p>
+    <div class="note warn">The toolkit README's <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Toolkit/Packages/com.catsplat.cardforge/README.md#package-boundary">package boundary table</a> lists "Circuit world layout" under <code>CardForge.Exploration</code>. On main, that code is <code>CircuitWorldLayout</code> in the game, and the toolkit assembly has no Circuit reference. The supported layout versions are owned by <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/MAINTAINING.md#supported-circuit-world-layouts">MAINTAINING, Supported Circuit world layouts</a>.</div>
+  </section>
+
+  <section id="checks"><h2><span class="num">12</span>The checks that compile this layer</h2>
+    <p class="lead">The rules run without Unity, so most of their tests are .NET console projects under <code>Tools/</code>, run through <code>Tools/Run-Checks.ps1 -Suite &lt;name&gt;</code>. Each project compiles the toolkit source files by path; it does not reference the Unity assemblies.</p>
+    <div class="scrollx"><table>
+      <tr><th>Suite</th><th>Project</th><th>Compiles</th></tr>
+      <tr><td><code>Circuit</code></td><td><code>Tools/CircuitChecks</code></td><td><code>Result.cs</code>, <code>Runtime/Core</code>, <code>Runtime/Circuit</code></td></tr>
+      <tr><td><code>World</code></td><td><code>Tools/CircuitWorldChecks</code></td><td>The above plus <code>Runtime/Exploration</code> and the game's <code>CircuitWorldLayout.cs</code></td></tr>
+      <tr><td><code>Persistence</code></td><td><code>Tools/CircuitPersistenceChecks</code></td><td><code>Result.cs</code>, Core, Circuit, the game's <code>CircuitPersistence.cs</code> and <code>Assets/Tests/CircuitPersistenceVerification.cs</code></td></tr>
+      <tr><td><code>Exploration</code></td><td><code>Tools/ExplorationChecks</code></td><td><code>Result.cs</code>, <code>Runtime/Exploration</code></td></tr>
+      <tr><td><code>Lessons</code></td><td><code>Tools/LessonChecks</code></td><td>Functional, Core, Progression, the two content parsers and <code>Tools/ContentStudio/UnityBoundary.cs</code></td></tr>
+      <tr><td><code>WorldFacts</code></td><td><code>Tools/ExpeditionPerformance/WorldFactChecks.csproj</code></td><td><code>Result.cs</code>, Core, Progression, the two parsers, Networking</td></tr>
+      <tr><td><code>LegacyProgression</code> (not in the default <code>Portable</code> set)</td><td>generated by <code>Tools/Expedition/check_progression.py</code></td><td><code>Result.cs</code>, Core, Progression, the parsers, <code>Toolkit/Tests/ExpeditionCoreChecks.cs</code> and the check files in <code>Tools/Expedition</code></td></tr>
+    </table></div>
+    <div class="note warn"><b>These projects do not enforce asmdef boundaries.</b> Each one puts several toolkit folders into a single .NET assembly. A Core file that used a Circuit type would still compile in <code>CircuitChecks</code>, and only Unity would reject it. The suite list and what is in <code>Portable</code> belong to <code>Tools/Run-Checks.ps1</code>; how to run them is on <a href="qa.html">QA &amp; Rehearsals</a> and <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CODE_ARCHITECTURE_GUIDE.md#test-and-package-boundaries">Test and package boundaries</a>.</div>
+  </section>
+
+  <div class="honest"><h4>Keep this page honest</h4><ul>
+    <li><code>Toolkit/Packages/com.catsplat.cardforge/Runtime/Functional/Result.cs</code>: <code>Result&lt;T&gt;</code> and <code>RuleError</code> (§02)</li>
+    <li><code>Toolkit/Packages/com.catsplat.cardforge/Runtime/*/*.asmdef</code>: assembly names, namespaces and references (§01)</li>
+    <li><code>Toolkit/Packages/com.catsplat.cardforge/Runtime/Core/CombatContracts.cs</code>: definitions, <code>Catalog</code>, state, command/event/resolution, <code>CardQuery</code> (§03, §06)</li>
+    <li><code>Toolkit/Packages/com.catsplat.cardforge/Runtime/Core/CombatRules.cs</code>: <code>NewMatch</code>, <code>LegalCommands</code>, <code>Validate</code>, <code>Resolve</code>, <code>Simulation</code>, the match-deck rule (§04, §05)</li>
+    <li><code>Toolkit/Packages/com.catsplat.cardforge/Runtime/Core/CombatAi.cs</code>, <code>BoardOccupancy.cs</code>, <code>LessonContracts.cs</code>, <code>LessonRules.cs</code> (§04, §06)</li>
+    <li><code>Toolkit/Packages/com.catsplat.cardforge/Runtime/Progression/*.cs</code>: the live and retired split; re-check with <code>git grep</code> over <code>Game/EmberGrove/Assets</code> (§07)</li>
+    <li><code>Toolkit/Packages/com.catsplat.cardforge/Runtime/Content/ExpeditionContent.cs</code>, <code>ContentPackFiles.cs</code>: <code>ContentPack.Validate</code> and the world validation on load (§07)</li>
+    <li><code>Toolkit/Packages/com.catsplat.cardforge/Runtime/Circuit/CircuitDefinition.cs</code>, <code>CircuitRules.cs</code>, <code>CircuitValidation.cs</code>, <code>CircuitGraph.cs</code>: Circuit data, the three partials, <code>BeginDuel</code>/<code>ResolveDuel</code>/receipts (§08, §10)</li>
+    <li><code>Toolkit/Packages/com.catsplat.cardforge/Runtime/Exploration/SectorDefinition.cs</code>, <code>SectorNavigation.cs</code>, <code>LandmarkRules.cs</code> (§11)</li>
+    <li><code>Game/EmberGrove/Assets/Runtime/ExpeditionApp.cs</code>, <code>ExpeditionApp.Queries.cs</code>, <code>ExpeditionApp.Session.cs</code>, <code>ExpeditionApp.Media.cs</code>: <code>Submit</code>/<code>ResolveLocal</code>/<code>Present</code>, the legal-command cache, <code>FairMatchSetup</code>, <code>BattleOutcome</code>, boss music (§05, §07, §10)</li>
+    <li><code>Game/EmberGrove/Assets/Runtime/ExpeditionView.Motion.cs</code>, <code>ExpeditionView.Input.cs</code>: <code>AnimateCommand</code>, <code>AnimateEvents</code>, drag release (§05)</li>
+    <li><code>Game/EmberGrove/Assets/Runtime/Exploration/IsometricSlice.Circuit.cs</code>, <code>IsometricSlice.Progress.cs</code>, <code>IsometricSlice.cs</code>: <code>LoadCircuit</code>, <code>RestoreCircuit</code>, <code>ApplyCircuit</code>, <code>PlayCircuitDuel</code>, <code>CommitFinishedCircuitDuel</code>, the save hooks, walking (§09, §10, §11)</li>
+    <li><code>Game/EmberGrove/Assets/Runtime/Exploration/IsometricCombatBridge.cs</code>, <code>CircuitPersistence.cs</code>, <code>CircuitWorldLayout.cs</code> (§10, §11)</li>
+    <li><code>Game/EmberGrove/Assets/Runtime/Exploration/IsometricSlice.Lessons.cs</code>, <code>.DeckBuilder.cs</code>, <code>.Waybook.cs</code>, <code>.Versus.cs</code>, <code>IsometricSectorVisuals.Authored.cs</code>, <code>AuthoredCircuitRoom.cs</code>: the other callers named in §06 and §11</li>
+    <li><code>Tools/Run-Checks.ps1</code> and the <code>.csproj</code> files it names (§12)</li>
+  </ul></div>
+</main>
+<footer>Bloomfire Wiki · page source <code>Docs/Wiki/rules.html</code>, built by <code>Tools/Documentation/structure_wiki.py</code> · Found a mistake? Fix it in the same commit as the code that made it one.</footer>
+</body>
+</html>

@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QA &amp; Rehearsals — Bloomfire Wiki</title>
+<link rel="stylesheet" href="wiki.css">
+<script src="mermaid.min.js" defer></script>
+<script src="wiki.js" defer></script>
+</head>
+<body>
+<nav class="wiki">
+  <a class="home" href="index.html">🔥 Bloomfire Wiki</a>
+  <div class="grp"><span class="grp-t">Start here</span>
+    <a href="codebase-tour.html">Codebase Tour</a>
+    <a href="glossary.html">Glossary</a>
+  </div>
+  <div class="grp"><span class="grp-t">Game systems</span>
+    <a href="rules.html">Rules Engine</a>
+    <a href="world.html">World &amp; Journal</a>
+    <a href="sessions.html">Hosted Sessions</a>
+    <a href="ui.html">UI &amp; Menus</a>
+    <a href="networking.html">Networking</a>
+    <a href="content.html">Content &amp; Media</a>
+    <a href="saves.html">Saves &amp; Settings</a>
+  </div>
+  <div class="grp"><span class="grp-t">Code health</span>
+    <a href="diagrams.html">Diagrams</a>
+    <a href="complexity.html">Complexity</a>
+    <a href="findings.html">Findings</a>
+  </div>
+  <div class="grp"><span class="grp-t">Ship &amp; maintain</span>
+    <a class="on" href="qa.html">QA &amp; Rehearsals</a>
+    <a href="builds.html">Builds &amp; Tools</a>
+    <a href="maintaining.html">Maintaining</a>
+  </div>
+</nav>
+<header class="page"><h1>How quality is <span class="flame">checked</span></h1><p class="tag">The four kinds of verification code in the repository: portable .NET and script suites, the Unity rehearsal inside a QA player, the editor batch proofs and the two-process network harness. This page covers where each one lives, what it compiles or drives, how it reports, and where QA code reaches into production code.</p></header>
+<main>
+
+<div class="tldr"><h4>In 60 seconds</h4><ul>
+  <li><b>Two worlds of checks.</b> <code>Tools/Run-Checks.ps1</code> runs .NET, Python and Node suites that compile toolkit and game <i>source files</i> by path, without Unity (<a href="#suites">§02</a>). Everything that needs Unity runs inside a player built with the <code>CIRCUIT_QA</code> define, or inside the Unity editor (<a href="#rehearsal">§03</a>, <a href="#editor">§08</a>).</li>
+  <li><b>One class, ten files.</b> The Circuit rehearsal is <code>CircuitSliceChecks</code>, a partial <code>MonoBehaviour</code> split over ten files in <code>Assets/Tests/Runtime</code>. <code>IsometricSlice.Start</code> installs it when the player was launched with <code>-circuit-verify &lt;dir&gt;</code> (<a href="#partials">§04</a>).</li>
+  <li><b>The first failure ends the run.</b> A small runner, <code>Advance</code> over a stack of iterators, drives every stage inline. <code>Require</code> throws on the first false check, <code>Unwind</code> runs the open <code>finally</code> blocks, and the run writes <code>verification.txt</code> and quits with 0 or 1 (<a href="#runner">§05</a>, <a href="#report">§06</a>).</li>
+  <li><b>Network QA is two real players.</b> <code>ExpeditionHarness</code> installs itself in an <code>EMBERGROVE_QA</code> player started with <code>-expedition-net-verify</code>. A host and a guest play over a real transport and check each other's final state through a shared folder. A detached quickmatch or lobby pair is compared afterwards by <code>Tools/ExpeditionNetworkChecks</code> (<a href="#network">§09</a>).</li>
+  <li><b>QA reaches production in a few known places.</b> These are 21 <code>#if</code> blocks in six runtime files, unguarded flag checks that every player runs, and several hundred string-keyed reflection calls into private members. A rename can break a rehearsal and still compile (<a href="#seams">§10</a>).</li>
+</ul></div>
+
+<div class="prereq"><h4>Before you start</h4><p>Read the <a href="codebase-tour.html">Codebase Tour</a> for the assemblies, and the <a href="glossary.html">Glossary</a> if a name is new. Have the <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Game/EmberGrove/Assets/Tests/README.md">Unity verification guide</a> open. It owns the entry-point table, the exact command lines and the coverage details that this page only points to. Building the QA players themselves is covered on <a href="builds.html">Builds &amp; Tools</a>.</p></div>
+
+<section id="anatomy"><h2><span class="num">01</span>Where the checks live</h2>
+  <p class="lead">There are four kinds of verification code. The portable suites need no Unity. The other three run Unity code: in a QA player, in a batch editor, or as two QA players talking to each other. A fifth piece, <code>Tools/Validate-CircuitPlayer.ps1</code>, inspects a built player assembly and belongs to the build pipeline.</p>
+  <div class="scrollx"><table>
+    <tr><th>Kind</th><th>Where</th><th>Runs in</th><th>Started by</th><th>Writes</th></tr>
+    <tr><td>Portable suites</td><td><code>Tools/*Checks</code>, <code>Tools/ExpeditionPerformance/WorldFactChecks.csproj</code>, <code>Tools/CircuitStudio/*.cjs</code>, <code>Tools/check_repository.py</code></td><td>.NET 10, Python, Node.js</td><td><code>pwsh -File Tools/Run-Checks.ps1</code></td><td><code>Temp/Checks/&lt;stamp&gt;/&lt;Suite&gt;.log</code> and <code>summary.json</code></td></tr>
+    <tr><td>Circuit rehearsal</td><td><code>Assets/Tests/Runtime/CircuitSliceChecks*.cs</code> (10 files)</td><td>Editor Play Mode, or a <code>CIRCUIT_QA</code> player</td><td><code>-circuit-verify &lt;dir&gt;</code></td><td><code>&lt;dir&gt;/verification.txt</code> and <code>&lt;name&gt;.png</code> captures</td></tr>
+    <tr><td>Editor batch proofs</td><td><code>CircuitSliceChecks.WorldTable.cs</code>, <code>Assets/Tests/CircuitPersistenceVerification.cs</code></td><td>A batch Unity editor</td><td><code>-executeMethod</code></td><td>Reports under repository <code>Temp/</code></td></tr>
+    <tr><td>Network harness</td><td><code>Assets/Tests/Runtime/ExpeditionHarness*.cs</code> (2 files)</td><td>Editor, or an <code>EMBERGROVE_QA</code> player (which also needs <code>CIRCUIT_QA</code>)</td><td><code>-expedition-net-verify &lt;dir&gt; &lt;role&gt; &lt;mode&gt; &lt;endpoint&gt;</code></td><td><code>verification.txt</code>, <code>network-capture.json</code>, <code>network-summary.txt</code></td></tr>
+  </table></div>
+  <p>No assembly definition exists under <code>Assets/Tests</code>. On purpose, the rehearsal code compiles into <code>Assembly-CSharp</code> with the game, so it can reach <code>internal</code> members. Compiler guards keep it out of ordinary players. Each rehearsal file opens with <code>#if UNITY_EDITOR || CIRCUIT_QA</code>, the two harness files with <code>#if UNITY_EDITOR || EMBERGROVE_QA</code>, and <code>CircuitPersistenceVerification.cs</code> with <code>#if UNITY_EDITOR || CIRCUIT_PERSISTENCE_PORTABLE</code>. The guide's own reasoning is in <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Game/EmberGrove/Assets/Tests/README.md">Tests/README.md</a>, and <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CODE_ARCHITECTURE_GUIDE.md#test-and-package-boundaries">CODE_ARCHITECTURE_GUIDE § Test and package boundaries</a> states the boundary.</p>
+  <p>The rehearsal and build code were part of the editor/test batch of the complexity work. See <a href="complexity.html">Complexity</a>.</p>
+</section>
+
+<section id="suites"><h2><span class="num">02</span>The portable suites</h2>
+  <p class="lead"><code>Tools/Run-Checks.ps1</code> is a table of named suites. Each one is a command it runs from the repository root, with output captured to a log. A failed suite does not stop the remaining ones. The script exits 1 if any selected suite failed, and its <code>summary.json</code> states that this is "Source checks only".</p>
+  <p>With no arguments it runs the <code>Portable</code> group of twelve suites. <code>-Suite All</code> adds the optional ones (Studio, Sockets, Performance, LegacyProgression, Audio, Docs, RelayLauncher, RelayPreflight), and <code>-List</code> prints the table. The .NET suites that the script starts directly share one <code>--artifacts-path</code> under <code>Temp/Checks/artifacts</code>; <code>FieldSetup</code> uses its own under <code>Temp/CircuitFieldSetupChecks</code>. <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Tools/README.md">Tools/README.md</a> owns the requirements and coverage of each suite. The table below adds what that guide does not list: the source each portable suite actually compiles, read from its <code>.csproj</code>.</p>
+  <div class="scrollx"><table>
+    <tr><th>Suite</th><th>Command</th><th>Compiles from <code>Toolkit/…/Runtime</code></th><th>Compiles from the game or elsewhere</th></tr>
+    <tr><td><code>Repository</code></td><td><code>python Tools/check_repository.py</code></td><td colspan="2">Reads files; compiles nothing. Checks assembly definitions, Unity metadata, local package paths, local Markdown links and the art-replacement checklist.</td></tr>
+    <tr><td><code>Circuit</code></td><td><code>CircuitChecks.csproj</code></td><td><code>Functional/Result.cs</code>, <code>Core/*</code>, <code>Circuit/*</code></td><td>—</td></tr>
+    <tr><td><code>Content</code></td><td><code>CircuitContentChecks.csproj</code> (gets the workspace path)</td><td><code>Functional/*</code>, <code>Core/*</code>, <code>Progression/*</code>, <code>Content/ExpeditionContent.cs</code>, <code>Content/WorldContent.cs</code></td><td><code>Tools/ContentStudio/UnityBoundary.cs</code> (stand-ins for <code>TextAsset</code>, <code>Resources</code>, <code>JsonUtility</code>)</td></tr>
+    <tr><td><code>FieldSetup</code></td><td><code>Tools/CircuitFieldSetupChecks/Run-Checks.ps1</code></td><td>Same as <code>Content</code></td><td><code>UnityBoundary.cs</code> and <code>Temp/CircuitFieldSetupChecks/ActualSetup.cs</code>. The script cuts <code>internal static class FairMatchSetup</code> out of <code>Assets/Runtime/ExpeditionApp.Session.cs</code> by counting braces.</td></tr>
+    <tr><td><code>World</code></td><td><code>CircuitWorldChecks.csproj</code></td><td><code>Functional/Result.cs</code>, <code>Core/*</code>, <code>Circuit/*</code>, <code>Exploration/*</code></td><td><code>Assets/Runtime/Exploration/CircuitWorldLayout.cs</code></td></tr>
+    <tr><td><code>Persistence</code></td><td><code>CircuitPersistenceChecks.csproj</code>, defines <code>CIRCUIT_PERSISTENCE_PORTABLE</code></td><td><code>Functional/Result.cs</code>, <code>Core/*</code>, <code>Circuit/*</code></td><td><code>Assets/Runtime/Exploration/CircuitPersistence.cs</code> and <code>Assets/Tests/CircuitPersistenceVerification.cs</code></td></tr>
+    <tr><td><code>Exploration</code></td><td><code>ExplorationChecks.csproj</code></td><td><code>Functional/Result.cs</code>, <code>Exploration/*</code></td><td>—</td></tr>
+    <tr><td><code>Lessons</code></td><td><code>LessonChecks.csproj</code> (gets the workspace path)</td><td>Same as <code>Content</code></td><td><code>UnityBoundary.cs</code></td></tr>
+    <tr><td><code>Network</code></td><td><code>ExpeditionNetworkChecks.csproj</code></td><td><code>Networking/ExpeditionNetworkSession.cs</code>, plus whatever <code>ExpeditionRelay.csproj</code> compiles: <code>Functional/Result.cs</code>, <code>Core/*</code>, <code>Exploration/SectorDefinition.cs</code>, <code>Exploration/SectorNavigation.cs</code>, <code>Progression/*</code>, <code>Networking/ExpeditionAuthority.cs</code>, <code>Networking/NetworkContracts.cs</code>, <code>Content/ExpeditionContent.cs</code> (with <code>CARDFORGE_HEADLESS</code>)</td><td>A <code>ProjectReference</code> to the relay and the ASP.NET Core framework</td></tr>
+    <tr><td><code>WorldFacts</code></td><td><code>Tools/ExpeditionPerformance/WorldFactChecks.csproj</code></td><td><code>Functional/Result.cs</code>, <code>Core/*</code>, <code>Progression/*</code>, <code>Content/ExpeditionContent.cs</code>, <code>Content/WorldContent.cs</code>, <code>Networking/*</code></td><td>Its own <code>UnityBoundaryStub.cs</code></td></tr>
+    <tr><td><code>DialogueModel</code></td><td><code>node Tools/CircuitStudio/check.cjs</code></td><td colspan="2">Loads <code>dialogue-model.js</code> and checks <code>Content/EmberGroveDefault/circuit-dialogue.json</code></td></tr>
+    <tr><td><code>LessonModel</code></td><td><code>node Tools/CircuitStudio/lessons-check.cjs</code></td><td colspan="2">Loads <code>lessons.js</code> and checks <code>Content/Circuit/lessons.json</code> against the card IDs in <code>expedition-content.json</code></td></tr>
+  </table></div>
+  <p>Three suites compile game files. <code>FieldSetup</code> cuts <code>FairMatchSetup</code> out of <code>ExpeditionApp.Session.cs</code>, <code>World</code> compiles <code>CircuitWorldLayout.cs</code>, and <code>Persistence</code> compiles <code>CircuitPersistence.cs</code> together with the scenario list that the Unity batch entry also runs (<a href="#editor">§08</a>). Each project sets <code>EnableDefaultCompileItems</code> to false and lists its inputs, so the asmdef boundaries that Unity enforces do not apply here. Every portable .NET project except <code>CircuitWorldChecks.csproj</code> sets <code>TreatWarningsAsErrors</code>.</p>
+  <details class="why"><summary>Why the content suites compile a fake <code>UnityEngine</code></summary>
+    <p><code>ExpeditionContent.cs</code> keeps its <code>Resources.Load</code> loader behind <code>#if !CARDFORGE_HEADLESS</code>, which the relay and Content Studio define. <code>WorldContent.cs</code> has no such guard: it uses <code>Resources</code>, <code>TextAsset</code> and <code>JsonUtility</code> directly. So every non-Unity project that compiles <code>WorldContent.cs</code> also compiles a stand-in <code>UnityEngine</code>. <code>Tools/ContentStudio/UnityBoundary.cs</code> declares <code>TextAsset</code>, a <code>Resources</code> whose <code>Load</code> throws, and a <code>JsonUtility</code> backed by System.Text.Json. <code>Tools/ExpeditionPerformance/UnityBoundaryStub.cs</code> is a second copy of the same idea, used by <code>WorldFacts</code> and the benchmark.</p>
+  </details>
+</section>
+
+<section id="rehearsal"><h2><span class="num">03</span>The Unity rehearsal</h2>
+  <p class="lead">A rehearsal is the real game scene, <code>CircuitJourney.unity</code>, played by code. Virtual keyboard, mouse and gamepad devices drive it, and the run checks the scene's objects and state as it goes. It needs a player built with <code>CIRCUIT_QA</code> (or the editor) and the <code>-circuit-verify &lt;output directory&gt;</code> argument.</p>
+  <div class="diagram"><pre class="mermaid">sequenceDiagram
+  participant P as QA player
+  participant S as IsometricSlice
+  participant C as CircuitSliceChecks
+  participant F as output directory
+  P-&gt;&gt;S: Start()
+  S-&gt;&gt;S: LoadCircuit, StartBuildWorld, ShowCircuit(Title)
+  S-&gt;&gt;C: Install(this), compiled only with the QA define
+  C-&gt;&gt;C: read -circuit-verify and -circuit-lifecycle
+  C-&gt;&gt;C: StartCoroutine(Guarded(Rehearse()))
+  loop every frame until done
+    C-&gt;&gt;S: queued input, Invoke / Get / Set by reflection
+    C-&gt;&gt;C: Check(condition, text) to Require
+    C-&gt;&gt;F: Capture(name) writes name.png
+  end
+  C-&gt;&gt;C: Unwind(stack), Cleanup()
+  C-&gt;&gt;F: verification.txt
+  C-&gt;&gt;P: Application.Quit(0 or 1)</pre></div>
+  <p class="caption">One rehearsal run. <code>Install</code> returns immediately without <code>-circuit-verify</code>, so an editor Play Mode session without the flag is unaffected.</p>
+  <ol class="steps">
+    <li><b>Install.</b> The last step of <code>IsometricSlice.Start</code> is <code>CircuitSliceChecks.Install(this)</code>, inside <code>#if UNITY_EDITOR || CIRCUIT_QA</code>. <code>Install</code> adds the component to the slice's GameObject, sets <code>RehearsalOwnsFocus</code> on the slice and starts <code>Guarded(Rehearse())</code>. A lifecycle phase gets its own <code>DontDestroyOnLoad</code> host instead (<a href="#lifecycle">§07</a>).</li>
+    <li><b>Take the input.</b> <code>TakeInput</code> sets the input system to <code>IgnoreFocus</code> and adds a virtual keyboard, gamepad and mouse. It then calls <code>OwnInput</code>, which disables every native device for the run and logs which ones in a <code>NOTE</code> line, so a physical mouse or pad cannot become <code>Mouse.current</code> or <code>Gamepad.current</code> mid-run. <code>Cleanup</code> gives them back.</li>
+    <li><b>Run the stages.</b> <code>Rehearse()</code> runs some rule checks without waiting a frame (glyph families, menu row availability, every custom <code>Graphic</code> requiring its <code>CanvasRenderer</code>). It then yields the stages in a fixed order, from <code>ArtworkRehearsal</code> through the title, waybook, first steps, deck builder and a played duel to the world fixtures. The order is the source of truth; read <code>Rehearse()</code> in <code>CircuitSliceChecks.cs</code>.</li>
+    <li><b>Report and quit.</b> <code>Guarded</code> writes the report and calls <code>Application.Quit(0)</code> on a pass and <code>Quit(1)</code> on a fail (<a href="#report">§06</a>).</li>
+  </ol>
+  <p>Some flags change what runs. These are read by the rehearsal code itself, and <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Game/EmberGrove/Assets/Tests/README.md">Tests/README.md</a> describes each one:</p>
+  <div class="scrollx"><table>
+    <tr><th>Flag (with <code>-circuit-verify</code>)</th><th>Read by</th><th>Effect</th></tr>
+    <tr><td><code>-circuit-world-only</code></td><td><code>CircuitSliceChecks.WorldOnly</code></td><td>Runs <code>ReusableDistrictRehearsal</code> only. The report is titled "Circuit authored-world verification".</td></tr>
+    <tr><td><code>-circuit-palettes</code></td><td><code>CircuitSliceChecks.PaletteMode</code></td><td>Runs <code>PaletteComparison</code> only. The report is titled "Circuit palette comparison".</td></tr>
+    <tr><td><code>-circuit-lifecycle &lt;phase&gt;</code></td><td><code>LifecyclePhaseArgument</code></td><td>Runs <code>RehearseLifecycle</code> instead (<a href="#lifecycle">§07</a>).</td></tr>
+    <tr><td><code>-circuit-4k</code></td><td><code>CircuitSliceChecks.FourK</code></td><td>Adds 3840×2160 coverage, plus onscreen captures on the Mac player.</td></tr>
+    <tr><td><code>-circuit-route-regression</code></td><td><code>LegacyRouteFixture</code></td><td>Adds the older workshop-role route checkpoint.</td></tr>
+    <tr><td><code>-circuit-all-cards</code></td><td><code>CircuitSliceChecks.TestingAllCards</code></td><td>Plays the testing save that owns every card. It works without <code>-circuit-verify</code> too, and is a tester feature of QA players (<a href="#seams">§10</a>).</td></tr>
+  </table></div>
+</section>
+
+<section id="partials"><h2><span class="num">04</span>What each rehearsal file covers</h2>
+  <p class="lead"><code>CircuitSliceChecks</code> is one <code>public sealed partial class</code> spread over ten files in <code>Game/EmberGrove/Assets/Tests/Runtime</code>. The main file holds the entry, the runner and the shared helpers. Each of the other nine holds a group of stages (the <code>…Rehearsal</code> iterators that <code>Rehearse()</code> or another stage yields).</p>
+  <div class="scrollx"><table>
+    <tr><th>File</th><th>Covers</th><th>Main members</th></tr>
+    <tr><td><code>CircuitSliceChecks.cs</code></td><td>Entry, runner, top-level order, first steps and practice, the walk through world, map and journal pages, the first played duel through to its saved result, and the world fixtures. Also input helpers, <code>Capture</code> and the reflection helpers.</td><td><code>Install</code>, <code>Guarded</code>, <code>Rehearse</code>, <code>FirstStepsRehearsal</code>, <code>PresentationRehearsal</code>, <code>PureTournamentFixture</code>, <code>ConnectedWorldFixture</code>, <code>LegacyRouteFixture</code>, <code>Advance</code>, <code>Unwind</code>, <code>Require</code></td></tr>
+    <tr><td><code>.Artwork.cs</code></td><td>Card artwork and narrative media in the live game, plus the Circuit-content proof that the editor batch entry runs. Also the rendered-border and hint-clearance checks that <code>Capture</code> calls.</td><td><code>ArtworkRehearsal</code>, <code>CircuitNarrativeMediaRehearsal</code>, <code>CircuitContentProof</code>, <code>CheckNavigationHintClearance</code></td></tr>
+    <tr><td><code>.BattlePolish.cs</code></td><td>The hosted battle: action guidance and target previews, hand growth, pause navigation, the end-turn question, opponent-turn focus, controller focus on the board, impact feedback, pinned reading, safe exits and retirement, move assistance.</td><td><code>BattleActionGuidanceRehearsal</code>, <code>BattleImpactRehearsal</code>, <code>CircuitExitRehearsal</code>, <code>MoveAssistanceRehearsal</code></td></tr>
+    <tr><td><code>.DeckBuilder.cs</code></td><td>The deck builder and the deck library.</td><td><code>DeckBuilderRehearsal</code>, <code>DeckLibraryRehearsal</code></td></tr>
+    <tr><td><code>.Lessons.cs</code></td><td>The title page, the handoff into practice, waybook lessons, battle stability, and the written UI Toolkit waybook page.</td><td><code>TitleRehearsal</code>, <code>WaybookLessonsRehearsal</code>, <code>WaybookPageRehearsal</code></td></tr>
+    <tr><td><code>.MenuRules.cs</code></td><td>Menu rules that need no frame (input glyph families, row availability, palette rules) and the <code>-circuit-palettes</code> mode.</td><td><code>GlyphFamilyRules</code>, <code>MenuRowAvailabilityRules</code>, <code>MenuPaletteRules</code>, <code>PaletteComparison</code></td></tr>
+    <tr><td><code>.Saves.cs</code></td><td>The testing all-cards save and the lifecycle phases.</td><td><code>TestingAllCards</code>, <code>TopUpTestingSave</code>, <code>TestingSaveRehearsal</code>, <code>RehearseLifecycle</code>, <code>LifecycleSaveDirectory</code></td></tr>
+    <tr><td><code>.Story.cs</code></td><td>The club opening, adventure events and episodes, the Lantern Quay visit, rewards, next-play prompts, retry saves and the book presentation.</td><td><code>CheckClubOpening</code>, <code>AdventureEventRehearsal</code>, <code>SpareChairEpisodeRehearsal</code>, <code>LanternQuayVisitRehearsal</code></td></tr>
+    <tr><td><code>.Versus.cs</code></td><td>World menus and Versus, feedback reports, field-guide rules, controller and keyboard routes through the world menus, settings focus.</td><td><code>WorldMenuRehearsal</code>, <code>WorldControllerKeyboardRehearsal</code>, <code>WorldSettingsFocusRehearsal</code></td></tr>
+    <tr><td><code>.WorldTable.cs</code></td><td>The editor batch entries and their isolated Play Mode proof. Also character models, authored districts and rooms, reusable districts (<code>-circuit-world-only</code>), room layouts, the living table and character staging at the table.</td><td><code>RunCardPresentationBatch</code>, <code>RunCircuitContentBatch</code>, <code>CardPresentationBatch</code>, <code>ReusableDistrictRehearsal</code>, <code>LivingTableRehearsal</code></td></tr>
+  </table></div>
+  <p>The coverage <i>claims</i> (what each stage proves and what it does not) belong to <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Game/EmberGrove/Assets/Tests/README.md">Tests/README.md</a> and to the "Native coverage" paragraph that <code>Guarded</code> writes into the full rehearsal report. The file split reflects history, not a strict rule. For example, the editor batch entries live in <code>.WorldTable.cs</code>, and the Circuit-content proof they run lives in <code>.Artwork.cs</code>.</p>
+</section>
+
+<section id="runner"><h2><span class="num">05</span>The inline runner</h2>
+  <p class="lead">Every stage is an <code>IEnumerator</code> that may <code>yield return</code> another stage. Unity runs only the outer coroutine, <code>Guarded</code>. Inside it, <code>Advance</code> walks a <code>Stack&lt;IEnumerator&gt;</code>, so nested stages run inline and any exception reaches one <code>try</code>/<code>catch</code>.</p>
+  <pre><code><span class="c">// CircuitSliceChecks.cs: shared with ExpeditionHarness and the editor checks</span>
+internal static bool Advance(Stack&lt;IEnumerator&gt; stack, out object yielded)
+{
+    while (stack.Count &gt; 0)
+    {
+        var top = stack.Peek();
+        if (!top.MoveNext()) { (stack.Pop() as IDisposable)?.Dispose(); continue; }
+        object current = top.Current;
+        if (current is IEnumerator nested) { stack.Push(nested); continue; }
+        yielded = current; return true;
+    }
+    yielded = null; return false;
+}</code></pre>
+  <div class="scrollx"><table>
+    <tr><th>Piece</th><th>Kind</th><th>What it does</th></tr>
+    <tr><td><code>Advance</code></td><td><code>internal static</code></td><td>Steps to the next real yield (<code>null</code>, <code>WaitForSecondsRealtime</code>, <code>WaitForEndOfFrame</code>, an <code>AsyncOperation</code>) and hands it to Unity. A yielded <code>IEnumerator</code> is pushed and run at once, so in the code's words "a helper coroutine costs no frame of its own". A finished iterator is disposed as it leaves.</td></tr>
+    <tr><td><code>Unwind</code></td><td><code>private static</code></td><td>Disposes whatever a stopped run left on the stack, innermost first, so the stages' <code>finally</code> blocks restore their fixtures. A failure during cleanup is added to the failure text.</td></tr>
+    <tr><td><code>Require</code></td><td><code>internal static</code></td><td>The single assertion. On false it throws <code>InvalidOperationException</code> with the text, followed by an optional context in brackets. On true it adds <code>"PASS " + text</code> to the list it was given.</td></tr>
+    <tr><td><code>Check</code></td><td>instance</td><td>Increments <code>assertions</code> and calls <code>Require</code> with the observations list and <code>FailureContext</code>. That appends <code>InputDiagnostic</code> (input kind, selection, devices, pointer, focus, frame delta, last press) to every failed check.</td></tr>
+    <tr><td><code>Guarded</code></td><td>instance, one per harness</td><td>Hooks <code>Application.logMessageReceived</code>, loops <code>Advance</code> inside <code>try</code>/<code>catch</code>, then calls <code>Unwind</code> and <code>Cleanup</code>. Any logged <code>Error</code>, <code>Exception</code> or <code>Assert</code> also fails the run. It then writes the build identity and the report and quits.</td></tr>
+  </table></div>
+  <p>Three things follow from this design. A check that fails throws, so every later stage is skipped; an assertion total tells you how far a run got, not how much it proved. One deliberately broken build can only test the first guard it trips. And a stage must put back what it changed in a <code>finally</code>, because <code>Unwind</code> is the only cleanup a failed run gets. <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Game/EmberGrove/Assets/Tests/README.md">Tests/README.md</a> owns the procedure built on this ("prove a new guard against the code it guards").</p>
+  <p>Other users of the runner:</p>
+  <ul>
+    <li><code>CardPresentationBatch</code> in <code>.WorldTable.cs</code> runs <code>Advance</code> and <code>Unwind</code> in its own loop.</li>
+    <li><code>ExpeditionHarness</code> imports the class as <code>using Rehearsal = EmberGrove.Exploration.CircuitSliceChecks;</code> and uses <code>Rehearsal.Advance</code>, <code>Rehearsal.Require</code>, <code>Rehearsal.WaitUntil</code>, <code>Rehearsal.Render</code> and the reflection helpers. Its <code>Guarded</code> does not call <code>Unwind</code>, counts only logged <code>Exception</code> and <code>Assert</code> messages, and passes no observations list, so its report has no <code>PASS</code> lines.</li>
+  </ul>
+  <p>That shared dependency is why <code>ExpeditionHarness.cs</code> stops the compile with <code>#error</code> when <code>EMBERGROVE_QA</code> is defined without <code>CIRCUIT_QA</code>.</p>
+</section>
+
+<section id="report"><h2><span class="num">06</span><code>verification.txt</code> and screenshots</h2>
+  <p class="lead">A run leaves one text report and a set of PNG captures in the <code>-circuit-verify</code> directory. A process that exits without writing <code>verification.txt</code> has not passed.</p>
+  <div class="grid c2">
+    <div class="card accent-ember"><h4>The report</h4><p>The report starts with <code>PASS</code> or <code>FAIL</code> and a title (<code>Bloomfire circuit rehearsal</code>, or the world-only, palette or lifecycle variant). Next come <code>BuildGuid</code>, <code>AssemblySha256</code> (the hash of the loaded <code>Assembly-CSharp</code>), <code>Version</code>, <code>GraphicsDeviceType</code>, <code>Assertions</code> and <code>Screenshots</code>. After those are the coverage and fixture-scope paragraphs, every <code>PASS</code> and <code>NOTE</code> observation in order, and finally the failure or "No runtime exceptions observed." A player with no build GUID fails.</p></div>
+    <div class="card accent-cyan"><h4>The captures</h4><p><code>Capture(name)</code> waits for the presentation to settle. It then moves the overlay canvases onto the world camera, renders one frame into a <code>RenderTexture</code> through <code>Render</code> (a render request under URP), and checks that the frame is not blank (<code>LightRange &gt; 100</code>). It writes <code>&lt;name&gt;.png</code> and restores the canvases and camera. Names sort by stage, for example <code>01-world</code>, <code>05d-deck-builder-*</code> and <code>palette-02-tasks-&lt;palette&gt;</code>.</p></div>
+  </div>
+  <p>The candidate packager reads three identity lines from the report: <code>Tools/Package-Isometric.ps1</code> requires exactly one <code>BuildGuid</code>, <code>AssemblySha256</code> and <code>Version</code> line, and each must match the QA player's <code>build-info.json</code> (<a href="builds.html#candidate">builds.html §06</a>). Some captures carry their own checks: <code>written: true</code> re-renders the waybook page without the interface and requires ink on it (<code>CheckWrittenPage</code>), and <code>menus-nav-pause-*</code> captures check rendered menu borders.</p>
+  <details class="why"><summary>Why a rehearsal never touches the tester's settings or save</summary>
+    <p>Two pieces of code that ship in <i>every</i> player react to the flag, not only the QA code. <code>ExpeditionApp.PreferenceKey</code> appends <code>.qa.&lt;hash&gt;</code> to every PlayerPrefs key when <code>-circuit-verify</code> or <code>-expedition-net-verify</code> is present, where the hash is taken over the full output path. <code>IsometricSlice.CircuitVerifying</code> suppresses Circuit saves and loads content from <code>StreamingAssets/Content</code> instead of an override. Because the key is a hash of the path, reusing an output directory inherits that directory's earlier preferences, and the guide says to use a fresh path for any run you want to compare.</p>
+  </details>
+</section>
+
+<section id="lifecycle"><h2><span class="num">07</span>Lifecycle phases</h2>
+  <p class="lead"><code>-circuit-lifecycle &lt;phase&gt;</code> tests what survives a real scene unload and a real process exit. Each phase is a separate launch of the QA player into the same fresh output directory. Each phase leaves <code>lifecycle-checkpoint.json</code> for the next one, and each writes its own <code>lifecycle-&lt;phase&gt;.txt</code> instead of <code>verification.txt</code>.</p>
+  <div class="diagram"><pre class="mermaid">stateDiagram-v2
+  state "unload" as unload
+  state "quit-battle" as quitBattle
+  state "quit-result" as quitResult
+  state "resume-result" as resumeResult
+  [*] --&gt; unload: fresh output directory
+  unload --&gt; quitBattle: checkpoint, Interrupted
+  quitBattle --&gt; quitResult: checkpoint, receipt, Interrupted
+  quitResult --&gt; resumeResult: checkpoint, receipt, Won / Lost / Drawn
+  resumeResult --&gt; [*]
+  note right of unload
+    moves without saving, reloads the scene,
+    then reloads again during a live battle
+  end note
+  note right of quitResult
+    plays a real match to its result,
+    quits without pressing Continue
+  end note</pre></div>
+  <p class="caption">The four phases and what each passes on. Each later phase first checks that the checkpoint names its predecessor, then that the restored state equals the checkpoint's <code>CircuitSave</code> after <code>CircuitRules.Recover</code>.</p>
+  <ul>
+    <li><b>Saves.</b> <code>LifecycleSaveDirectory</code> resolves to <code>&lt;output&gt;/saves</code> and throws if that path is inside <code>Application.persistentDataPath</code>. <code>IsometricSlice.CircuitStorageRoot</code> picks it up through a <code>CIRCUIT_QA</code> block, so the phases use the production save adapter on isolated files.</li>
+    <li><b>Surviving a reload.</b> The runner lives on a <code>DontDestroyOnLoad</code> GameObject and is kept in the static <code>lifecycleRunner</code>. When the reloaded scene's <code>IsometricSlice.Start</code> calls <code>Install</code> again, <code>Install</code> rebinds the existing runner to the new slice and returns. <code>LifecycleReloadScene</code> checks that exactly one runner exists.</li>
+    <li><b>Order is enforced.</b> <code>unload</code> refuses an output directory that already has a save or checkpoint. The procedure (four launches, which reports to read) is in <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Game/EmberGrove/Assets/Tests/README.md">Tests/README.md</a>. What the save format promises is on <a href="saves.html">Saves &amp; Settings</a>.</li>
+  </ul>
+</section>
+
+<section id="editor"><h2><span class="num">08</span>Editor batch entry points</h2>
+  <p class="lead">Three proofs run in a batch Unity editor through <code>-executeMethod</code>, with no player build. Two of them share an isolated Play Mode lifecycle. The third runs the save scenarios that the portable <code>Persistence</code> suite also runs.</p>
+  <div class="scrollx"><table>
+    <tr><th><code>-executeMethod</code></th><th>Lives in</th><th>How it runs</th><th>Report</th></tr>
+    <tr><td><code>EmberGrove.Exploration.CircuitSliceChecks.RunCardPresentationBatch</code></td><td><code>.WorldTable.cs</code>, inside <code>#if UNITY_EDITOR</code></td><td>Requires batch mode and opens the shipping scene if the editor started on an untitled one. Then <code>BeginCardPresentationVerification</code> refuses dirty scenes or Prefab Mode, runs the editor-side workshop checks, prepares an isolated scene, sets <code>SessionState</code> flags and enters Play Mode. The <code>[InitializeOnLoadMethod]</code> <code>RegisterCardPresentationBatch</code> subscribes <code>StartCardPresentationBatch</code> to play-mode changes; on <code>EnteredPlayMode</code> it starts <code>CardPresentationBatch</code> (<code>Advance</code>/<code>Unwind</code>). On <code>EnteredEditMode</code> it restores the scene setup, writes the final report and calls <code>EditorApplication.Exit</code>. So the command is run <i>without</i> <code>-quit</code>.</td><td><code>Temp/MilestoneB/card-presentation/verification.txt</code>, or <code>-card-presentation-report</code></td></tr>
+    <tr><td><code>EmberGrove.Exploration.CircuitSliceChecks.RunCircuitContentBatch</code></td><td>Same file</td><td>The same lifecycle with the content flag set. Its Play Mode proof is <code>CircuitContentProof</code> in <code>.Artwork.cs</code>, which loads an exported pack (<code>-circuit-content-pack</code>) through <code>ContentPackFiles</code>.</td><td><code>Temp/MilestoneB/circuit-content/verification.txt</code>, or <code>-circuit-content-report</code></td></tr>
+    <tr><td><code>EmberGrove.Exploration.CircuitPersistenceVerification.RunBatch</code></td><td><code>Assets/Tests/CircuitPersistenceVerification.cs</code></td><td>Calls <code>RunScenarios</code> with a <code>SaveCodec</code> over Unity's <code>JsonUtility</code>, against the production <code>CircuitPersistence</code> store. It uses its own local <code>Check</code>, not the rehearsal runner. <code>Tools/CircuitPersistenceChecks</code> calls the same <code>RunScenarios</code> with System.Text.Json.</td><td><code>Temp/ReleaseReview/circuit-persistence-unity.txt</code>, and with <code>-circuit-persistence-labels</code> a labels file beside it</td></tr>
+  </table></div>
+  <p>The two card-presentation entries also have live-editor forms, <code>RunCardPresentationInEditor</code> and <code>RunCircuitContentInEditor(path)</code>. <code>CircuitPersistenceVerification.cs</code> is guarded by <code>#if UNITY_EDITOR || CIRCUIT_PERSISTENCE_PORTABLE</code>, so no player compiles it, and the portable project compiles it by path with that define. The purpose of each entry is in the entry table of <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Game/EmberGrove/Assets/Tests/README.md">Tests/README.md</a>.</p>
+</section>
+
+<section id="network"><h2><span class="num">09</span>The network harness</h2>
+  <p class="lead"><code>ExpeditionHarness</code> (namespace <code>EmberGrove.Expedition</code>, two partial files) plays a whole networked match between two independently running QA players over a real transport. Each player writes its own report and capture. Two players that share a parent folder check each other's final public state there; a detached pair is checked afterwards by a separate console tool.</p>
+  <p><b>Install.</b> A <code>[RuntimeInitializeOnLoadMethod(AfterSceneLoad)]</code> method reads the arguments. Unlike the Circuit rehearsal, no production code calls it. On Android, <code>NetworkLaunchArguments</code> builds those arguments from the launch intent extra <code>bloomfire.qa</code> (<code>mode:role:run-id:port</code>), using <code>ParseAndroidNetworkLaunch</code>. The editor build's Android preparation checks call <code>CheckAndroidNetworkLaunch</code> to test that parser.</p>
+  <div class="scrollx"><table>
+    <tr><th>Argument</th><th>Values</th></tr>
+    <tr><td><code>-expedition-net-verify &lt;output&gt; &lt;role&gt; &lt;mode&gt; &lt;endpoint&gt;</code></td><td>role <code>host</code> or <code>guest</code>. Mode <code>lan</code>, <code>relay</code>, <code>relay-public</code>, <code>relay-private</code>, <code>trusted</code>, <code>quickmatch</code> or <code>lobby</code>. The named-room modes need a loopback <code>ws</code>/<code>wss</code> endpoint at <code>/relay</code>, or the active private test preset.</td></tr>
+    <tr><td><code>-expedition-net-detached</code></td><td>No shared handshake folder; used for Android and mixed pairs. Quickmatch or lobby only, with a fresh output directory.</td></tr>
+    <tr><td><code>-expedition-net-faults</code></td><td>Installs <code>NetworkFaults</code>, a <code>DelegatingHandler</code> that drops one accepted command acknowledgement and one resume acknowledgement, then replays an old view. Quickmatch or lobby only.</td></tr>
+  </table></div>
+  <div class="diagram"><pre class="mermaid">sequenceDiagram
+  participant H as Host player
+  participant T as Transport (LAN host, relay or authority)
+  participant G as Guest player
+  H-&gt;&gt;H: RehearseNetwork(), OpenVersusFromTitle by reflection
+  G-&gt;&gt;G: RehearseNetwork(), OpenVersusFromTitle by reflection
+  H-&gt;&gt;T: HostLan / HostRelay / Create trusted match
+  H-&gt;&gt;H: AtomicText(room-code.txt) in the shared parent folder
+  G-&gt;&gt;G: TryReadPublishedText(room-code.txt)
+  G-&gt;&gt;T: JoinLan / JoinRelay / Join trusted match
+  loop until State.IsOver
+    T--&gt;&gt;H: new revision, 3 privacy checks
+    T--&gt;&gt;G: new revision, 3 privacy checks
+    H-&gt;&gt;T: Submit(command), 1 legal-actions check
+    G-&gt;&gt;T: Submit(command), 1 legal-actions check
+  end
+  H-&gt;&gt;H: public-final-state.txt, network-summary.txt
+  G-&gt;&gt;G: public-final-state.txt, network-summary.txt
+  Note over H,G: RehearseNetworkPeerAgreement reads the peer's public-final-state.txt (and result-id.txt in trusted mode) from the shared parent folder
+  H-&gt;&gt;H: verification.txt, network-capture.json
+  G-&gt;&gt;G: verification.txt, network-capture.json</pre></div>
+  <p class="caption">A pair run in the LAN, relay or trusted-room modes. Quickmatch, lobby and the named-room modes add their own steps before the match, where the two players meet. In the trusted modes each player also suspends and resumes once mid-match, and with <code>-expedition-net-faults</code> runs <code>RehearseLostAcknowledgements</code>. At revision 42 a player concedes, so a run always ends.</p>
+  <p><b>What each player writes.</b> A player writes these files:</p>
+  <ul>
+    <li><code>verification.txt</code>, titled "Expedition UI rehearsal".</li>
+    <li><code>network-summary.txt</code>, with commands sent, snapshots observed, final revision and result ID.</li>
+    <li><code>public-final-state.txt</code>.</li>
+    <li><code>network-capture.json</code>, the <code>NetworkCapture</code> schema with the public-state hash, protocol versions and fault flags.</li>
+    <li>In the trusted modes, <code>result-id.txt</code>.</li>
+    <li>For the named-room modes, <code>named-room-capture.json</code>, plus <code>automatic-relay-capture.json</code> when the endpoint is the private test preset.</li>
+    <li>Screenshots, and playtest feedback under <code>Feedback/</code>.</li>
+  </ul>
+  <p>A detached client's report says so in its text: its own PASS is not a pair pass. Pair agreement then comes from <code>dotnet run --project Tools/ExpeditionNetworkChecks -c Release -- compare-player-reports</code>, which reads both <code>network-capture.json</code> files and the authority run's saved health response, and accepts only fault-enabled quickmatch or lobby captures (see <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Tools/ExpeditionNetworkChecks/README.md#independent-unity-player-captures">ExpeditionNetworkChecks § Independent Unity player captures</a>).</p>
+  <div class="note rule"><b>Comparing two network runs by assertion count.</b> The match loop in <code>ExpeditionHarness.Network.cs</code> adds three checks for every newly observed revision: the remote projection hides the shuffle state, the opponent's hand and both decks. It adds one check before every submitted command. The total therefore grows with match length. The part that should not change between two runs of the same mode is <b><code>assertions − 3 × snapshots observed − commands sent</code></b>, with the last two values taken from that run's <code>network-summary.txt</code>. This rule comes from reading the loop; it is not written down anywhere else.</div>
+  <p>The device commands for a Windows–Android pair are owned by <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/NETWORKING.md#mixed-windowsandroid-test-plan">NETWORKING § Mixed Windows–Android test plan</a>, and the private relay test by <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/NETWORKING.md#private-qa-two-device-test">NETWORKING § Private QA two-device test</a>. How the transports work is on <a href="networking.html">Networking</a>.</p>
+</section>
+
+<section id="seams"><h2><span class="num">10</span>How QA code reaches production</h2>
+  <p class="lead">QA code is meant to be absent from ordinary players. That holds because a fixed set of seams connects it to the game, and each is either compiled out or harmless when no QA flag is passed. These were counted on <code>main</code> at <code>ca8d41e</code>. They are the places to look first when a rehearsal breaks after a refactor, or when you are deciding what to untangle.</p>
+  <div class="scrollx"><table>
+    <tr><th>Seam</th><th>Where</th><th>Measured</th><th>Compiled out of ordinary players?</th></tr>
+    <tr><td><b>Production calls into QA types</b>, inside <code>#if</code></td><td><code>IsometricSlice.cs</code>, <code>IsometricSlice.Circuit.cs</code>, <code>IsometricSlice.Hud.cs</code>, <code>IsometricSlice.Versus.cs</code>, <code>ExpeditionView.Settings.cs</code>, <code>ExpeditionApp.Network.cs</code></td><td>25 references to <code>CircuitSliceChecks</code> or <code>ExpeditionHarness</code> in these 6 runtime files</td><td>Yes. Every reference sits inside one of the 21 QA-guarded blocks in these files: 12 <code>UNITY_EDITOR || CIRCUIT_QA</code> blocks in 4 files, 4 <code>UNITY_EDITOR || EMBERGROVE_QA</code> blocks in 2 files, and 5 <code>EMBERGROVE_QA &amp;&amp; EMBERGROVE_PRIVATE_RELAY_QA &amp;&amp; !UNITY_EDITOR</code> blocks in <code>ExpeditionApp.Network.cs</code>. Not every block names those types: the private-relay blocks hold the relay preset and use the generated <code>PrivateRelayQaSettings</code>, and a few <code>CIRCUIT_QA</code> blocks hold <code>RehearsalOwnsFocus</code> or call a QA-only helper.</td></tr>
+    <tr><td><b>Test hooks in toolkit signatures</b></td><td><code>ExpeditionNetworkSession</code> constructor</td><td>Optional <code>trustedHandler</code> and <code>relayReadinessHandler</code> parameters, which <code>ExpeditionApp.Network.cs</code> fills from <code>ExpeditionHarness.CreateRehearsalHandler()</code> and <code>CreateRelayReadinessRehearsalHandler()</code> under the QA define</td><td>The call sites are; the parameters ship in the toolkit.</td></tr>
+    <tr><td><b>Flag checks in every build</b></td><td><code>IsometricSlice.CircuitVerifying</code>, <code>ExpeditionApp.PreferenceKey</code> / <code>RehearsalPreferenceFlag</code></td><td>Read <code>-circuit-verify</code> and <code>-expedition-net-verify</code></td><td>No. On purpose they isolate saves, content and preferences even in a shipping smoke run (<a href="#report">§06</a>).</td></tr>
+    <tr><td><b>QA-only fields on production types</b></td><td><code>IsometricSlice.RehearsalOwnsFocus</code></td><td>Read in <code>OnApplicationFocus</code></td><td>Yes; <code>Validate-CircuitPlayer.ps1</code> fails a shipping player that has it.</td></tr>
+    <tr><td><b>A tester feature that lives in test code</b></td><td>The all-cards testing save: <code>CircuitSliceChecks.Saves.cs</code>, shown by <code>ExpeditionView.Settings.TestingSaveRows</code></td><td>Settings rows and the save path go through <code>CircuitSliceChecks.TestingAllCards</code>, <code>TestingAllCardsWanted</code>, <code>TestingResetWanted</code>, <code>TopUpTestingSave</code></td><td>Yes; the validator also searches for its member names and strings.</td></tr>
+    <tr><td><b>String-keyed reflection into private members</b></td><td>The helpers <code>Invoke</code>, <code>Get</code>, <code>Get&lt;T&gt;</code>, <code>Set</code> and <code>SetProperty</code> on <code>CircuitSliceChecks</code> (shared with the harness), plus direct <code>typeof(…).GetProperty/GetField/GetMethod</code></td><td>Several hundred call sites by text search, the large majority on the <code>IsometricSlice</code> instance; <code>.Lessons.cs</code> and the main file have the most</td><td>The callers are. A renamed private member still compiles and fails only when a rehearsal reaches it. Android QA builds keep these members alive with <code>AndroidNetworkQaLinker</code>, which preserves all of <code>Assembly-CSharp</code>.</td></tr>
+    <tr><td><b>Portable suites reflecting into toolkit and relay internals</b></td><td><code>Tools/ExpeditionPerformance/WorldFactChecks.cs</code>, <code>Tools/ExpeditionNetworkChecks/Program.cs</code></td><td><code>ExpeditionAuthority</code>'s private <code>state</code>, <code>lastCommand</code> and <code>lastEvents</code>, <code>RelayApplication.NormalizeSourceRevision</code>, and the relay's internal <code>RelayAccess</code>, <code>RelayAdmission</code> and <code>RelayDirectory</code> types, looked up by name</td><td>Not applicable (no player involved)</td></tr>
+    <tr><td><b>Source-text extraction</b></td><td><code>Tools/CircuitFieldSetupChecks/Run-Checks.ps1</code></td><td>Cuts <code>FairMatchSetup</code> out of <code>ExpeditionApp.Session.cs</code> by brace counting</td><td>Not applicable</td></tr>
+    <tr><td><b>Editor build calling QA code</b></td><td><code>IsometricSliceBuild.CircuitAndroidPreparationChecks</code></td><td>One call, <code>ExpeditionHarness.CheckAndroidNetworkLaunch()</code></td><td>Editor assembly only</td></tr>
+  </table></div>
+  <p><b>The other side of the guard.</b> <code>Tools/Validate-CircuitPlayer.ps1</code> opens the built <code>Assembly-CSharp.dll</code> with <code>Unity.Cecil</code>. For a shipping player it requires: no <code>CircuitSliceChecks</code> or <code>ExpeditionHarness</code> type, no <code>RehearsalOwnsFocus</code> field, no member whose name matches <code>TestingAllCards</code> or <code>TestingSave</code>, and none of the testing literals as an <code>ldstr</code> operand. For a rehearsal player it requires the rehearsal type. This is the check that turns "compiled out" into a verified fact for each build (<a href="builds.html#validate">builds.html §07</a>). The structural problems this table points at are weighed on <a href="findings.html">Findings</a>.</p>
+</section>
+
+<section id="guides"><h2><span class="num">11</span>Guides that own the details</h2>
+  <p class="lead">This page describes how the pieces connect. The commands, coverage claims and evidence rules are kept in the guides below; change them there.</p>
+  <div class="grid c2">
+    <a class="card accent-ember" href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Game/EmberGrove/Assets/Tests/README.md"><h4>Unity verification (Tests/README.md)</h4><p>The entry-point table, every rehearsal flag, the open intermittent failures, the lifecycle procedure, and how to confirm which build a report came from.</p></a>
+    <a class="card accent-gold" href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Tools/README.md"><h4>Maintainer tools (Tools/README.md)</h4><p>Suite requirements and coverage, and the optional suites with their prerequisites.</p></a>
+    <a class="card accent-cyan" href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/MAINTAINING.md#verify-and-build-the-game"><h4>MAINTAINING § Verify and build the game</h4><p>The order to run checks, rehearsal and builds in, with the menu items and command lines.</p></a>
+    <a class="card accent-violet" href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/NETWORKING.md#mixed-windowsandroid-test-plan"><h4>NETWORKING § Mixed Windows–Android test plan</h4><p>Device commands, ready-file coordination and cleanup for a Windows–Android pair.</p></a>
+  </div>
+</section>
+
+<div class="honest"><h4>Keep this page honest</h4><ul>
+  <li><code>Tools/Run-Checks.ps1</code>: the suite table, the <code>Portable</code> list and the summary scope string</li>
+  <li><code>Tools/*/…Checks.csproj</code>, <code>Tools/ExpeditionPerformance/WorldFactChecks.csproj</code>, <code>Tools/ExpeditionRelay/ExpeditionRelay.csproj</code>: the compile lists in §02</li>
+  <li><code>Tools/CircuitFieldSetupChecks/Run-Checks.ps1</code>: the brace-counting extraction of <code>FairMatchSetup</code></li>
+  <li><code>Game/EmberGrove/Assets/Tests/Runtime/CircuitSliceChecks.cs</code>: <code>Install</code>, <code>Guarded</code>, <code>Rehearse</code>, <code>Capture</code>, <code>Check</code>, the reflection helpers, <code>Advance</code>, <code>Unwind</code> and <code>Require</code></li>
+  <li><code>Game/EmberGrove/Assets/Tests/Runtime/CircuitSliceChecks.*.cs</code>: the file-to-stage table in §04</li>
+  <li><code>Game/EmberGrove/Assets/Tests/Runtime/CircuitSliceChecks.Saves.cs</code>: lifecycle phases, <code>LifecycleSaveDirectory</code> and the testing save</li>
+  <li><code>Game/EmberGrove/Assets/Tests/Runtime/CircuitSliceChecks.WorldTable.cs</code> and <code>Game/EmberGrove/Assets/Tests/CircuitPersistenceVerification.cs</code>: the batch entries and their report paths</li>
+  <li><code>Game/EmberGrove/Assets/Tests/Runtime/ExpeditionHarness.cs</code> and <code>ExpeditionHarness.Network.cs</code>: install, arguments, modes, output files and the per-snapshot and per-command checks</li>
+  <li><code>Game/EmberGrove/Assets/Runtime/Exploration/IsometricSlice*.cs</code>, <code>ExpeditionView.Settings.cs</code>, <code>ExpeditionApp.Network.cs</code>, <code>ExpeditionApp.Settings.cs</code>: the seams and their counts in §10</li>
+  <li><code>Tools/Validate-CircuitPlayer.ps1</code>: what a shipping and a rehearsal assembly must and must not contain</li>
+</ul></div>
+</main>
+<footer>Bloomfire Wiki · page source <code>Docs/Wiki/qa.html</code>, built by <code>Tools/Documentation/structure_wiki.py</code> · Found a mistake? Fix it in the same commit as the code that made it one.</footer>
+</body>
+</html>

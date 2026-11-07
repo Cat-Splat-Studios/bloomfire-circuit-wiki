@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Content &amp; Media — Bloomfire Wiki</title>
+<link rel="stylesheet" href="wiki.css">
+<script src="mermaid.min.js" defer></script>
+<script src="wiki.js" defer></script>
+</head>
+<body>
+<nav class="wiki">
+  <a class="home" href="index.html">🔥 Bloomfire Wiki</a>
+  <div class="grp"><span class="grp-t">Start here</span>
+    <a href="codebase-tour.html">Codebase Tour</a>
+    <a href="glossary.html">Glossary</a>
+  </div>
+  <div class="grp"><span class="grp-t">Game systems</span>
+    <a href="rules.html">Rules Engine</a>
+    <a href="world.html">World &amp; Journal</a>
+    <a href="sessions.html">Hosted Sessions</a>
+    <a href="ui.html">UI &amp; Menus</a>
+    <a href="networking.html">Networking</a>
+    <a class="on" href="content.html">Content &amp; Media</a>
+    <a href="saves.html">Saves &amp; Settings</a>
+  </div>
+  <div class="grp"><span class="grp-t">Code health</span>
+    <a href="diagrams.html">Diagrams</a>
+    <a href="complexity.html">Complexity</a>
+    <a href="findings.html">Findings</a>
+  </div>
+  <div class="grp"><span class="grp-t">Ship &amp; maintain</span>
+    <a href="qa.html">QA &amp; Rehearsals</a>
+    <a href="builds.html">Builds &amp; Tools</a>
+    <a href="maintaining.html">Maintaining</a>
+  </div>
+</nav>
+<header class="page"><h1>How content <span class="flame">reaches</span> the game</h1><p class="tag">Where cards, dialogue, places, pictures and sounds are authored, how they are checked and staged, and which code reads them while the game runs.</p></header>
+<main>
+  <div class="tldr"><h4>In 60 seconds</h4><ul>
+    <li><b>Three content folders, three loaders.</b> <code>Content/EmberGroveDefault</code> is the replaceable pack, read by <code>ContentPackFiles.Load</code>. <code>Content/Circuit</code> holds the Circuit's sidecar files, read by <code>IsometricSlice.CircuitText</code>. <code>Content/Exploration/sector.json</code> is the start-up sector, read by <code>IsometricSlice.Start</code>.</li>
+    <li><b>Only the pack can be swapped without a build.</b> <code>ContentPackFiles.DefaultRoot</code> picks <code>-content-pack</code>, then <code>persistentDataPath/ContentOverride</code>, then <code>StreamingAssets/Content</code>. The sidecars and the sector are always read from <code>StreamingAssets</code>.</li>
+    <li><b>The build copies; the repository owns.</b> <code>IsometricSliceBuild</code> validates each folder and copies it into the git-ignored <code>StreamingAssets</code> before every build. The staged copy is never the source.</li>
+    <li><b>Media is by ID, never by path.</b> <code>media.json</code> registers each picture and sound once. Artwork goes through shared <code>CardArtworkCache</code> leases; the world reads music and voice, and each hosted session reads music and sound-cue overrides, from the pack.</li>
+    <li><b>Content Studio runs the game's own parsers.</b> <code>Tools/ContentStudio</code> compiles the toolkit's content files with <code>CARDFORGE_HEADLESS</code> and a small <code>UnityEngine</code> stand-in, so a pack that validates in Studio has passed the same <code>ExpeditionContent.Parse</code> and <code>WorldContent.Parse</code> as the game.</li>
+  </ul></div>
+
+  <div class="prereq"><h4>Before you start</h4><ul>
+    <li>This page explains structure. The field-by-field pack format is owned by the <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Tools/ContentStudio/PACK_CONTRACT.md">pack contract</a>, the creator workflow by the <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/TOOLKIT_AUTHORING_GUIDE.md">designer and writer pipeline</a>, and art and menu-role rules by the <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CIRCUIT_PRESENTATION.md">artist and presentation pipeline</a>.</li>
+    <li>How the loaded content becomes a running Circuit is on <a href="world.html">World &amp; Journal</a>; how each hosted session reloads it is on <a href="sessions.html">Hosted Sessions</a>; what the game saves is on <a href="saves.html">Saves &amp; Settings</a>.</li>
+  </ul></div>
+
+  <section id="anatomy"><h2><span class="num">01</span>Where the pieces live</h2>
+    <p class="lead">Content is plain JSON plus media files in <code>Content/</code>. The loaders are in one toolkit assembly, <code>CardForge.Content</code>; the game code that presents media is in <code>Game/EmberGrove/Assets/Runtime</code>; the editors are in <code>Tools/</code>.</p>
+    <div class="scrollx"><table>
+      <tr><th>Place</th><th>What it holds</th><th>Who reads it</th></tr>
+      <tr><td><code>Content/EmberGroveDefault/</code></td><td>The default pack: <code>manifest.json</code>, <code>expedition-content.json</code> (cards, decks, encounters, match rules), <code>world-content.json</code> (older Expedition campaign data), <code>media.json</code>, <code>circuit-dialogue.json</code> and <code>media/</code> (card sheets, portraits, music, voice)</td><td><code>ContentPackFiles.Load</code>, Content Studio, the build's staging step</td></tr>
+      <tr><td><code>Content/Circuit/</code></td><td>Sidecars the pack does not own: <code>card-guide.json</code>, <code>locations.json</code>, <code>journey.json</code>, <code>practice.json</code>, <code>lessons.json</code>, and <code>Voice/</code> (<code>lines.json</code> plus WAV guide recordings)</td><td><code>IsometricSlice.LoadCircuit</code> through <code>CircuitText</code>; <code>PracticeNarration</code> for <code>Voice/</code></td></tr>
+      <tr><td><code>Content/Exploration/</code></td><td><code>sector.json</code>, the start-up sector that must pass <code>SectorNavigation.Validate</code></td><td><code>IsometricSlice.Start</code></td></tr>
+      <tr><td><code>Toolkit/…/Runtime/Content/</code></td><td><code>ContentPackFiles.cs</code> (manifest, media schema, loader), <code>ExpeditionContent.cs</code> (combat parser), <code>WorldContent.cs</code> (world parser). The assembly <code>CardForge.Content</code> is the only toolkit runtime assembly without <code>noEngineReferences</code>.</td><td>The game, Content Studio, the relay and several check projects (by source path)</td></tr>
+      <tr><td><code>Game/EmberGrove/Assets/Runtime/</code></td><td><code>CardArtworkCache.cs</code>, <code>ExpeditionApp.Media.cs</code>, <code>ExpeditionView.Media.cs</code>, <code>GameAudioDirector.cs</code>, <code>PracticeNarration.cs</code>, <code>Exploration/IsometricSlice.Audio.cs</code>, <code>Exploration/IsometricSlice.Circuit.cs</code></td><td>The running game</td></tr>
+      <tr><td><code>Game/EmberGrove/Assets/Resources/DuelAudio/</code></td><td>The built-in battle sound palette</td><td><code>GameAudioDirector.Initialize</code> via <code>Resources.Load</code></td></tr>
+      <tr><td><code>Game/EmberGrove/Assets/Editor/IsometricSliceBuild.cs</code></td><td><code>StageSector</code>, <code>StageEncounterContent</code>, <code>StageCircuit</code></td><td>Unity editor menu and batch builds</td></tr>
+      <tr><td><code>Tools/ContentStudio/</code></td><td>CardForge Content Studio: one service (<code>Program.cs</code>), a Windows host (<code>DesktopHost.cs</code>), the page (<code>web/</code>), launch and publish scripts</td><td>Designers, writers and artists</td></tr>
+      <tr><td><code>Tools/CircuitStudio/</code></td><td>Standalone browser pages for dialogue branches (<code>index.html</code>) and lessons (<code>lessons.html</code>), their Node checks, and the Current Card Workshop launcher</td><td>Maintainers and designers</td></tr>
+    </table></div>
+    <p>The class diagram of <code>CardForge.Content</code> and the game assembly is generated on <a href="diagrams.html">Diagrams</a>.</p>
+  </section>
+
+  <section id="pipeline"><h2><span class="num">02</span>From authored file to running game</h2>
+    <p class="lead">Every path starts in <code>Content/</code>, is checked when the build stages it (the pack and the sector fully; the sidecars for presence and lesson rules) and again as the game loads it, and is read at run time from <code>StreamingAssets</code> or from an override folder.</p>
+    <div class="diagram"><pre class="mermaid">
+flowchart LR
+  subgraph repo["Content/ in the repository"]
+    P["EmberGroveDefault pack"]
+    C["Circuit sidecars"]
+    S["Exploration/sector.json"]
+  end
+  CS["Content Studio"] -- "Save" --&gt; P
+  WS["CircuitStudio pages"] -- "lessons.json, copied by hand" --&gt; C
+  WS -- "circuit-dialogue.json, copied by hand" --&gt; P
+  P --&gt; SE["StageEncounterContent"]
+  C --&gt; SC["StageCircuit"]
+  S --&gt; SS["StageSector"]
+  SE --&gt; A1["StreamingAssets/Content"]
+  SC --&gt; A2["StreamingAssets/Circuit"]
+  SS --&gt; A3["StreamingAssets/Exploration"]
+  O["-content-pack or ContentOverride"] --&gt; DR
+  A1 --&gt; DR["ContentPackFiles.DefaultRoot"]
+  DR --&gt; L["ContentPackFiles.Load"]
+  L --&gt; LP["LoadedContentPack"]
+  A2 --&gt; CT["IsometricSlice.CircuitText"]
+  A3 --&gt; ST["IsometricSlice.Start"]
+  CT --&gt; LC["IsometricSlice.LoadCircuit"]
+  LP --&gt; LC
+  ST --&gt; LC
+  LC --&gt; CD["CircuitDefinition, then RestoreCircuit"]
+  DR -- "Load again" --&gt; EA["ExpeditionApp.Start, per hosted session"]
+</pre></div>
+    <p class="caption">Authored files to the running game. <code>IsometricSlice.Start</code> reads the sector first and only then calls <code>LoadCircuit</code>; hosted sessions load the pack again from the same root (<code>IsometricSlice.CircuitContentRoot</code>, passed as <code>IsometricCombatBridge.ContentRoot</code>).</p>
+    <ol class="steps">
+      <li><b>Start-up order.</b> <code>IsometricSlice.Start</code> reads <code>StreamingAssets/Exploration/sector.json</code>. <code>LoadCircuit</code> then reads the five sidecars, calls <code>ContentPackFiles.Load</code>, runs <code>ResolveCircuitDialogue</code> and the artwork lease, checks the guide, dialogue, location, journey and presentation tables, builds a <code>CircuitDefinition</code>, checks the rival decks and finally restores the save. Any failure sets <code>Error</code>, so a broken pack stops the Circuit before it reads a save.</li>
+      <li><b>After the pack.</b> <code>LoadWorldPreferences</code> applies player settings and <code>InitializeCircuitMusic</code> starts the world's music source.</li>
+      <li><b>Each hosted session.</b> Every <code>HostedSessionKind</code> (Circuit duel, friendly game, practice, lesson, Versus, settings) runs an <code>ExpeditionApp</code>, whose <code>Start</code> calls <code>ContentPackFiles.Load(sessionContentRoot ?? DefaultRoot())</code> and then <code>InitializeMedia</code>.</li>
+    </ol>
+    <div class="note warn">A run with <code>-circuit-verify</code> or <code>-expedition-net-verify</code> ignores the override order: <code>CircuitContentRoot</code> is then always <code>StreamingAssets/Content</code>, so rehearsals play the bundled pack.</div>
+  </section>
+
+  <section id="pack"><h2><span class="num">03</span>The pack: manifest and documents</h2>
+    <p class="lead"><code>manifest.json</code> is a <code>ContentManifest</code>. It names the pack and points at three required documents and one optional one; <code>Load</code> reads only <code>manifest.json</code> and the documents it names; media files are read later by the code that presents them.</p>
+    <div class="scrollx"><table>
+      <tr><th>Manifest field</th><th>Type in code</th><th>Effect</th></tr>
+      <tr><td><code>Version</code>, <code>Id</code></td><td><code>int</code>, <code>string</code></td><td><code>ParseManifest</code> rejects a version other than 1 and a blank <code>Id</code> or one longer than 96 characters.</td></tr>
+      <tr><td><code>Title</code>, <code>Description</code>, <code>Author</code>, <code>ContentVersion</code>, <code>MinimumGameVersion</code></td><td><code>string</code></td><td>Identity. <code>IsometricSliceBuild.ValidateAndroidContentVersion</code> compares <code>MinimumGameVersion</code> with an Android candidate's version.</td></tr>
+      <tr><td><code>CombatFile</code>, <code>WorldFile</code>, <code>MediaFile</code></td><td><code>string</code>, defaulting to <code>expedition-content.json</code>, <code>world-content.json</code>, <code>media.json</code></td><td>Must each pass <code>SafeRelativePath</code>.</td></tr>
+      <tr><td><code>Circuit</code></td><td><code>CircuitPackDefinition</code> (<code>Version</code>, <code>DialogueFile</code>)</td><td>Optional. Present means the pack owns its Circuit dialogue; absent means the game uses the bundled <code>StreamingAssets/Content/circuit-dialogue.json</code>.</td></tr>
+    </table></div>
+    <details class="why"><summary>Why the manifest is scanned by hand for "Circuit"</summary>
+      <p>Unity's <code>JsonUtility</code> cannot tell a missing inline object from an explicit <code>null</code>: both arrive as a default object. Only omission may opt an older pack into the bundled dialogue, so <code>ParseManifest</code> calls <code>HasRootProperty(json, "Circuit")</code>, a small tokenizer that counts top-level property names (so the word inside a description does not count), refuses a duplicate, and requires the value to be an object. If the property is present, <code>Circuit.Version</code> must be 1 and <code>DialogueFile</code> a safe path; otherwise <code>manifest.Circuit</code> is set to <code>null</code>.</p>
+    </details>
+    <p>What each document owns, and which collections the current Circuit still plays, is the <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/TOOLKIT_AUTHORING_GUIDE.md#pack-documents">pack documents table</a>; the field rules are the <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Tools/ContentStudio/PACK_CONTRACT.md">pack contract</a> and its <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Tools/ContentStudio/PACK_CONTRACT.md#optional-circuit-dialogue">optional Circuit dialogue</a> section.</p>
+  </section>
+
+  <section id="loader"><h2><span class="num">04</span>Loading a pack: ContentPackFiles</h2>
+    <p class="lead"><code>ContentPackFiles</code> is a static class of coroutines. It reads every file through <code>UnityWebRequest</code>, so the same code works on a desktop folder and inside an Android APK, then hands pure definitions to the rest of the game as one <code>LoadedContentPack</code>.</p>
+    <h3>Which folder is the pack</h3>
+    <ol class="steps">
+      <li><b><code>-content-pack &lt;folder&gt;</code></b> on the command line, made absolute with <code>Path.GetFullPath</code>. This is the creator review shortcut the <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/TOOLKIT_AUTHORING_GUIDE.md#updating-an-installed-game">authoring guide</a> describes.</li>
+      <li><b><code>Application.persistentDataPath/ContentOverride</code></b>, but only if it contains a <code>manifest.json</code>.</li>
+      <li><b><code>Application.streamingAssetsPath/Content</code></b>, the staged default pack.</li>
+    </ol>
+    <h3>What <code>Load</code> does</h3>
+    <div class="scrollx"><table>
+      <tr><th>Step</th><th>Member</th><th>On failure</th></tr>
+      <tr><td>Read <code>manifest.json</code></td><td>private <code>Read</code>, then <code>LoadManifest</code> → <code>ParseManifest</code></td><td><code>failure(message)</code>, stop</td></tr>
+      <tr><td>Read the combat, world and media files the manifest names, in that order</td><td><code>Read</code> for each</td><td><code>failure</code>, stop at the first</td></tr>
+      <tr><td>Read the declared dialogue</td><td><code>LoadDialogue</code> → <code>JsonUtility.FromJson&lt;CircuitDialogue&gt;</code> and <code>CircuitRules.ValidateDialogue</code></td><td><code>"Invalid Circuit dialogue: …"</code></td></tr>
+      <tr><td>Parse and cross-check</td><td><code>LoadPackParsed</code>: <code>ExpeditionContent.Parse</code>, <code>WorldContent.Parse</code>, <code>JsonUtility.FromJson&lt;MediaDefinition&gt;</code>, then <code>World.Validate(pack)</code>, <code>MediaDefinition.Validate</code> and, with dialogue, <code>CircuitRules.ValidateDialogueMedia</code></td><td>A parser's exception, or all validation messages joined into one <code>InvalidDataException</code>; its message goes to <code>failure</code></td></tr>
+      <tr><td>Identify the combat content</td><td>SHA-256 of the combat JSON into <code>ActiveCombatHash</code> and <code>LoadedContentPack.CombatHash</code></td><td>—</td></tr>
+    </table></div>
+    <h3>Paths that cannot escape</h3>
+    <p><code>SafeRelativePath</code> accepts a forward-slash relative path of at most 240 characters with no <code>\</code>, <code>:</code>, <code>%</code>, <code>?</code>, <code>#</code>, leading <code>/</code>, empty segment, <code>.</code> or <code>..</code>. <code>Location(root, relative)</code> then builds the URL: for a <code>jar:</code> root (Android) it escapes each segment; for a folder it checks that the full path stays inside the root and that no folder or file on the way is a reparse point (link or junction). Every read of a pack media file (<code>CardArtworkCache</code>, <code>ExpeditionApp.ReadAudio</code>, the Circuit's voice and music) goes through <code>Location</code>; the practice guide's WAVs in <code>StreamingAssets/Circuit/Voice</code> are checked by <code>PracticeNarration</code>'s own file-name rule instead.</p>
+    <h3>The parsers</h3>
+    <ul>
+      <li><code>ExpeditionContent.Parse(json)</code> maps private authoring DTOs (<code>AuthoredPack</code>, <code>AuthoredCard</code>, …) to a <code>ContentPack</code>, reads enum names strictly (<code>ReadEnum</code> rejects unknown names), runs <code>ContentPack.Validate</code> and <code>CreateCatalog</code>, and throws on any error. Under <code>CARDFORGE_HEADLESS</code> it deserializes with <code>System.Text.Json</code>; otherwise with <code>JsonUtility</code>.</li>
+      <li><code>WorldContent.Parse(json)</code> maps <code>WorldDto</code> to a <code>WorldDefinition</code> and runs <code>WorldDefinition.Validate</code>. It always calls <code>JsonUtility</code>; Content Studio's headless build supplies that name through <code>Tools/ContentStudio/UnityBoundary.cs</code>. <code>WorldContent.Serialize</code> is the reverse.</li>
+      <li>Under <code>CARDFORGE_HEADLESS</code>, <code>ContentPackFiles</code> keeps <code>ParseManifest</code>, <code>SafeRelativePath</code>, <code>Location</code> and the media schema but leaves out <code>DefaultRoot</code>, <code>Load</code>, <code>LoadDialogue</code> and <code>Read</code>.</li>
+    </ul>
+  </section>
+
+  <section id="limits"><h2><span class="num">05</span>Size caps, timeouts and content hashes</h2>
+    <p class="lead">Each limit is enforced where the bytes enter, not in one place. These are the values in code on <code>main</code>.</p>
+    <div class="scrollx"><table>
+      <tr><th>Where</th><th>Limit</th></tr>
+      <tr><td><code>ContentPackFiles.Read</code> (manifest, combat, world, media, dialogue)</td><td>8 MiB per file, checked while downloading and again at the end; 15 s request timeout; a leading byte-order mark is trimmed</td></tr>
+      <tr><td><code>MediaDefinition.Validate</code></td><td>At most 8192 assets; IDs at most 128 characters and unique; paths start with <code>media/</code>; volume 0–1; atlas 1–64 columns and rows</td></tr>
+      <tr><td><code>MenuPaletteDefinition.Validate</code></td><td>At most 16 palettes</td></tr>
+      <tr><td><code>CardArtworkCache</code></td><td>Images at most 4096 px a side; all resident artwork together at most <code>BudgetBytes</code> (96 MiB, counted as 4 bytes a texel over every mip); 10 s timeout</td></tr>
+      <tr><td><code>ExpeditionApp.InitializeMedia</code></td><td>At most 32 <code>Sound</code> assets; each at most 20 s and named after a known cue family</td></tr>
+      <tr><td><code>IsometricSlice.InitializeCircuitMusic</code></td><td>Circuit music between 0.1 s and 600 s</td></tr>
+      <tr><td><code>PracticeNarration</code></td><td><code>lines.json</code> version 1, at most 2048 lines, WAV file names only</td></tr>
+      <tr><td>Content Studio (<code>PackValidation.CheckSizes</code>, <code>ImportMedia</code>, <code>Zip</code>)</td><td>4 MiB per JSON document; 64 MiB per media file; 512 MiB of media per export</td></tr>
+    </table></div>
+    <h3>Content hashes</h3>
+    <div class="scrollx"><table>
+      <tr><th>Hash</th><th>Of what</th><th>Used by</th></tr>
+      <tr><td><code>LoadedContentPack.CombatHash</code> / <code>ContentPackFiles.ActiveCombatHash</code></td><td>SHA-256 of the combat JSON text only (not world, media or dialogue)</td><td><code>ExpeditionApp.TrustedCombatHash</code> for trusted server matches, and <code>IsometricSlice.Versus</code> when joining a trusted lobby</td></tr>
+      <tr><td><code>IsometricSlice.lobbyContentHash</code></td><td>SHA-256 of <code>Circuit/locations.json</code></td><td>Sent with <code>JoinLobbyTrusted</code></td></tr>
+      <tr><td><code>ExpeditionFingerprint.Compute</code></td><td>The catalog, deck presets and match rules</td><td>The network handshake and the Android <code>BuildIdentity</code> (<code>IsometricSliceBuild.AndroidContentIdentity</code>)</td></tr>
+      <tr><td><code>Tools/Package-Isometric.ps1 -ReviewCandidate</code></td><td>SHA-256 of every canonical file in the pack, the five sidecars, <code>Voice/</code> and <code>sector.json</code></td><td>Refuses a player whose <code>StreamingAssets</code> holds a missing, changed or extra file</td></tr>
+    </table></div>
+    <p>Menu palette colours are in none of the network hashes (the combat hash, the lobby hash or the fingerprint), so a palette cannot split online play; the review-candidate check does hash <code>media.json</code>. What the network does with the hashes is on <a href="networking.html">Networking</a>.</p>
+  </section>
+
+  <section id="sidecars"><h2><span class="num">06</span>The Circuit sidecars and the sector file</h2>
+    <p class="lead">The sidecars carry Circuit data the pack format does not model. They are always read from <code>StreamingAssets/Circuit</code>, never from the pack root, so a <code>-content-pack</code> folder cannot change them.</p>
+    <div class="scrollx"><table>
+      <tr><th>File</th><th>Read into</th><th>Required</th></tr>
+      <tr><td><code>card-guide.json</code></td><td><code>CircuitGuide</code>; must describe every pack card exactly once, and supplies archetypes, starters and opponent encounter IDs</td><td>Yes</td></tr>
+      <tr><td><code>locations.json</code></td><td><code>CircuitPlaces</code>; every layout must pass <code>SectorNavigation.Validate</code>; also hashed for the lobby</td><td>Yes</td></tr>
+      <tr><td><code>journey.json</code></td><td><code>CircuitJourney</code>; learning policy and solo perks</td><td>Yes</td></tr>
+      <tr><td><code>practice.json</code></td><td>Raw JSON kept as <code>practiceContentJson</code></td><td>No; a failure logs a warning and uses the built-in guide</td></tr>
+      <tr><td><code>lessons.json</code></td><td><code>CardForge.Lessons.LessonLibrary</code></td><td>No; same fallback</td></tr>
+      <tr><td><code>Voice/lines.json</code> and <code>Voice/*.wav</code></td><td><code>PracticeNarration.VoicePack</code></td><td>No; a missing or stale recording leaves the instruction silent</td></tr>
+    </table></div>
+    <p><code>CircuitText</code> is a coroutine that reads one file and either sets <code>Error</code> (required) or logs a warning (optional). <code>Content/Exploration/sector.json</code> is read by <code>IsometricSlice.Start</code> with its own request (not <code>CircuitText</code>), and a failure sets <code>Error</code> as for a required sidecar; its <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Content/Exploration/README.md">README</a> explains why the file must stay even though editing it changes nothing a player sees. Designer-facing settings in <code>locations.json</code> are described in <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CIRCUIT_PRESENTATION.md#designer-settings-without-unity">designer settings without Unity</a>.</p>
+    <p><code>ResolveCircuitDialogue</code> decides where dialogue comes from: the pack's declared document if <code>Load</code> returned one; an error if the manifest declared one that is missing; otherwise the bundled <code>StreamingAssets/Content/circuit-dialogue.json</code> through <code>LoadDialogue</code>.</p>
+  </section>
+
+  <section id="staging"><h2><span class="num">07</span>Staging into StreamingAssets at build</h2>
+    <p class="lead"><code>StreamingAssets/Content</code>, <code>/Circuit</code> and <code>/Exploration</code> are listed in <code>.gitignore</code>. <code>IsometricSliceBuild</code> recreates them from <code>Content/</code> before every scene creation, build and editor stage; each method validates its inputs before it copies anything.</p>
+    <div class="scrollx"><table>
+      <tr><th>Method</th><th>Validates</th><th>Copies</th></tr>
+      <tr><td><code>StageSector</code></td><td><code>SectorNavigation.Validate</code> on <code>sector.json</code></td><td><code>sector.json</code> → <code>StreamingAssets/Exploration</code></td></tr>
+      <tr><td><code>StageEncounterContent</code></td><td><code>ParseManifest</code>, both parsers, <code>World.Validate</code>, <code>MediaDefinition.Validate</code>, the declared dialogue, and that every non-blank media path names an existing file</td><td>Every pack file except <code>.meta</code> files and dot-named files or folders → <code>StreamingAssets/Content</code>. It overwrites but never deletes, so unrelated staged files stay.</td></tr>
+      <tr><td><code>StageCircuit</code></td><td><code>LessonRules.Validate</code> against the pack's catalog and match rules, and that all five sidecars exist</td><td>The five sidecars and <code>Voice/*.wav</code> plus <code>Voice/lines.json</code> → <code>StreamingAssets/Circuit</code>; deletes the retired <code>StreamingAssets/Circuit/dialogue.json</code></td></tr>
+    </table></div>
+    <p>All three run, in that order, from the menu <span class="kbd">Bloomfire Circuit ▸ Stage content for editor</span> (<code>StageCircuitContent</code>), from <code>CreateScene</code>, and from <code>Build</code>. An Android build also checks that the staged <code>expedition-content.json</code> hashes to the <code>BuildIdentity.ContentSha256</code> it computed before staging. The build menus and packaging are on <a href="builds.html">Builds &amp; Tools</a>.</p>
+    <div class="note rule">Never edit the staged <code>StreamingAssets</code> copy; the next stage overwrites it. <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/MAINTAINING.md#ownership">MAINTAINING ownership</a> names <code>Content</code> as the owner of pack data, media and sidecars.</div>
+  </section>
+
+  <section id="media"><h2><span class="num">08</span>Media: media.json, artwork leases and audio</h2>
+    <p class="lead"><code>media.json</code> is a <code>MediaDefinition</code>: a list of <code>MediaAssetDefinition</code> records (<code>Id</code>, <code>Kind</code>, <code>Path</code>, <code>Volume</code>, <code>Loop</code>, atlas cell, optional <code>Transcript</code>) and one <code>MediaThemeDefinition</code>. Everything else refers to media by ID. A blank <code>Path</code> is a deliberate placeholder.</p>
+    <div class="scrollx"><table>
+      <tr><th>Kind</th><th>Consumer</th><th>How it is used</th></tr>
+      <tr><td><code>CardArt</code>, <code>Portrait</code></td><td><code>CardArtworkCache.Lease</code></td><td>Texture plus a sprite cut from the atlas cell (<code>CardArtworkCache.TryCell</code>, one-texel inset for multi-cell sheets). <code>ExpeditionView.ApplyExternalTheme</code> turns <code>CardArt</code> sprites into <code>CardArtworkOverride</code>s by card ID; the Circuit uses them through <code>TravellerPictures.ConfigureArtwork</code>.</td></tr>
+      <tr><td><code>Artwork</code></td><td><code>CardArtworkCache.Lease</code></td><td>Texture only, no sprite: backdrops (<code>Theme.BackdropId</code>), choice pictures (cropped to the atlas cell when drawn) and Waybook art slots.</td></tr>
+      <tr><td><code>Music</code></td><td><code>ExpeditionApp.Media</code> and <code>IsometricSlice.Audio</code></td><td>A hosted session cross-fades two sources between <code>Theme.MusicMenuId</code>, <code>MusicJourneyId</code>, <code>MusicBattleId</code>, <code>MusicBossId</code> and <code>MusicVictoryId</code>, except when it sits inside the world (<code>UsesWorldPresentation</code>). The world plays one source (looping when the asset's <code>Loop</code> is set): <code>music.circuit</code>, else the journey music, ducked while a voice or practice runs.</td></tr>
+      <tr><td><code>Voice</code></td><td><code>IsometricSlice.Audio</code></td><td><code>PresentCircuitVoice</code> plays a line's <code>AudioId</code> only when <code>MatchesTranscript</code> is true. With the <code>SpokenHelp</code> setting on, <code>CircuitGuideForText</code> finds <code>voice.guide.*</code> records whose transcript equals the focused button's text.</td></tr>
+      <tr><td><code>Sound</code></td><td><code>GameAudioDirector.OverrideCue</code></td><td>Replaces one built-in cue family loaded from <code>Resources/DuelAudio</code>; the ID is <code>sound.&lt;family&gt;</code> or the bare family name.</td></tr>
+    </table></div>
+    <h3>Artwork leases</h3>
+    <p><code>CardArtworkCache</code> keeps one static dictionary of decoded images keyed by URL. Each caller takes a <code>Lease</code> with <code>Acquire(root, media)</code>; the lease borrows entries (incrementing <code>Users</code>), owns its own sprites, and on <code>Dispose</code> releases them. The world (<code>IsometricSlice.worldArtwork</code>) and each hosted session (<code>ExpeditionApp.mediaArtwork</code>) hold separate leases, so a battle inside the world reuses the world's textures without decoding them again.</p>
+    <div class="diagram"><pre class="mermaid">
+sequenceDiagram
+  participant W as IsometricSlice
+  participant L1 as Lease (world)
+  participant C as CardArtworkCache.images
+  participant L2 as Lease (session)
+  participant A as ExpeditionApp
+  W-&gt;&gt;L1: Acquire(loaded.Root, loaded.Media)
+  W-&gt;&gt;L1: Load()
+  L1-&gt;&gt;C: LoadRequest(url), Users = 1
+  C--&gt;&gt;L1: Finish checks 4096 px and the 96 MiB budget
+  A-&gt;&gt;L2: Acquire(LoadedPack.Root, LoadedPack.Media)
+  A-&gt;&gt;L2: Load()
+  L2-&gt;&gt;C: same url found, Users = 2
+  A-&gt;&gt;L2: Dispose() from DisposeMedia
+  L2-&gt;&gt;C: Users = 1, texture stays
+  W-&gt;&gt;L1: Dispose() from OnDestroy
+  L1-&gt;&gt;C: Users = 0, destroy texture, remove entry
+</pre></div>
+    <p class="caption">Two leases sharing one decoded image. A download in flight is owned by the shared entry, not by either coroutine, so closing one lease does not cancel the other's image.</p>
+    <p>The practice guide is separate from <code>media.json</code>: <code>PracticeNarration</code> reads <code>StreamingAssets/Circuit/Voice/lines.json</code> and matches each line's <code>Text</code> to the current practice instruction. Artist rules for portraits and recordings are in <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CIRCUIT_PRESENTATION.md#circuit-speaker-portraits-and-recordings">Circuit speaker portraits and recordings</a> and the <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Tools/ContentStudio/PACK_CONTRACT.md#media">pack contract's media section</a>.</p>
+  </section>
+
+  <section id="palettes"><h2><span class="num">09</span>Menu roles and palettes from the pack</h2>
+    <p class="lead">A pack can recolour the menus without code. The colours live in <code>media.json</code> under <code>Theme</code>; the code that applies them is <code>DuelUi.MenuColour</code>, one static table read by both uGUI stacks.</p>
+    <ul>
+      <li><b>Schema.</b> <code>MediaThemeDefinition.MenuPalettes</code> holds <code>MenuPaletteDefinition</code>s; <code>MenuPalette</code> names the one in use and <code>SelectedMenuPalette</code> finds it (empty means none). <code>ThemeColour(role)</code> returns the palette's colour for one of the five Theme roles, else the Theme's own. <code>WaybookPalette</code> lets a palette choose the book's garden or berry palette.</li>
+      <li><b>Allowed roles.</b> <code>MenuPaletteDefinition.ThemeRoles</code> (the five Theme colours) and <code>MenuPaletteDefinition.MenuRoles</code> (the settable, non-High-Contrast roles in <code>DuelUi.MenuColour</code>). <code>MenuPaletteDefinition.Validate</code> rejects anything else, so a bad palette fails the pack load.</li>
+      <li><b>Trying one without editing.</b> <code>-menu-palette &lt;id&gt;</code> sets <code>ContentPackFiles.MenuPaletteOverride</code>; <code>LoadPackParsed</code> writes it into <code>Theme.MenuPalette</code> before validation.</li>
+      <li><b>Applying.</b> <code>DuelUi.MenuColour.Use(palette)</code> is called by <code>IsometricSlice.LoadCircuit</code> and <code>ExpeditionView.ApplyExternalTheme</code> as each stack loads its pack. <code>UseHighContrast</code> is called from <code>ExpeditionApp.ApplyRuntimePreferences</code>. <code>Resolve</code> resets every role to its captured literal (<code>Builtin</code>), then, unless High Contrast is on, writes the palette's colours, keeping each role's own alpha.</li>
+      <li><b>The Waybook.</b> <code>Theme.Waybook</code> is a <code>WaybookPresentationDefinition</code> (copy, palette, mascot, note style and <code>ArtSlots</code> bound to <code>ArtRoles</code>); <code>IsometricSlice.Waybook</code> reads it as <code>WaybookStyle</code>.</li>
+    </ul>
+    <p>The rules for which role a menu site takes, and what a palette does not reach yet, are owned by <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CIRCUIT_PRESENTATION.md#menu-roles">Menu roles</a>. How the menus themselves are built is on <a href="ui.html">UI &amp; Menus</a>.</p>
+  </section>
+
+  <section id="studio"><h2><span class="num">10</span>Content Studio</h2>
+    <p class="lead"><code>Tools/ContentStudio</code> is one .NET 10 project (<code>ContentStudio.csproj</code>, assembly <code>EmberGrove.ContentStudio</code>). It compiles the toolkit's Functional, Core, Progression and Circuit folders and the three content files by path, with <code>CARDFORGE_HEADLESS</code> and the <code>UnityBoundary.cs</code> stand-in for <code>JsonUtility</code> and <code>Resources</code>.</p>
+    <div class="grid c2">
+      <div class="card accent-cyan"><h4>Desktop host</h4><p>Built with <code>-p:StudioDesktop=true</code> (adds <code>STUDIO_DESKTOP</code>, WinForms and WebView2). <code>DesktopHost</code> intercepts the page's requests to <code>https://cardforge.invalid</code> in process and passes them to <code>Program.Request</code>; no socket is opened. Default folder: <code>Documents/CardForge/WorkingPacks/EmberGrove</code>.</p></div>
+      <div class="card accent-gold"><h4>Loopback server</h4><p>The default build, or the desktop executable with <code>--serve</code>. <code>RunServer</code> starts an <code>HttpListener</code> on <code>http://127.0.0.1:47831</code> (or <code>--port</code>), refuses non-loopback callers and routes to the same <code>Program.Request</code>.</p></div>
+    </div>
+    <div class="scrollx"><table>
+      <tr><th>Endpoint</th><th>Does</th></tr>
+      <tr><td><code>GET /api/pack</code></td><td>The documents (<code>StudioDocuments</code>), a SHA-256 <code>Revision</code>, the folder and the schema lists (enum names, palette and Waybook roles taken from CardForge)</td></tr>
+      <tr><td><code>POST /api/validate</code></td><td><code>PackValidation.Run</code>: Studio's own field checks plus <code>ExpeditionContent.Parse</code>, <code>WorldContent.Parse</code>, <code>World.Validate</code> and <code>CircuitRules.ValidateDialogueMedia</code>; returns errors, warnings and issues that point at a record and field</td></tr>
+      <tr><td><code>POST /api/save</code></td><td>Refuses invalid drafts and a stale <code>ExpectedRevision</code>; copies every touched document into <code>.studio-backups/&lt;UTC&gt;</code>, writes <code>*.studio-tmp</code>, moves each into place, and restores the old bytes if any step fails</td></tr>
+      <tr><td><code>POST /api/export</code></td><td>A ZIP of the documents and every referenced media file</td></tr>
+      <tr><td><code>GET</code>/<code>POST /api/media</code></td><td>Preview a media file; import one (refuses different bytes at an existing path)</td></tr>
+    </table></div>
+    <p>Every <code>/api/</code> call needs the session token (the <code>X-Studio-Token</code> header, or a <code>token</code> query value on a GET), which <code>WebResource</code> writes into the page. Studio is stricter than the game in places: <code>CheckManifest</code> requires the canonical document names, <code>CheckCircuit</code> requires the dialogue file to be <code>circuit-dialogue.json</code>, and documents are capped at 4 MiB instead of 8.</p>
+    <div class="scrollx"><table>
+      <tr><th>Script</th><th>Does</th></tr>
+      <tr><td><code>Start-Studio.ps1</code></td><td>In the repository: regenerates the handbook and runs the project from source on <code>Content/EmberGroveDefault</code> itself (so a save edits the canonical pack); <code>-Browser</code> uses the loopback server. Outside the repository: runs the published executable on the working folder.</td></tr>
+      <tr><td><code>Publish-Studio.ps1</code></td><td>A self-contained single-file win-x64 build into a new, empty folder (default <code>Builds/CardForgeStudio</code>), with <code>sample/</code> copied from the pack, the README, the handbook and optional manuals</td></tr>
+      <tr><td><code>check_current_catalog.ps1</code></td><td>The <code>Studio</code> suite of <code>Tools/Run-Checks.ps1</code></td></tr>
+    </table></div>
+    <p>Controls, recovery and boundaries are owned by the <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Tools/ContentStudio/README.md">Studio README</a>; the transport and API contract by <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Tools/ContentStudio/PACK_CONTRACT.md#studio-workspace-and-transport">Studio workspace and transport</a>; the creator loop by <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/TOOLKIT_AUTHORING_GUIDE.md#author-preview-validate-save">Author, preview, validate, save</a>.</p>
+  </section>
+
+  <section id="circuitstudio"><h2><span class="num">11</span>CircuitStudio and the Card Workshop</h2>
+    <p class="lead"><code>Tools/CircuitStudio</code> is not a .NET project. It holds two offline HTML tools that open a JSON file and download an edited copy (they never write the source), their Node checks, and a launcher that runs Content Studio on the canonical pack.</p>
+    <div class="scrollx"><table>
+      <tr><th>File</th><th>What it is</th></tr>
+      <tr><td><code>index.html</code>, <code>studio.js</code>, <code>dialogue-model.js</code></td><td>Circuit Studio — Dialogue: opens <code>circuit-dialogue.json</code>, edits speakers and conversations, previews branches against a player's progress, downloads the result. Content Studio owns pack dialogue editing; this page keeps the branch simulation.</td></tr>
+      <tr><td><code>lessons.html</code>, <code>lessons.js</code></td><td>The lesson workshop: opens <code>Content/Circuit/lessons.json</code> and a card catalog, validates, downloads <code>lessons.json</code> to be copied back by hand</td></tr>
+      <tr><td><code>check.cjs</code>, <code>lessons-check.cjs</code></td><td>The <code>DialogueModel</code> and <code>LessonModel</code> suites of <code>Tools/Run-Checks.ps1</code></td></tr>
+      <tr><td><code>Start-CardWorkshop.ps1</code>, <code>Open-CardWorkshop.cmd</code></td><td>Builds Content Studio from current sources into <code>Temp/CurrentCardWorkshop/&lt;fingerprint&gt;</code> and serves <code>Content/EmberGroveDefault</code> on loopback from port 47841; <code>-Stop</code> stops the process it recorded in <code>session.json</code></td></tr>
+    </table></div>
+    <p>In Unity, <span class="kbd">CardForge ▸ Current Card Workshop</span> opens <code>CurrentCardWorkshop</code>, an <code>EditorWindow</code> that lists the catalog with <code>ExpeditionContent.Parse</code>, edits the table presentation prefab, and starts <code>Start-CardWorkshop.ps1</code> from its <b>Open rules in Content Studio</b> button.</p>
+  </section>
+
+  <section id="loose-ends"><h2><span class="num">12</span>Loose ends seen from this page</h2>
+    <p class="lead">Structural facts a fixer should know. The ranked list of problems is on <a href="findings.html">Findings</a>.</p>
+    <ul>
+      <li><b>Unused loaders.</b> <code>ExpeditionContent.Load</code> and <code>WorldContent.Load</code> read <code>Resources/Expedition/…</code>; nothing on <code>main</code> calls <code>ExpeditionContent.Load</code>, and the game's <code>Resources/Expedition</code> folder holds only <code>ExpeditionTheme.asset</code>.</li>
+      <li><b>Global statics.</b> <code>ContentPackFiles.ActiveCombatHash</code> and the palette inside <code>DuelUi.MenuColour</code> are process-wide and belong to whichever pack loaded last; <code>ContentPackFiles.MenuPaletteOverride</code> is a settable static read from the command line.</li>
+      <li><b>Rules written twice.</b> Studio's <code>CheckMenuPalettes</code> and <code>CheckWaybook</code> in <code>Program.cs</code> repeat the rules of <code>MenuPaletteDefinition.Validate</code> and <code>WaybookPresentationDefinition.Validate</code> so each message can name a field; only the role lists are shared.</li>
+      <li><b>Two override stories.</b> The pack can be replaced at run time; the sidecars and sector cannot, yet <code>card-guide.json</code> must describe exactly the pack's cards, so a review pack that changes the card set fails at start-up.</li>
+      <li><b>Repeated loads.</b> Every hosted session reloads and revalidates the whole pack (<a href="sessions.html">Hosted Sessions</a>).</li>
+      <li><b>A stale guide.</b> <code>Docs/Concepts/AUDIO_DESIGN.md</code> (Integration) still names <code>DuelAudioDirector</code>; the class on <code>main</code> is <code>GameAudioDirector</code>.</li>
+    </ul>
+  </section>
+
+  <div class="honest"><h4>Keep this page honest</h4><ul>
+    <li><code>Toolkit/Packages/com.catsplat.cardforge/Runtime/Content/ContentPackFiles.cs</code> — manifest, media and palette schema, <code>DefaultRoot</code>, <code>Load</code>, <code>SafeRelativePath</code>, <code>Location</code>, the 8 MiB cap and the combat hash</li>
+    <li><code>Toolkit/Packages/com.catsplat.cardforge/Runtime/Content/ExpeditionContent.cs</code>, <code>WorldContent.cs</code> — the two parsers and the unused <code>Load</code> methods</li>
+    <li><code>Game/EmberGrove/Assets/Runtime/Exploration/IsometricSlice.Circuit.cs</code> — <code>CircuitText</code>, <code>LoadCircuit</code>, <code>CircuitContentRoot</code>, <code>ResolveCircuitDialogue</code>, <code>lobbyContentHash</code></li>
+    <li><code>Game/EmberGrove/Assets/Runtime/Exploration/IsometricSlice.cs</code> — start-up order and lease disposal</li>
+    <li><code>Game/EmberGrove/Assets/Editor/IsometricSliceBuild.cs</code> — <code>StageSector</code>, <code>StageEncounterContent</code>, <code>StageCircuit</code>, <code>AndroidContentIdentity</code></li>
+    <li><code>Game/EmberGrove/Assets/Runtime/CardArtworkCache.cs</code>, <code>ExpeditionApp.Media.cs</code>, <code>ExpeditionView.Media.cs</code>, <code>GameAudioDirector.cs</code>, <code>PracticeNarration.cs</code>, <code>Exploration/IsometricSlice.Audio.cs</code> — media consumers and their limits</li>
+    <li><code>Game/EmberGrove/Assets/Runtime/DuelUi.cs</code> — <code>MenuColour.Use</code>, <code>UseHighContrast</code>, <code>Resolve</code></li>
+    <li><code>Tools/ContentStudio/Program.cs</code>, <code>DesktopHost.cs</code>, <code>ContentStudio.csproj</code>, <code>Start-Studio.ps1</code>, <code>Publish-Studio.ps1</code> — Studio hosts, API, validation, save and export</li>
+    <li><code>Tools/CircuitStudio/*</code> and <code>Game/EmberGrove/Assets/Editor/CurrentCardWorkshop.cs</code> — the standalone pages and the workshop launcher</li>
+    <li><code>Tools/Package-Isometric.ps1</code> — the review-candidate content hash check</li>
+  </ul></div>
+</main>
+<footer>Bloomfire Wiki · page source <code>Docs/Wiki/content.html</code>, built by <code>Tools/Documentation/structure_wiki.py</code> · Found a mistake? Fix it in the same commit as the code that made it one.</footer>
+</body>
+</html>

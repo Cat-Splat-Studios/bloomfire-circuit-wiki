@@ -1,0 +1,2377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Diagrams — Bloomfire Wiki</title>
+<link rel="stylesheet" href="wiki.css">
+<script src="mermaid.min.js" defer></script>
+<script src="wiki.js" defer></script>
+</head>
+<body>
+<nav class="wiki">
+  <a class="home" href="index.html">🔥 Bloomfire Wiki</a>
+  <div class="grp"><span class="grp-t">Start here</span>
+    <a href="codebase-tour.html">Codebase Tour</a>
+    <a href="glossary.html">Glossary</a>
+  </div>
+  <div class="grp"><span class="grp-t">Game systems</span>
+    <a href="rules.html">Rules Engine</a>
+    <a href="world.html">World &amp; Journal</a>
+    <a href="sessions.html">Hosted Sessions</a>
+    <a href="ui.html">UI &amp; Menus</a>
+    <a href="networking.html">Networking</a>
+    <a href="content.html">Content &amp; Media</a>
+    <a href="saves.html">Saves &amp; Settings</a>
+  </div>
+  <div class="grp"><span class="grp-t">Code health</span>
+    <a class="on" href="diagrams.html">Diagrams</a>
+    <a href="complexity.html">Complexity</a>
+    <a href="findings.html">Findings</a>
+  </div>
+  <div class="grp"><span class="grp-t">Ship &amp; maintain</span>
+    <a href="qa.html">QA &amp; Rehearsals</a>
+    <a href="builds.html">Builds &amp; Tools</a>
+    <a href="maintaining.html">Maintaining</a>
+  </div>
+</nav>
+<header class="page"><h1>The code as <span class="flame">diagrams</span></h1><p class="tag">Assemblies, tool projects, classes and partial classes, drawn from the tracked sources on every build.</p></header>
+<main>
+<p class="lead"><b>This page is GENERATED</b> by <code>Tools/Documentation/structure_wiki.py</code> from the C#, <code>.asmdef</code> and <code>.csproj</code> files Git tracks; there is no page source. Change the code or the generator and rebuild (<a href="maintaining.html#build">maintaining.html §01</a>). The reader sees declarations only: it does not compile, it reads every <code>#if</code> branch as present, and it places a type name by namespace and assembly the way C# does in the simple cases, leaving out any reference it cannot place.</p>
+<section id="assemblies"><h2><span class="num">01</span>Unity assemblies</h2>
+<p class="lead">Every <code>.asmdef</code> in the repository, plus the two assemblies Unity makes for the game's own scripts, which have no <code>.asmdef</code>. An arrow means “references”. Types counts include nested types.</p>
+<div class="scrollx"><table>
+<tr><th>Assembly</th><th>Folder</th><th>References</th><th>Compiled for</th><th>UnityEngine</th><th class="num">C# files</th><th class="num">Types</th></tr>
+<tr><td><code>EmberGrove.Networking</code></td><td><code>Teaching/LegacyEditor</code></td><td><code>CardForge.Functional</code> · not found in tracked sources: <code>EmberGrove.Core</code></td><td>outside the package and the game project</td><td>no</td><td class="num">0</td><td class="num">0</td></tr>
+<tr><td><code>CardForge.Linker.Editor</code></td><td><code>Toolkit/Packages/com.catsplat.cardforge/Editor</code></td><td>none</td><td>Editor only</td><td>yes</td><td class="num">1</td><td class="num">1</td></tr>
+<tr><td><code>CardForge.Circuit</code></td><td><code>Toolkit/Packages/com.catsplat.cardforge/Runtime/Circuit</code></td><td><code>CardForge.Functional</code>, <code>EmberGrove.Expedition</code></td><td>all platforms</td><td>no</td><td class="num">4</td><td class="num">38</td></tr>
+<tr><td><code>CardForge.Content</code></td><td><code>Toolkit/Packages/com.catsplat.cardforge/Runtime/Content</code></td><td><code>CardForge.Functional</code>, <code>CardForge.Circuit</code>, <code>EmberGrove.Expedition</code>, <code>EmberGrove.Expedition.Progression</code></td><td>all platforms</td><td>yes</td><td class="num">3</td><td class="num">30</td></tr>
+<tr><td><code>EmberGrove.Expedition</code></td><td><code>Toolkit/Packages/com.catsplat.cardforge/Runtime/Core</code></td><td><code>CardForge.Functional</code></td><td>all platforms</td><td>no</td><td class="num">6</td><td class="num">41</td></tr>
+<tr><td><code>CardForge.Exploration</code></td><td><code>Toolkit/Packages/com.catsplat.cardforge/Runtime/Exploration</code></td><td><code>CardForge.Functional</code></td><td>all platforms</td><td>no</td><td class="num">3</td><td class="num">7</td></tr>
+<tr><td><code>CardForge.Functional</code></td><td><code>Toolkit/Packages/com.catsplat.cardforge/Runtime/Functional</code></td><td>none</td><td>all platforms</td><td>no</td><td class="num">1</td><td class="num">2</td></tr>
+<tr><td><code>EmberGrove.Expedition.Networking</code></td><td><code>Toolkit/Packages/com.catsplat.cardforge/Runtime/Networking</code></td><td><code>CardForge.Functional</code>, <code>EmberGrove.Expedition</code>, <code>EmberGrove.Expedition.Progression</code></td><td>all platforms</td><td>no</td><td class="num">3</td><td class="num">37</td></tr>
+<tr><td><code>EmberGrove.Expedition.Progression</code></td><td><code>Toolkit/Packages/com.catsplat.cardforge/Runtime/Progression</code></td><td><code>EmberGrove.Expedition</code></td><td>all platforms</td><td>no</td><td class="num">5</td><td class="num">46</td></tr>
+<tr><td><code>CardForge.Samples</code></td><td><code>Toolkit/Packages/com.catsplat.cardforge/Samples~/MinimalTactics</code></td><td><code>CardForge.Functional</code>, <code>EmberGrove.Expedition</code>, <code>EmberGrove.Expedition.Progression</code>, <code>EmberGrove.Expedition.Networking</code></td><td>package sample, compiled only after a project imports it</td><td>no</td><td class="num">3</td><td class="num">3</td></tr>
+<tr><td><code>CardForge.Samples.Editor</code></td><td><code>Toolkit/Packages/com.catsplat.cardforge/Samples~/MinimalTactics/Editor</code></td><td><code>CardForge.Samples</code>, <code>CardForge.Linker.Editor</code></td><td>package sample, compiled only after a project imports it</td><td>yes</td><td class="num">1</td><td class="num">1</td></tr>
+<tr><td><code>Assembly-CSharp</code> (no .asmdef)</td><td><code>Game/EmberGrove/Assets</code></td><td><code>CardForge.Circuit</code>, <code>CardForge.Content</code>, <code>CardForge.Exploration</code>, <code>CardForge.Functional</code>, <code>EmberGrove.Expedition</code>, <code>EmberGrove.Expedition.Networking</code>, <code>EmberGrove.Expedition.Progression</code></td><td>game scripts outside Editor folders</td><td>yes</td><td class="num">87</td><td class="num">133</td></tr>
+<tr><td><code>Assembly-CSharp-Editor</code> (no .asmdef)</td><td><code>Game/EmberGrove/Assets</code></td><td><code>Assembly-CSharp</code>, <code>CardForge.Circuit</code>, <code>CardForge.Content</code>, <code>CardForge.Exploration</code>, <code>CardForge.Functional</code>, <code>CardForge.Linker.Editor</code>, <code>EmberGrove.Expedition</code>, <code>EmberGrove.Expedition.Networking</code>, <code>EmberGrove.Expedition.Progression</code></td><td>game scripts in Editor folders, Editor only</td><td>yes</td><td class="num">2</td><td class="num">10</td></tr>
+</table></div>
+
+<h3 id="assemblies-package">The CardForge package</h3>
+<div class="diagram"><pre class="mermaid">
+flowchart LR
+  subgraph g_Runtime[&quot;Runtime&quot;]
+    a_CardForge_Circuit[&quot;CardForge.Circuit&lt;br/&gt;Runtime/Circuit&lt;br/&gt;no UnityEngine&quot;]
+    a_CardForge_Content[&quot;CardForge.Content&lt;br/&gt;Runtime/Content&lt;br/&gt;uses UnityEngine&quot;]
+    a_EmberGrove_Expedition[&quot;EmberGrove.Expedition&lt;br/&gt;Runtime/Core&lt;br/&gt;no UnityEngine&quot;]
+    a_CardForge_Exploration[&quot;CardForge.Exploration&lt;br/&gt;Runtime/Exploration&lt;br/&gt;no UnityEngine&quot;]
+    a_CardForge_Functional[&quot;CardForge.Functional&lt;br/&gt;Runtime/Functional&lt;br/&gt;no UnityEngine&quot;]
+    a_EmberGrove_Expedition_Networking[&quot;EmberGrove.Expedition.Networking&lt;br/&gt;Runtime/Networking&lt;br/&gt;no UnityEngine&quot;]
+    a_EmberGrove_Expedition_Progression[&quot;EmberGrove.Expedition.Progression&lt;br/&gt;Runtime/Progression&lt;br/&gt;no UnityEngine&quot;]
+  end
+  subgraph g_Editor[&quot;Editor&quot;]
+    a_CardForge_Linker_Editor[&quot;CardForge.Linker.Editor&lt;br/&gt;Editor&lt;br/&gt;uses UnityEngine&quot;]
+  end
+  subgraph g_Samples___imported_on_request[&quot;Samples~, imported on request&quot;]
+    a_CardForge_Samples[&quot;CardForge.Samples&lt;br/&gt;Samples~/MinimalTactics&lt;br/&gt;no UnityEngine&quot;]
+    a_CardForge_Samples_Editor[&quot;CardForge.Samples.Editor&lt;br/&gt;Samples~/MinimalTactics/Editor&lt;br/&gt;uses UnityEngine&quot;]
+  end
+  a_CardForge_Circuit --&gt; a_CardForge_Functional
+  a_CardForge_Circuit --&gt; a_EmberGrove_Expedition
+  a_CardForge_Content --&gt; a_CardForge_Functional
+  a_CardForge_Content --&gt; a_CardForge_Circuit
+  a_CardForge_Content --&gt; a_EmberGrove_Expedition
+  a_CardForge_Content --&gt; a_EmberGrove_Expedition_Progression
+  a_EmberGrove_Expedition --&gt; a_CardForge_Functional
+  a_CardForge_Exploration --&gt; a_CardForge_Functional
+  a_EmberGrove_Expedition_Networking --&gt; a_CardForge_Functional
+  a_EmberGrove_Expedition_Networking --&gt; a_EmberGrove_Expedition
+  a_EmberGrove_Expedition_Networking --&gt; a_EmberGrove_Expedition_Progression
+  a_EmberGrove_Expedition_Progression --&gt; a_EmberGrove_Expedition
+  a_CardForge_Samples -.-&gt; a_CardForge_Functional
+  a_CardForge_Samples -.-&gt; a_EmberGrove_Expedition
+  a_CardForge_Samples -.-&gt; a_EmberGrove_Expedition_Progression
+  a_CardForge_Samples -.-&gt; a_EmberGrove_Expedition_Networking
+  a_CardForge_Samples_Editor -.-&gt; a_CardForge_Samples
+  a_CardForge_Samples_Editor -.-&gt; a_CardForge_Linker_Editor
+</pre></div>
+<p class="caption">From the <code>references</code> of each <code>.asmdef</code> under <code>Toolkit/Packages/com.catsplat.cardforge</code>. Dashed arrows belong to the sample, which Unity ignores until a project imports it.</p>
+
+<h3 id="assemblies-game">What the game compiles against</h3>
+<div class="diagram"><pre class="mermaid">
+flowchart LR
+  g_runtime[&quot;Assembly-CSharp&lt;br/&gt;Game/EmberGrove/Assets&lt;br/&gt;scripts outside Editor folders&quot;]
+  g_editor[&quot;Assembly-CSharp-Editor&lt;br/&gt;Game/EmberGrove/Assets&lt;br/&gt;scripts in Editor folders&quot;]
+  g_editor --&gt; g_runtime
+  subgraph g_package[&quot;CardForge package&quot;]
+    a_CardForge_Circuit[&quot;CardForge.Circuit&quot;]
+    a_CardForge_Content[&quot;CardForge.Content&quot;]
+    a_CardForge_Exploration[&quot;CardForge.Exploration&quot;]
+    a_CardForge_Functional[&quot;CardForge.Functional&quot;]
+    a_CardForge_Linker_Editor[&quot;CardForge.Linker.Editor&quot;]
+    a_EmberGrove_Expedition[&quot;EmberGrove.Expedition&quot;]
+    a_EmberGrove_Expedition_Networking[&quot;EmberGrove.Expedition.Networking&quot;]
+    a_EmberGrove_Expedition_Progression[&quot;EmberGrove.Expedition.Progression&quot;]
+  end
+  g_runtime --&gt; a_CardForge_Circuit
+  g_runtime --&gt; a_CardForge_Content
+  g_runtime --&gt; a_CardForge_Exploration
+  g_runtime --&gt; a_CardForge_Functional
+  g_runtime --&gt; a_EmberGrove_Expedition
+  g_runtime --&gt; a_EmberGrove_Expedition_Networking
+  g_runtime --&gt; a_EmberGrove_Expedition_Progression
+  g_editor --&gt; a_CardForge_Linker_Editor
+</pre></div>
+<p class="caption">Unity gives the game's own scripts every auto-referenced package assembly that is not Editor only; the editor assembly also gets the Editor-only ones. The game loads the package through a <code>file:</code> entry in <code>Game/EmberGrove/Packages/manifest.json</code>.</p>
+
+</section>
+<section id="tools"><h2><span class="num">02</span>The .NET tools and what they compile</h2>
+<p class="lead">No tool project references a Unity assembly. Each compiles toolkit or game source files directly by path, so a Unity assembly boundary is not a boundary here. Read from each tracked <code>.csproj</code>; package paths are shortened to the part after the package folder.</p>
+<div class="scrollx"><table>
+<tr><th>Project</th><th>SDK</th><th>Defines</th><th>Compiles from outside its folder</th><th>Own C# files</th><th>Project references</th></tr>
+<tr><td><code>Tools/CircuitChecks/CircuitChecks.csproj</code></td><td>Microsoft.NET.Sdk</td><td>—</td><td><code>Runtime/Functional/Result.cs</code><br><code>Runtime/Core/*.cs</code><br><code>Runtime/Circuit/*.cs</code></td><td>1</td><td>—</td></tr>
+<tr><td><code>Tools/CircuitContentChecks/CircuitContentChecks.csproj</code></td><td>Microsoft.NET.Sdk</td><td>—</td><td><code>Runtime/Functional/*.cs</code><br><code>Runtime/Core/*.cs</code><br><code>Runtime/Progression/*.cs</code><br><code>Runtime/Content/ExpeditionContent.cs</code><br><code>Runtime/Content/WorldContent.cs</code><br><code>Tools/ContentStudio/UnityBoundary.cs</code></td><td>1</td><td>—</td></tr>
+<tr><td><code>Tools/CircuitFieldSetupChecks/CircuitFieldSetupChecks.csproj</code></td><td>Microsoft.NET.Sdk</td><td>—</td><td><code>Runtime/Functional/*.cs</code><br><code>Runtime/Core/*.cs</code><br><code>Runtime/Progression/*.cs</code><br><code>Runtime/Content/ExpeditionContent.cs</code><br><code>Runtime/Content/WorldContent.cs</code><br><code>Tools/ContentStudio/UnityBoundary.cs</code><br><code>Temp/CircuitFieldSetupChecks/ActualSetup.cs</code> (not tracked)</td><td>1</td><td>—</td></tr>
+<tr><td><code>Tools/CircuitPersistenceChecks/CircuitPersistenceChecks.csproj</code></td><td>Microsoft.NET.Sdk</td><td><code>CIRCUIT_PERSISTENCE_PORTABLE</code></td><td><code>Runtime/Functional/Result.cs</code><br><code>Runtime/Core/*.cs</code><br><code>Runtime/Circuit/*.cs</code><br><code>Game/EmberGrove/Assets/Runtime/Exploration/CircuitPersistence.cs</code><br><code>Game/EmberGrove/Assets/Tests/CircuitPersistenceVerification.cs</code></td><td>1</td><td>—</td></tr>
+<tr><td><code>Tools/CircuitWorldChecks/CircuitWorldChecks.csproj</code></td><td>Microsoft.NET.Sdk</td><td>—</td><td><code>Runtime/Functional/Result.cs</code><br><code>Runtime/Core/*.cs</code><br><code>Runtime/Circuit/*.cs</code><br><code>Runtime/Exploration/*.cs</code><br><code>Game/EmberGrove/Assets/Runtime/Exploration/CircuitWorldLayout.cs</code></td><td>1</td><td>—</td></tr>
+<tr><td><code>Tools/CodeMetrics/CodeMetrics.csproj</code></td><td>Microsoft.NET.Sdk</td><td>—</td><td>—</td><td>1</td><td>—</td></tr>
+<tr><td><code>Tools/ContentStudio/ContentStudio.csproj</code></td><td>Microsoft.NET.Sdk</td><td><code>CARDFORGE_HEADLESS</code>, <code>STUDIO_DESKTOP (conditional)</code></td><td><code>Runtime/Functional/*.cs</code><br><code>Runtime/Core/*.cs</code><br><code>Runtime/Progression/*.cs</code><br><code>Runtime/Circuit/*.cs</code><br><code>Runtime/Content/ContentPackFiles.cs</code><br><code>Runtime/Content/ExpeditionContent.cs</code><br><code>Runtime/Content/WorldContent.cs</code></td><td>3</td><td>—</td></tr>
+<tr><td><code>Tools/ExpeditionNetworkChecks/ExpeditionNetworkChecks.csproj</code></td><td>Microsoft.NET.Sdk</td><td>—</td><td><code>Runtime/Networking/ExpeditionNetworkSession.cs</code></td><td>3</td><td><code>Tools/ExpeditionRelay/ExpeditionRelay.csproj</code></td></tr>
+<tr><td><code>Tools/ExpeditionPerformance/ExpeditionPerformance.csproj</code></td><td>Microsoft.NET.Sdk</td><td><code>BASELINE_CORE (conditional)</code></td><td><code>Runtime/Functional/Result.cs</code><br><code>Runtime/Core/*.cs</code><br><code>Runtime/Progression/*.cs</code><br><code>Runtime/Content/ExpeditionContent.cs</code><br><code>Runtime/Content/WorldContent.cs</code><br><code>Toolkit/Tests/ExpeditionCoreChecks.cs</code> (conditional)</td><td>3</td><td>—</td></tr>
+<tr><td><code>Tools/ExpeditionPerformance/WorldFactChecks.csproj</code></td><td>Microsoft.NET.Sdk</td><td>—</td><td><code>Runtime/Functional/Result.cs</code><br><code>Runtime/Core/*.cs</code><br><code>Runtime/Progression/*.cs</code><br><code>Runtime/Content/ExpeditionContent.cs</code><br><code>Runtime/Content/WorldContent.cs</code><br><code>Runtime/Networking/*.cs</code></td><td>2</td><td>—</td></tr>
+<tr><td><code>Tools/ExpeditionRelay/ExpeditionRelay.csproj</code></td><td>Microsoft.NET.Sdk.Web</td><td><code>CARDFORGE_HEADLESS</code></td><td><code>Runtime/Functional/Result.cs</code><br><code>Runtime/Core/*.cs</code><br><code>Runtime/Exploration/SectorDefinition.cs</code><br><code>Runtime/Exploration/SectorNavigation.cs</code><br><code>Runtime/Progression/*.cs</code><br><code>Runtime/Networking/ExpeditionAuthority.cs</code><br><code>Runtime/Networking/NetworkContracts.cs</code><br><code>Runtime/Content/ExpeditionContent.cs</code></td><td>4 (all in its folder)</td><td>—</td></tr>
+<tr><td><code>Tools/ExpeditionRelay/Launcher/EmberGroveRelay.csproj</code></td><td>Microsoft.NET.Sdk</td><td>—</td><td>—</td><td>3 (all in its folder)</td><td><code>Tools/ExpeditionRelay/ExpeditionRelay.csproj</code></td></tr>
+<tr><td><code>Tools/ExplorationChecks/ExplorationChecks.csproj</code></td><td>Microsoft.NET.Sdk</td><td>—</td><td><code>Runtime/Functional/Result.cs</code><br><code>Runtime/Exploration/*.cs</code></td><td>1</td><td>—</td></tr>
+<tr><td><code>Tools/LessonChecks/LessonChecks.csproj</code></td><td>Microsoft.NET.Sdk</td><td>—</td><td><code>Runtime/Functional/*.cs</code><br><code>Runtime/Core/*.cs</code><br><code>Runtime/Progression/*.cs</code><br><code>Runtime/Content/ExpeditionContent.cs</code><br><code>Runtime/Content/WorldContent.cs</code><br><code>Tools/ContentStudio/UnityBoundary.cs</code></td><td>1</td><td>—</td></tr>
+</table></div>
+
+<h3 id="tools-1">Tools 1: CircuitChecks, CircuitContentChecks, CircuitFieldSetupChecks, CircuitPersistenceChecks, CircuitWorldChecks</h3>
+<div class="diagram"><pre class="mermaid">
+flowchart LR
+  p_Tools_CircuitChecks_CircuitChecks_csproj[&quot;CircuitChecks&lt;br/&gt;Tools/CircuitChecks&quot;]
+  p_Tools_CircuitContentChecks_CircuitContentChecks_csproj[&quot;CircuitContentChecks&lt;br/&gt;Tools/CircuitContentChecks&quot;]
+  p_Tools_CircuitFieldSetupChecks_CircuitFieldSetupChecks_csproj[&quot;CircuitFieldSetupChecks&lt;br/&gt;Tools/CircuitFieldSetupChecks&quot;]
+  p_Tools_CircuitPersistenceChecks_CircuitPersistenceChecks_csproj[&quot;CircuitPersistenceChecks&lt;br/&gt;Tools/CircuitPersistenceChecks&quot;]
+  p_Tools_CircuitWorldChecks_CircuitWorldChecks_csproj[&quot;CircuitWorldChecks&lt;br/&gt;Tools/CircuitWorldChecks&quot;]
+  subgraph s_CardForge_package[&quot;CardForge package&quot;]
+    f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Circuit[&quot;Runtime/Circuit&lt;br/&gt;CardForge.Circuit&quot;]
+    f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Content[&quot;Runtime/Content&lt;br/&gt;CardForge.Content&quot;]
+    f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Core[&quot;Runtime/Core&lt;br/&gt;EmberGrove.Expedition&quot;]
+    f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Exploration[&quot;Runtime/Exploration&lt;br/&gt;CardForge.Exploration&quot;]
+    f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Functional[&quot;Runtime/Functional&lt;br/&gt;CardForge.Functional&quot;]
+    f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Progression[&quot;Runtime/Progression&lt;br/&gt;EmberGrove.Expedition.Progression&quot;]
+  end
+  subgraph s_Game[&quot;Game&quot;]
+    f_Game_EmberGrove_Assets_Runtime_Exploration[&quot;Game/EmberGrove/Assets/Runtime/Exploration&quot;]
+    f_Game_EmberGrove_Assets_Tests[&quot;Game/EmberGrove/Assets/Tests&quot;]
+  end
+  subgraph s_Temp__written_by_a_check_run[&quot;Temp, written by a check run&quot;]
+    f_Temp_CircuitFieldSetupChecks[&quot;Temp/CircuitFieldSetupChecks&quot;]
+  end
+  subgraph s_Tools[&quot;Tools&quot;]
+    f_Tools_ContentStudio[&quot;Tools/ContentStudio&quot;]
+  end
+  p_Tools_CircuitChecks_CircuitChecks_csproj --&gt;|&quot;Result.cs&quot;| f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Functional
+  p_Tools_CircuitChecks_CircuitChecks_csproj --&gt;|&quot;*.cs&quot;| f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Core
+  p_Tools_CircuitChecks_CircuitChecks_csproj --&gt;|&quot;*.cs&quot;| f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Circuit
+  p_Tools_CircuitContentChecks_CircuitContentChecks_csproj --&gt;|&quot;*.cs&quot;| f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Functional
+  p_Tools_CircuitContentChecks_CircuitContentChecks_csproj --&gt;|&quot;*.cs&quot;| f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Core
+  p_Tools_CircuitContentChecks_CircuitContentChecks_csproj --&gt;|&quot;*.cs&quot;| f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Progression
+  p_Tools_CircuitContentChecks_CircuitContentChecks_csproj --&gt;|&quot;ExpeditionContent.cs, WorldContent.cs&quot;| f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Content
+  p_Tools_CircuitContentChecks_CircuitContentChecks_csproj --&gt;|&quot;UnityBoundary.cs&quot;| f_Tools_ContentStudio
+  p_Tools_CircuitFieldSetupChecks_CircuitFieldSetupChecks_csproj --&gt;|&quot;*.cs&quot;| f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Functional
+  p_Tools_CircuitFieldSetupChecks_CircuitFieldSetupChecks_csproj --&gt;|&quot;*.cs&quot;| f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Core
+  p_Tools_CircuitFieldSetupChecks_CircuitFieldSetupChecks_csproj --&gt;|&quot;*.cs&quot;| f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Progression
+  p_Tools_CircuitFieldSetupChecks_CircuitFieldSetupChecks_csproj --&gt;|&quot;ExpeditionContent.cs, WorldContent.cs&quot;| f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Content
+  p_Tools_CircuitFieldSetupChecks_CircuitFieldSetupChecks_csproj --&gt;|&quot;UnityBoundary.cs&quot;| f_Tools_ContentStudio
+  p_Tools_CircuitFieldSetupChecks_CircuitFieldSetupChecks_csproj --&gt;|&quot;ActualSetup.cs&quot;| f_Temp_CircuitFieldSetupChecks
+  p_Tools_CircuitPersistenceChecks_CircuitPersistenceChecks_csproj --&gt;|&quot;Result.cs&quot;| f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Functional
+  p_Tools_CircuitPersistenceChecks_CircuitPersistenceChecks_csproj --&gt;|&quot;*.cs&quot;| f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Core
+  p_Tools_CircuitPersistenceChecks_CircuitPersistenceChecks_csproj --&gt;|&quot;*.cs&quot;| f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Circuit
+  p_Tools_CircuitPersistenceChecks_CircuitPersistenceChecks_csproj --&gt;|&quot;CircuitPersistence.cs&quot;| f_Game_EmberGrove_Assets_Runtime_Exploration
+  p_Tools_CircuitPersistenceChecks_CircuitPersistenceChecks_csproj --&gt;|&quot;CircuitPersistenceVerification.cs&quot;| f_Game_EmberGrove_Assets_Tests
+  p_Tools_CircuitWorldChecks_CircuitWorldChecks_csproj --&gt;|&quot;Result.cs&quot;| f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Functional
+  p_Tools_CircuitWorldChecks_CircuitWorldChecks_csproj --&gt;|&quot;*.cs&quot;| f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Core
+  p_Tools_CircuitWorldChecks_CircuitWorldChecks_csproj --&gt;|&quot;*.cs&quot;| f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Circuit
+  p_Tools_CircuitWorldChecks_CircuitWorldChecks_csproj --&gt;|&quot;*.cs&quot;| f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Exploration
+  p_Tools_CircuitWorldChecks_CircuitWorldChecks_csproj --&gt;|&quot;CircuitWorldLayout.cs&quot;| f_Game_EmberGrove_Assets_Runtime_Exploration
+</pre></div>
+<p class="caption">Arrows are <code>&lt;Compile Include&gt;</code> items outside the project's own folder, labelled with the files or pattern; dashed ones are conditional and thick ones are project references.</p>
+
+<h3 id="tools-2">Tools 2: CodeMetrics, ContentStudio, ExpeditionNetworkChecks, ExpeditionPerformance, WorldFactChecks</h3>
+<div class="diagram"><pre class="mermaid">
+flowchart LR
+  p_Tools_CodeMetrics_CodeMetrics_csproj[&quot;CodeMetrics&lt;br/&gt;Tools/CodeMetrics&quot;]
+  p_Tools_ContentStudio_ContentStudio_csproj[&quot;ContentStudio&lt;br/&gt;Tools/ContentStudio&quot;]
+  p_Tools_ExpeditionNetworkChecks_ExpeditionNetworkChecks_csproj[&quot;ExpeditionNetworkChecks&lt;br/&gt;Tools/ExpeditionNetworkChecks&quot;]
+  p_Tools_ExpeditionPerformance_ExpeditionPerformance_csproj[&quot;ExpeditionPerformance&lt;br/&gt;Tools/ExpeditionPerformance&quot;]
+  p_Tools_ExpeditionPerformance_WorldFactChecks_csproj[&quot;WorldFactChecks&lt;br/&gt;Tools/ExpeditionPerformance&quot;]
+  subgraph s_CardForge_package[&quot;CardForge package&quot;]
+    f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Circuit[&quot;Runtime/Circuit&lt;br/&gt;CardForge.Circuit&quot;]
+    f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Content[&quot;Runtime/Content&lt;br/&gt;CardForge.Content&quot;]
+    f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Core[&quot;Runtime/Core&lt;br/&gt;EmberGrove.Expedition&quot;]
+    f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Functional[&quot;Runtime/Functional&lt;br/&gt;CardForge.Functional&quot;]
+    f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Networking[&quot;Runtime/Networking&lt;br/&gt;EmberGrove.Expedition.Networking&quot;]
+    f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Progression[&quot;Runtime/Progression&lt;br/&gt;EmberGrove.Expedition.Progression&quot;]
+  end
+  subgraph s_Toolkit[&quot;Toolkit&quot;]
+    f_Toolkit_Tests[&quot;Toolkit/Tests&quot;]
+  end
+  p_Tools_ContentStudio_ContentStudio_csproj --&gt;|&quot;*.cs&quot;| f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Functional
+  p_Tools_ContentStudio_ContentStudio_csproj --&gt;|&quot;*.cs&quot;| f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Core
+  p_Tools_ContentStudio_ContentStudio_csproj --&gt;|&quot;*.cs&quot;| f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Progression
+  p_Tools_ContentStudio_ContentStudio_csproj --&gt;|&quot;*.cs&quot;| f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Circuit
+  p_Tools_ContentStudio_ContentStudio_csproj --&gt;|&quot;ContentPackFiles.cs, ExpeditionContent.cs, WorldContent.cs&quot;| f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Content
+  p_Tools_ExpeditionNetworkChecks_ExpeditionNetworkChecks_csproj --&gt;|&quot;ExpeditionNetworkSession.cs&quot;| f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Networking
+  p_Tools_ExpeditionRelay_ExpeditionRelay_csproj[&quot;ExpeditionRelay&lt;br/&gt;Tools/ExpeditionRelay&quot;]
+  p_Tools_ExpeditionNetworkChecks_ExpeditionNetworkChecks_csproj ==&gt;|&quot;project reference&quot;| p_Tools_ExpeditionRelay_ExpeditionRelay_csproj
+  p_Tools_ExpeditionPerformance_ExpeditionPerformance_csproj --&gt;|&quot;Result.cs&quot;| f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Functional
+  p_Tools_ExpeditionPerformance_ExpeditionPerformance_csproj --&gt;|&quot;*.cs&quot;| f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Core
+  p_Tools_ExpeditionPerformance_ExpeditionPerformance_csproj --&gt;|&quot;*.cs&quot;| f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Progression
+  p_Tools_ExpeditionPerformance_ExpeditionPerformance_csproj --&gt;|&quot;ExpeditionContent.cs, WorldContent.cs&quot;| f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Content
+  p_Tools_ExpeditionPerformance_ExpeditionPerformance_csproj -.-&gt;|&quot;ExpeditionCoreChecks.cs&quot;| f_Toolkit_Tests
+  p_Tools_ExpeditionPerformance_WorldFactChecks_csproj --&gt;|&quot;Result.cs&quot;| f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Functional
+  p_Tools_ExpeditionPerformance_WorldFactChecks_csproj --&gt;|&quot;*.cs&quot;| f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Core
+  p_Tools_ExpeditionPerformance_WorldFactChecks_csproj --&gt;|&quot;*.cs&quot;| f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Progression
+  p_Tools_ExpeditionPerformance_WorldFactChecks_csproj --&gt;|&quot;ExpeditionContent.cs, WorldContent.cs&quot;| f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Content
+  p_Tools_ExpeditionPerformance_WorldFactChecks_csproj --&gt;|&quot;*.cs&quot;| f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Networking
+</pre></div>
+<p class="caption">Arrows are <code>&lt;Compile Include&gt;</code> items outside the project's own folder, labelled with the files or pattern; dashed ones are conditional and thick ones are project references.</p>
+
+<h3 id="tools-3">Tools 3: ExpeditionRelay, EmberGroveRelay, ExplorationChecks, LessonChecks</h3>
+<div class="diagram"><pre class="mermaid">
+flowchart LR
+  p_Tools_ExpeditionRelay_ExpeditionRelay_csproj[&quot;ExpeditionRelay&lt;br/&gt;Tools/ExpeditionRelay&quot;]
+  p_Tools_ExpeditionRelay_Launcher_EmberGroveRelay_csproj[&quot;EmberGroveRelay&lt;br/&gt;Tools/ExpeditionRelay/Launcher&quot;]
+  p_Tools_ExplorationChecks_ExplorationChecks_csproj[&quot;ExplorationChecks&lt;br/&gt;Tools/ExplorationChecks&quot;]
+  p_Tools_LessonChecks_LessonChecks_csproj[&quot;LessonChecks&lt;br/&gt;Tools/LessonChecks&quot;]
+  subgraph s_CardForge_package[&quot;CardForge package&quot;]
+    f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Content[&quot;Runtime/Content&lt;br/&gt;CardForge.Content&quot;]
+    f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Core[&quot;Runtime/Core&lt;br/&gt;EmberGrove.Expedition&quot;]
+    f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Exploration[&quot;Runtime/Exploration&lt;br/&gt;CardForge.Exploration&quot;]
+    f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Functional[&quot;Runtime/Functional&lt;br/&gt;CardForge.Functional&quot;]
+    f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Networking[&quot;Runtime/Networking&lt;br/&gt;EmberGrove.Expedition.Networking&quot;]
+    f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Progression[&quot;Runtime/Progression&lt;br/&gt;EmberGrove.Expedition.Progression&quot;]
+  end
+  subgraph s_Tools[&quot;Tools&quot;]
+    f_Tools_ContentStudio[&quot;Tools/ContentStudio&quot;]
+  end
+  p_Tools_ExpeditionRelay_ExpeditionRelay_csproj --&gt;|&quot;Result.cs&quot;| f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Functional
+  p_Tools_ExpeditionRelay_ExpeditionRelay_csproj --&gt;|&quot;*.cs&quot;| f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Core
+  p_Tools_ExpeditionRelay_ExpeditionRelay_csproj --&gt;|&quot;SectorDefinition.cs, SectorNavigation.cs&quot;| f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Exploration
+  p_Tools_ExpeditionRelay_ExpeditionRelay_csproj --&gt;|&quot;*.cs&quot;| f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Progression
+  p_Tools_ExpeditionRelay_ExpeditionRelay_csproj --&gt;|&quot;ExpeditionAuthority.cs, NetworkContracts.cs&quot;| f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Networking
+  p_Tools_ExpeditionRelay_ExpeditionRelay_csproj --&gt;|&quot;ExpeditionContent.cs&quot;| f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Content
+  p_Tools_ExpeditionRelay_Launcher_EmberGroveRelay_csproj ==&gt;|&quot;project reference&quot;| p_Tools_ExpeditionRelay_ExpeditionRelay_csproj
+  p_Tools_ExplorationChecks_ExplorationChecks_csproj --&gt;|&quot;Result.cs&quot;| f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Functional
+  p_Tools_ExplorationChecks_ExplorationChecks_csproj --&gt;|&quot;*.cs&quot;| f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Exploration
+  p_Tools_LessonChecks_LessonChecks_csproj --&gt;|&quot;*.cs&quot;| f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Functional
+  p_Tools_LessonChecks_LessonChecks_csproj --&gt;|&quot;*.cs&quot;| f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Core
+  p_Tools_LessonChecks_LessonChecks_csproj --&gt;|&quot;*.cs&quot;| f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Progression
+  p_Tools_LessonChecks_LessonChecks_csproj --&gt;|&quot;ExpeditionContent.cs, WorldContent.cs&quot;| f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Content
+  p_Tools_LessonChecks_LessonChecks_csproj --&gt;|&quot;UnityBoundary.cs&quot;| f_Tools_ContentStudio
+</pre></div>
+<p class="caption">Arrows are <code>&lt;Compile Include&gt;</code> items outside the project's own folder, labelled with the files or pattern; dashed ones are conditional and thick ones are project references.</p>
+
+</section>
+<section id="toolkit"><h2><span class="num">03</span>CardForge class diagrams</h2>
+<p class="lead">One diagram per toolkit assembly and namespace, dependencies first, split where a namespace has more than 30 top-level types. A box lists up to 10 public members (one line per method name) and says how many more there are; enumerations show no values. Arrows: <code>&lt;|--</code> inherits, <code>&lt;|..</code> implements, <code>--&gt;</code> a field or property of that type (<code>*</code> for a collection), labelled with the member names. Nested types are left out.</p>
+<h3 id="toolkit-cardforge-functional-embergrove">CardForge.Functional — namespace EmberGrove</h3>
+<div class="diagram"><pre class="mermaid">
+classDiagram
+  class c_RuleError[&quot;RuleError&quot;]
+  c_RuleError : +string Code
+  c_RuleError : +ToString() string
+  class c_Result[&quot;Result‹T›&quot;]
+  &lt;&lt;struct&gt;&gt; c_Result
+  c_Result : +bool IsSuccess
+  c_Result : +T Value
+  c_Result : +RuleError Error
+  c_Result : +Ok(T) Result~T~$
+  c_Result : +Fail(string, string) Result~T~$
+  c_Result : +Map~U~(Func~T, U~) Result~U~
+  c_Result : +Bind~U~(Func~T, Result~U~~) Result~U~
+  c_Result : +Match(Action~T~, Action~RuleError~)
+  c_Result : … 1 more
+  c_Result --&gt; c_RuleError : error, Error
+</pre></div>
+<p class="caption">2 types. Files: <code>Result.cs</code>.</p>
+
+<h3 id="toolkit-cardforge-exploration">CardForge.Exploration — namespace CardForge.Exploration</h3>
+<div class="diagram"><pre class="mermaid">
+classDiagram
+  class c_ExplorationProgress[&quot;ExplorationProgress&quot;]
+  c_ExplorationProgress : +string[] Completed
+  c_ExplorationProgress : +string Objective
+  class c_LandmarkRules[&quot;LandmarkRules&quot;]
+  &lt;&lt;static&gt;&gt; c_LandmarkRules
+  c_LandmarkRules : +New(SectorDefinition) ExplorationProgress$
+  c_LandmarkRules : +CanInteract(SectorDefinition, ExplorationProgress, string) bool$
+  c_LandmarkRules : +Complete(…) Result~ExplorationProgress~$
+  class c_SectorDefinition[&quot;SectorDefinition&quot;]
+  c_SectorDefinition : +string Id
+  c_SectorDefinition : +string Objective
+  c_SectorDefinition : +float CellSize
+  c_SectorDefinition : +float MoveSpeed
+  c_SectorDefinition : +float CameraPitch
+  c_SectorDefinition : +float CameraYaw
+  c_SectorDefinition : +float CameraSize
+  c_SectorDefinition : +float CameraFollow
+  c_SectorDefinition : +int StartX
+  c_SectorDefinition : +string[] Rows
+  c_SectorDefinition : … 6 more
+  class c_LobbyDefinition[&quot;LobbyDefinition&quot;]
+  c_LobbyDefinition : +int Version
+  c_LobbyDefinition : +int MaxParticipants
+  c_LobbyDefinition : +string RoomId
+  c_LobbyDefinition : +float InteractionRadius
+  c_LobbyDefinition : +SectorDefinition Layout
+  class c_LandmarkDefinition[&quot;LandmarkDefinition&quot;]
+  c_LandmarkDefinition : +string RoomId
+  c_LandmarkDefinition : +int RoomRevision
+  c_LandmarkDefinition : +string Id
+  c_LandmarkDefinition : +string Action
+  c_LandmarkDefinition : +string Body
+  c_LandmarkDefinition : +string Kind
+  c_LandmarkDefinition : +string Requires
+  c_LandmarkDefinition : +string CompletionText
+  c_LandmarkDefinition : +string EncounterId
+  c_LandmarkDefinition : +string CompletionBody
+  c_LandmarkDefinition : … 2 more
+  class c_GridPoint[&quot;GridPoint&quot;]
+  &lt;&lt;struct&gt;&gt; c_GridPoint
+  c_GridPoint : +int X
+  c_GridPoint : +Equals(GridPoint) bool
+  c_GridPoint : +GetHashCode() int
+  c_GridPoint : +ToString() string
+  c_GridPoint : … 1 more
+  class c_SectorNavigation[&quot;SectorNavigation&quot;]
+  &lt;&lt;static&gt;&gt; c_SectorNavigation
+  c_SectorNavigation : +int MaximumDimension$
+  c_SectorNavigation : +Validate(SectorDefinition) string[]$
+  c_SectorNavigation : +IsWalkable(SectorDefinition, int, int) bool$
+  c_SectorNavigation : +FindPath(SectorDefinition, GridPoint, GridPoint) GridPoint[]$
+  c_SectorNavigation : +PointWalkable(SectorDefinition, float, …) bool$
+  c_SectorDefinition --&gt; &quot;*&quot; c_LandmarkDefinition : Decorations, Landmarks
+  c_LobbyDefinition --&gt; c_SectorDefinition : Layout
+</pre></div>
+<p class="caption">7 types. Files: <code>LandmarkRules.cs</code>, <code>SectorDefinition.cs</code>, <code>SectorNavigation.cs</code>.</p>
+
+<h3 id="toolkit-cardforge-linker-editor-cardforge-editor">CardForge.Linker.Editor — namespace CardForge.Editor</h3>
+<div class="diagram"><pre class="mermaid">
+classDiagram
+  class c_CardForgeLinkerProcessor[&quot;CardForgeLinkerProcessor&quot;]
+  c_CardForgeLinkerProcessor : +int callbackOrder
+  c_CardForgeLinkerProcessor : +GenerateAdditionalLinkXmlFile(…) string
+</pre></div>
+<p class="caption">1 types. Files: <code>CardForgeLinkerProcessor.cs</code>.</p>
+
+<h3 id="toolkit-embergrove-expedition-cardforge-lessons">EmberGrove.Expedition — namespace CardForge.Lessons</h3>
+<div class="diagram"><pre class="mermaid">
+classDiagram
+  class c_LessonLibrary[&quot;LessonLibrary&quot;]
+  c_LessonLibrary : +int Version
+  c_LessonLibrary : +LessonCategory[] Categories
+  c_LessonLibrary : +LessonDefinition[] Lessons
+  c_LessonLibrary : +string BasicPracticeLesson
+  c_LessonLibrary : +string[] PracticePath
+  class c_LessonCategory[&quot;LessonCategory&quot;]
+  c_LessonCategory : +string Id
+  class c_LessonDefinition[&quot;LessonDefinition&quot;]
+  c_LessonDefinition : +string Id
+  c_LessonDefinition : +string Title
+  c_LessonDefinition : +string Summary
+  c_LessonDefinition : +string Picture
+  c_LessonDefinition : +string[] Prerequisites
+  c_LessonDefinition : +LessonPage[] Pages
+  c_LessonDefinition : +LessonScenario Scenario
+  class c_LessonPage[&quot;LessonPage&quot;]
+  c_LessonPage : +string Title
+  c_LessonPage : +string[] ExampleCardIds
+  c_LessonPage : +string[] Effects
+  class c_LessonScenario[&quot;LessonScenario&quot;]
+  c_LessonScenario : +uint Seed
+  c_LessonScenario : +int EnemyLife
+  c_LessonScenario : +bool UseMatchDrawRules
+  c_LessonScenario : +LessonCard[] PlayerDeck
+  c_LessonScenario : +LessonCard[] OpponentDeck
+  c_LessonScenario : +LessonAction[] Setup
+  c_LessonScenario : +LessonStep[] Steps
+  class c_LessonCard[&quot;LessonCard&quot;]
+  c_LessonCard : +string Key
+  class c_LessonStep[&quot;LessonStep&quot;]
+  c_LessonStep : +string Id
+  c_LessonStep : +string SelectPrompt
+  c_LessonStep : +string Explanation
+  c_LessonStep : +string AfterPrompt
+  c_LessonStep : +bool Auto
+  c_LessonStep : +LessonAction Action
+  class c_LessonAction[&quot;LessonAction&quot;]
+  c_LessonAction : +string Kind
+  c_LessonAction : +string Target
+  c_LessonAction : +string Rank
+  c_LessonAction : +int Player
+  class c_LessonBinding[&quot;LessonBinding&quot;]
+  &lt;&lt;struct&gt;&gt; c_LessonBinding
+  c_LessonBinding : +string Key
+  c_LessonBinding : +int CardId
+  class c_PreparedLesson[&quot;PreparedLesson&quot;]
+  c_PreparedLesson : +CombatState State
+  c_PreparedLesson : +LessonBinding[] Bindings
+  class c_LessonRules[&quot;LessonRules&quot;]
+  &lt;&lt;static&gt;&gt; c_LessonRules
+  c_LessonRules : +HasScenario(LessonDefinition) bool$
+  c_LessonRules : +Validate(LessonLibrary, Catalog, CombatConfig) string[]$
+  c_LessonRules : +ValidateLesson(LessonDefinition, Catalog, CombatConfig) string[]$
+  c_LessonRules : +Prepare(LessonDefinition, Catalog, CombatConfig) Result~PreparedLesson~$
+  c_LessonRules : +Command(LessonAction, LessonBinding[]) Result~CombatCommand~$
+  c_LessonRules : +Matches(CombatCommand, CombatCommand) bool$
+  class c_CombatState[&quot;CombatState · EmberGrove.Expedition&quot;]
+  &lt;&lt;external&gt;&gt; c_CombatState
+  c_LessonLibrary --&gt; &quot;*&quot; c_LessonCategory : Categories
+  c_LessonLibrary --&gt; &quot;*&quot; c_LessonDefinition : Lessons
+  c_LessonDefinition --&gt; &quot;*&quot; c_LessonPage : Pages
+  c_LessonDefinition --&gt; c_LessonScenario : Scenario
+  c_LessonScenario --&gt; &quot;*&quot; c_LessonCard : PlayerDeck, OpponentDeck
+  c_LessonScenario --&gt; &quot;*&quot; c_LessonStep : Steps
+  c_LessonScenario --&gt; &quot;*&quot; c_LessonAction : Setup
+  c_LessonStep --&gt; c_LessonAction : Action
+  c_PreparedLesson --&gt; c_CombatState : State
+  c_PreparedLesson --&gt; &quot;*&quot; c_LessonBinding : Bindings
+</pre></div>
+<p class="caption">11 types; 1 referenced types from elsewhere, tagged external and named with where they live. Files: <code>LessonContracts.cs</code>, <code>LessonRules.cs</code>.</p>
+
+<h3 id="toolkit-embergrove-expedition">EmberGrove.Expedition — namespace EmberGrove.Expedition</h3>
+<div class="diagram"><pre class="mermaid">
+classDiagram
+  class c_BoardOccupancy[&quot;BoardOccupancy&quot;]
+  &lt;&lt;struct&gt;&gt; c_BoardOccupancy
+  c_BoardOccupancy : +HasUnit(int, int, Rank) bool
+  c_BoardOccupancy : +HasDefender(int, int) bool
+  class c_CombatAi[&quot;CombatAi&quot;]
+  &lt;&lt;static&gt;&gt; c_CombatAi
+  c_CombatAi : +Choose(CombatState, Catalog) CombatCommand$
+  c_CombatAi : +DescribeIntent(CombatState, Catalog) string$
+  c_CombatAi : +Describe(CombatState, CombatCommand, Catalog) string$
+  class c_CardKind[&quot;CardKind&quot;]
+  &lt;&lt;enumeration&gt;&gt; c_CardKind
+  class c_Rank[&quot;Rank&quot;]
+  &lt;&lt;enumeration&gt;&gt; c_Rank
+  class c_TerrainKind[&quot;TerrainKind&quot;]
+  &lt;&lt;enumeration&gt;&gt; c_TerrainKind
+  class c_TargetMode[&quot;TargetMode&quot;]
+  &lt;&lt;enumeration&gt;&gt; c_TargetMode
+  class c_EffectTrigger[&quot;EffectTrigger&quot;]
+  &lt;&lt;enumeration&gt;&gt; c_EffectTrigger
+  class c_EffectOperation[&quot;EffectOperation&quot;]
+  &lt;&lt;enumeration&gt;&gt; c_EffectOperation
+  class c_EffectCondition[&quot;EffectCondition&quot;]
+  &lt;&lt;enumeration&gt;&gt; c_EffectCondition
+  class c_EffectSelector[&quot;EffectSelector&quot;]
+  &lt;&lt;enumeration&gt;&gt; c_EffectSelector
+  class c_Zone[&quot;Zone&quot;]
+  &lt;&lt;enumeration&gt;&gt; c_Zone
+  class c_ActionKind[&quot;ActionKind&quot;]
+  &lt;&lt;enumeration&gt;&gt; c_ActionKind
+  class c_CombatEventKind[&quot;CombatEventKind&quot;]
+  &lt;&lt;enumeration&gt;&gt; c_CombatEventKind
+  class c_CardTrait[&quot;CardTrait&quot;]
+  &lt;&lt;enumeration&gt;&gt; c_CardTrait
+  class c_EffectDefinition[&quot;EffectDefinition&quot;]
+  c_EffectDefinition : +EffectTrigger Trigger
+  c_EffectDefinition : +EffectOperation Operation
+  c_EffectDefinition : +EffectSelector Selector
+  c_EffectDefinition : +int Amount
+  c_EffectDefinition : +TerrainKind Terrain
+  c_EffectDefinition : +EffectCondition Condition
+  c_EffectDefinition : +int ConditionValue
+  c_EffectDefinition : +Copy() EffectDefinition
+  class c_CardDefinition[&quot;CardDefinition&quot;]
+  c_CardDefinition : +string Id
+  c_CardDefinition : +string Rules
+  c_CardDefinition : +CardKind Kind
+  c_CardDefinition : +int Cost
+  c_CardDefinition : +int Attack
+  c_CardDefinition : +int Health
+  c_CardDefinition : +int ArtIndex
+  c_CardDefinition : +bool Ranged
+  c_CardDefinition : +TargetMode Target
+  c_CardDefinition : +EffectDefinition[] Effects
+  c_CardDefinition : … 1 more
+  class c_CardQuery[&quot;CardQuery&quot;]
+  &lt;&lt;static&gt;&gt; c_CardQuery
+  c_CardQuery : +Compare(CardDefinition, CardDefinition) int$
+  c_CardQuery : +TextRank(CardDefinition, string) int$
+  c_CardQuery : +Bit(int) int$
+  c_CardQuery : +Select(IEnumerable~CardDefinition~, string, …) CardDefinition[]$
+  c_CardQuery : +PageCount(int, int) int$
+  c_CardQuery : +Traits(CardDefinition) int$
+  class c_Catalog[&quot;Catalog&quot;]
+  c_Catalog : +IReadOnlyList~CardDefinition~ Cards
+  c_Catalog : +Get(string) CardDefinition
+  c_Catalog : +Contains(string) bool
+  class c_DeckEntry[&quot;DeckEntry&quot;]
+  &lt;&lt;struct&gt;&gt; c_DeckEntry
+  c_DeckEntry : +string DefinitionId
+  c_DeckEntry : +int UpgradeLevel
+  class c_CombatConfig[&quot;CombatConfig&quot;]
+  c_CombatConfig : +int StartingLife
+  c_CombatConfig : +int PulsePerTurn
+  c_CombatConfig : +int HandSize
+  c_CombatConfig : +int MaxRounds
+  c_CombatConfig : +int MomentumBonus
+  c_CombatConfig : +int OpeningHandSize
+  c_CombatConfig : +bool SpentCardsStayDiscarded
+  c_CombatConfig : +Copy() CombatConfig
+  class c_CardState[&quot;CardState&quot;]
+  &lt;&lt;struct&gt;&gt; c_CardState
+  c_CardState : +int Id
+  c_CardState : +int UpgradeLevel
+  c_CardState : +int Health
+  c_CardState : +int Shield
+  c_CardState : +int Lane
+  c_CardState : +string DefinitionId
+  c_CardState : +Zone Zone
+  c_CardState : +Rank Rank
+  c_CardState : +bool Ready
+  class c_SideState[&quot;SideState&quot;]
+  c_SideState : +int Team
+  c_SideState : +int MaxLife
+  c_SideState : +int Shield
+  c_SideState : +int Pulse
+  c_SideState : +int CardsPlayedThisTurn
+  c_SideState : +bool MomentumEarnedThisTurn
+  c_SideState : +List~int~ Deck
+  c_SideState : +List~int~ Hand
+  c_SideState : +List~int~ Discard
+  c_SideState : +DeepCopy() SideState
+  class c_CombatState[&quot;CombatState&quot;]
+  c_CombatState : +SideState[] Players
+  c_CombatState : +List~CardState~ Cards
+  c_CombatState : +TerrainKind[] Terrain
+  c_CombatState : +CombatConfig Config
+  c_CombatState : +int ActivePlayer
+  c_CombatState : +int Round
+  c_CombatState : +int TurnsThisRound
+  c_CombatState : +int Winner
+  c_CombatState : +uint RngState
+  c_CombatState : +bool IsOver
+  c_CombatState : … 1 more
+  class c_CombatCommand[&quot;CombatCommand&quot;]
+  &lt;&lt;struct&gt;&gt; c_CombatCommand
+  c_CombatCommand : +ActionKind Kind
+  c_CombatCommand : +int Player
+  c_CombatCommand : +int TargetId
+  c_CombatCommand : +int Lane
+  c_CombatCommand : +Rank Rank
+  c_CombatCommand : +HeroTarget(int) int$
+  c_CombatCommand : +HeroPlayer(int) int$
+  c_CombatCommand : +Play(int, int, …) CombatCommand$
+  c_CombatCommand : +Attack(int, int, int) CombatCommand$
+  c_CombatCommand : +Move(int, int, …) CombatCommand$
+  c_CombatCommand : … 3 more
+  class c_CombatEvent[&quot;CombatEvent&quot;]
+  c_CombatEvent : +CombatEventKind Kind
+  c_CombatEvent : +string Text
+  c_CombatEvent : +int Player
+  c_CombatEvent : +int SourceId
+  c_CombatEvent : +int TargetId
+  c_CombatEvent : +int Lane
+  c_CombatEvent : +int Amount
+  c_CombatEvent : +TerrainKind Terrain
+  class c_CombatResolution[&quot;CombatResolution&quot;]
+  c_CombatResolution : +CombatState State
+  c_CombatResolution : +IReadOnlyList~CombatEvent~ Events
+  class c_CombatRules[&quot;CombatRules&quot;]
+  &lt;&lt;static&gt;&gt; c_CombatRules
+  c_CombatRules : +int LaneCount$
+  c_CombatRules : +string Version$
+  c_CombatRules : +int MaximumCopies$
+  c_CombatRules : +int LegacyDeckSize$
+  c_CombatRules : +int StandardDeckSize$
+  c_CombatRules : +IsMatchDeckSize(int) bool$
+  c_CombatRules : +LegalMatchDeck(string[], Func~string, bool~, int) bool$
+  c_CombatRules : +NewMatch(Catalog, DeckEntry[], …) CombatState$
+  c_CombatRules : +ValidateConfig(CombatConfig) List~string~$
+  c_CombatRules : +ValidateSnapshot(CombatState, Catalog) List~string~$
+  c_CombatRules : … 12 more
+  c_EffectDefinition --&gt; c_TerrainKind : Terrain
+  c_EffectDefinition --&gt; c_EffectTrigger : Trigger
+  c_EffectDefinition --&gt; c_EffectOperation : Operation
+  c_EffectDefinition --&gt; c_EffectCondition : Condition
+  c_EffectDefinition --&gt; c_EffectSelector : Selector
+  c_CardDefinition --&gt; c_CardKind : Kind
+  c_CardDefinition --&gt; c_TargetMode : Target
+  c_CardDefinition --&gt; &quot;*&quot; c_EffectDefinition : Effects
+  c_Catalog --&gt; &quot;*&quot; c_CardDefinition : cards, lookup, …
+  c_CardState --&gt; c_Rank : Rank
+  c_CardState --&gt; c_Zone : Zone
+  c_CombatState --&gt; &quot;*&quot; c_TerrainKind : Terrain
+  c_CombatState --&gt; c_CombatConfig : Config
+  c_CombatState --&gt; &quot;*&quot; c_CardState : Cards
+  c_CombatState --&gt; &quot;*&quot; c_SideState : Players
+  c_CombatCommand --&gt; c_Rank : Rank
+  c_CombatCommand --&gt; c_ActionKind : Kind
+  c_CombatEvent --&gt; c_TerrainKind : Terrain
+  c_CombatEvent --&gt; c_CombatEventKind : Kind
+  c_CombatResolution --&gt; c_CombatState : State
+  c_CombatResolution --&gt; &quot;*&quot; c_CombatEvent : Events
+</pre></div>
+<p class="caption">27 types. Files: <code>BoardOccupancy.cs</code>, <code>CombatAi.cs</code>, <code>CombatContracts.cs</code>, <code>CombatRules.cs</code>.</p>
+
+<h3 id="toolkit-cardforge-circuit-1">CardForge.Circuit — namespace CardForge.Circuit (1 of 2)</h3>
+<div class="diagram"><pre class="mermaid">
+classDiagram
+  class c_CircuitDefinition[&quot;CircuitDefinition&quot;]
+  c_CircuitDefinition : +string Id
+  c_CircuitDefinition : +int DeckSize
+  c_CircuitDefinition : +CircuitCard[] Cards
+  c_CircuitDefinition : +CircuitStarter[] Starters
+  c_CircuitDefinition : +CircuitOpponent[] Opponents
+  c_CircuitDefinition : +CircuitMentor[] Mentors
+  c_CircuitDefinition : +CircuitLearningPolicy Learning
+  c_CircuitDefinition : +CircuitSoloPerk[] SoloPerks
+  c_CircuitDefinition : +CircuitDialogue Dialogue
+  class c_CircuitLearningPolicy[&quot;CircuitLearningPolicy&quot;]
+  c_CircuitLearningPolicy : +int RequiredCompletedRuns
+  c_CircuitLearningPolicy : +int QualifyingWinsForTutorial
+  c_CircuitLearningPolicy : +bool RequireTutorial
+  class c_CircuitSoloPerk[&quot;CircuitSoloPerk&quot;]
+  c_CircuitSoloPerk : +string Id
+  c_CircuitSoloPerk : +string Description
+  class c_CircuitLearningStatus[&quot;CircuitLearningStatus&quot;]
+  c_CircuitLearningStatus : +bool TutorialCompleted
+  c_CircuitLearningStatus : +int CompletedRuns
+  c_CircuitLearningStatus : +int RemainingRuns
+  c_CircuitLearningStatus : +int QualifyingWins
+  c_CircuitLearningStatus : +int RequiredQualifyingWins
+  class c_CircuitCard[&quot;CircuitCard&quot;]
+  c_CircuitCard : +string Id
+  c_CircuitCard : +int Tier
+  class c_CircuitStarter[&quot;CircuitStarter&quot;]
+  c_CircuitStarter : +string Id
+  c_CircuitStarter : +bool InitiallyAvailable
+  c_CircuitStarter : +string[] CardIds
+  class c_CircuitOpponent[&quot;CircuitOpponent&quot;]
+  c_CircuitOpponent : +string Id
+  c_CircuitOpponent : +string Archetype
+  c_CircuitOpponent : +int Tier
+  c_CircuitOpponent : +bool Champion
+  class c_CircuitMentor[&quot;CircuitMentor&quot;]
+  c_CircuitMentor : +string Id
+  c_CircuitMentor : +string[] DialogueIds
+  class c_CircuitDialogue[&quot;CircuitDialogue&quot;]
+  c_CircuitDialogue : +Speaker[] Speakers
+  c_CircuitDialogue : +DialogueEntry[] Entries
+  c_CircuitDialogue : +CircuitEventDefinition[] Events
+  c_CircuitDialogue : +CircuitEpisodeDefinition[] Episodes
+  c_CircuitDialogue : +CircuitVisitDefinition[] Visits
+  c_CircuitDialogue : +CircuitTaskDefinition[] Tasks
+  c_CircuitDialogue : +CircuitOpeningDefinition Opening
+  class c_CircuitOpeningDefinition[&quot;CircuitOpeningDefinition&quot;]
+  c_CircuitOpeningDefinition : +int Version
+  c_CircuitOpeningDefinition : +string DefaultNickname
+  c_CircuitOpeningDefinition : +string RepeatLabel
+  c_CircuitOpeningDefinition : +string SkipLabel
+  c_CircuitOpeningDefinition : +string BackLabel
+  c_CircuitOpeningDefinition : +string NameLabel
+  c_CircuitOpeningDefinition : +string NamePrompt
+  c_CircuitOpeningDefinition : +string NameDoneLabel
+  c_CircuitOpeningDefinition : +string NameUndoLabel
+  c_CircuitOpeningDefinition : +string NameDefaultLabel
+  c_CircuitOpeningDefinition : … 2 more
+  class c_CircuitOpeningBeat[&quot;CircuitOpeningBeat&quot;]
+  c_CircuitOpeningBeat : +string Id
+  c_CircuitOpeningBeat : +string SpeakerId
+  c_CircuitOpeningBeat : +string Text
+  c_CircuitOpeningBeat : +string AudioId
+  c_CircuitOpeningBeat : +string ActionLabel
+  c_CircuitOpeningBeat : +string Shot
+  c_CircuitOpeningBeat : +string Action
+  class c_CircuitOpeningBadge[&quot;CircuitOpeningBadge&quot;]
+  c_CircuitOpeningBadge : +string Id
+  c_CircuitOpeningBadge : +string Icon
+  class c_Speaker[&quot;Speaker&quot;]
+  c_Speaker : +string Id
+  c_Speaker : +string Role
+  c_Speaker : +string Color
+  c_Speaker : +string PortraitId
+  class c_DialogueEntry[&quot;DialogueEntry&quot;]
+  c_DialogueEntry : +string Id
+  c_DialogueEntry : +string Text
+  c_DialogueEntry : +string AudioId
+  c_DialogueEntry : +int MinStage
+  c_DialogueEntry : +string[] RequiresSeen
+  c_DialogueEntry : +DialogueChoice[] Choices
+  class c_DialogueChoice[&quot;DialogueChoice&quot;]
+  c_DialogueChoice : +string Label
+  c_DialogueChoice : +string Topic
+  c_DialogueChoice : +string PictureId
+  class c_CircuitEventDefinition[&quot;CircuitEventDefinition&quot;]
+  c_CircuitEventDefinition : +string Id
+  c_CircuitEventDefinition : +string SpeakerId
+  c_CircuitEventDefinition : +string Text
+  c_CircuitEventDefinition : +string Icon
+  c_CircuitEventDefinition : +string RequiresEventId
+  c_CircuitEventDefinition : +string RequiresEpisodeId
+  c_CircuitEventDefinition : +string AudioId
+  c_CircuitEventDefinition : +int Version
+  c_CircuitEventDefinition : +string Scope
+  c_CircuitEventDefinition : +string[] RequiresSeen
+  c_CircuitEventDefinition : … 2 more
+  class c_CircuitEventChoice[&quot;CircuitEventChoice&quot;]
+  c_CircuitEventChoice : +string Id
+  c_CircuitEventChoice : +string Icon
+  c_CircuitEventChoice : +string PictureId
+  class c_CircuitEventVariant[&quot;CircuitEventVariant&quot;]
+  c_CircuitEventVariant : +string EventId
+  c_CircuitEventVariant : +string Text
+  c_CircuitEventVariant : +string AudioId
+  class c_CircuitEpisodeDefinition[&quot;CircuitEpisodeDefinition&quot;]
+  c_CircuitEpisodeDefinition : +string Id
+  c_CircuitEpisodeDefinition : +string LocationId
+  c_CircuitEpisodeDefinition : +string SpeakerId
+  c_CircuitEpisodeDefinition : +string OpponentId
+  c_CircuitEpisodeDefinition : +string RequiresEventId
+  c_CircuitEpisodeDefinition : +string CompletionEventId
+  c_CircuitEpisodeDefinition : +string Icon
+  c_CircuitEpisodeDefinition : +string MatchLabel
+  c_CircuitEpisodeDefinition : +string Text
+  c_CircuitEpisodeDefinition : +string LossText
+  c_CircuitEpisodeDefinition : … 5 more
+  class c_CircuitVisitDefinition[&quot;CircuitVisitDefinition · same namespace&quot;]
+  &lt;&lt;external&gt;&gt; c_CircuitVisitDefinition
+  class c_CircuitTaskDefinition[&quot;CircuitTaskDefinition · same namespace&quot;]
+  &lt;&lt;external&gt;&gt; c_CircuitTaskDefinition
+  c_CircuitDefinition --&gt; c_CircuitLearningPolicy : Learning
+  c_CircuitDefinition --&gt; &quot;*&quot; c_CircuitSoloPerk : SoloPerks
+  c_CircuitDefinition --&gt; &quot;*&quot; c_CircuitCard : Cards
+  c_CircuitDefinition --&gt; &quot;*&quot; c_CircuitStarter : Starters
+  c_CircuitDefinition --&gt; &quot;*&quot; c_CircuitOpponent : Opponents
+  c_CircuitDefinition --&gt; &quot;*&quot; c_CircuitMentor : Mentors
+  c_CircuitDefinition --&gt; c_CircuitDialogue : Dialogue
+  c_CircuitDialogue --&gt; c_CircuitOpeningDefinition : Opening
+  c_CircuitDialogue --&gt; &quot;*&quot; c_Speaker : Speakers
+  c_CircuitDialogue --&gt; &quot;*&quot; c_DialogueEntry : Entries
+  c_CircuitDialogue --&gt; &quot;*&quot; c_CircuitEventDefinition : Events
+  c_CircuitDialogue --&gt; &quot;*&quot; c_CircuitEpisodeDefinition : Episodes
+  c_CircuitDialogue --&gt; &quot;*&quot; c_CircuitVisitDefinition : Visits
+  c_CircuitDialogue --&gt; &quot;*&quot; c_CircuitTaskDefinition : Tasks
+  c_CircuitOpeningDefinition --&gt; &quot;*&quot; c_CircuitOpeningBeat : Beats
+  c_CircuitOpeningDefinition --&gt; &quot;*&quot; c_CircuitOpeningBadge : Badges
+  c_DialogueEntry --&gt; &quot;*&quot; c_DialogueChoice : Choices
+  c_CircuitEventDefinition --&gt; &quot;*&quot; c_CircuitEventChoice : Choices
+  c_CircuitEventDefinition --&gt; &quot;*&quot; c_CircuitEventVariant : Variants
+</pre></div>
+<p class="caption">19 types; 2 referenced types from elsewhere, tagged external and named with where they live. Files: <code>CircuitDefinition.cs</code>.</p>
+
+<h3 id="toolkit-cardforge-circuit-2">CardForge.Circuit — namespace CardForge.Circuit (2 of 2)</h3>
+<div class="diagram"><pre class="mermaid">
+classDiagram
+  class c_CircuitEpisodeRecord[&quot;CircuitEpisodeRecord&quot;]
+  c_CircuitEpisodeRecord : +string EpisodeId
+  c_CircuitEpisodeRecord : +int ContentVersion
+  c_CircuitEpisodeRecord : +CircuitDuelOutcome Outcome
+  class c_CircuitVisitDefinition[&quot;CircuitVisitDefinition&quot;]
+  c_CircuitVisitDefinition : +string Id
+  c_CircuitVisitDefinition : +string Icon
+  c_CircuitVisitDefinition : +string RequiresEventId
+  c_CircuitVisitDefinition : +int Version
+  c_CircuitVisitDefinition : +int Stage
+  class c_CircuitVisitRecord[&quot;CircuitVisitRecord&quot;]
+  c_CircuitVisitRecord : +string VisitId
+  c_CircuitVisitRecord : +string RequiresEventId
+  c_CircuitVisitRecord : +int ContentVersion
+  class c_CircuitTaskDefinition[&quot;CircuitTaskDefinition&quot;]
+  c_CircuitTaskDefinition : +string Id
+  c_CircuitTaskDefinition : +string DialogueId
+  c_CircuitTaskDefinition : +string EpisodeId
+  c_CircuitTaskDefinition : +string VisitId
+  c_CircuitTaskDefinition : +string LocationId
+  c_CircuitTaskDefinition : +string Title
+  c_CircuitTaskDefinition : +string Note
+  c_CircuitTaskDefinition : +string Icon
+  c_CircuitTaskDefinition : +string ActionLabel
+  c_CircuitTaskDefinition : +string LockedReason
+  class c_CircuitEventStatus[&quot;CircuitEventStatus&quot;]
+  &lt;&lt;enumeration&gt;&gt; c_CircuitEventStatus
+  class c_CircuitTaskState[&quot;CircuitTaskState&quot;]
+  &lt;&lt;enumeration&gt;&gt; c_CircuitTaskState
+  class c_CircuitEventRecord[&quot;CircuitEventRecord&quot;]
+  c_CircuitEventRecord : +string EventId
+  c_CircuitEventRecord : +string ChoiceId
+  c_CircuitEventRecord : +int ContentVersion
+  c_CircuitEventRecord : +CircuitEventStatus Status
+  class c_CircuitTaskStatus[&quot;CircuitTaskStatus&quot;]
+  c_CircuitTaskStatus : +string TaskId
+  c_CircuitTaskStatus : +string DialogueId
+  c_CircuitTaskStatus : +string EpisodeId
+  c_CircuitTaskStatus : +string VisitId
+  c_CircuitTaskStatus : +string LocationId
+  c_CircuitTaskStatus : +string Title
+  c_CircuitTaskStatus : +string Note
+  c_CircuitTaskStatus : +string Icon
+  c_CircuitTaskStatus : +string ActionLabel
+  c_CircuitTaskStatus : +string Reason
+  c_CircuitTaskStatus : … 1 more
+  class c_CircuitLocationKind[&quot;CircuitLocationKind&quot;]
+  &lt;&lt;enumeration&gt;&gt; c_CircuitLocationKind
+  class c_CircuitDuelOutcome[&quot;CircuitDuelOutcome&quot;]
+  &lt;&lt;enumeration&gt;&gt; c_CircuitDuelOutcome
+  class c_CircuitLocation[&quot;CircuitLocation&quot;]
+  c_CircuitLocation : +string Id
+  c_CircuitLocation : +string MentorId
+  c_CircuitLocation : +string RoomId
+  c_CircuitLocation : +int RoomRevision
+  c_CircuitLocation : +CircuitLocationKind Kind
+  c_CircuitLocation : +int X
+  c_CircuitLocation : +int Stage
+  c_CircuitLocation : +string[] Links
+  c_CircuitLocation : +bool Completed
+  class c_CircuitProfile[&quot;CircuitProfile&quot;]
+  c_CircuitProfile : +int Version
+  c_CircuitProfile : +string[] Collection
+  c_CircuitProfile : +string[] SeenDialogueIds
+  c_CircuitProfile : +CircuitEventRecord[] EventRecords
+  c_CircuitProfile : +CircuitEpisodeRecord[] EpisodeRecords
+  c_CircuitProfile : +string SelectedTaskId
+  c_CircuitProfile : +int RunsStarted
+  c_CircuitProfile : +int DuelsWon
+  c_CircuitProfile : +int ChampionsDefeated
+  c_CircuitProfile : +int HighestStage
+  c_CircuitProfile : … 3 more
+  class c_CircuitDeck[&quot;CircuitDeck&quot;]
+  c_CircuitDeck : +string Id
+  c_CircuitDeck : +string Name
+  c_CircuitDeck : +string StarterId
+  c_CircuitDeck : +string[] Cards
+  class c_CircuitDuel[&quot;CircuitDuel&quot;]
+  c_CircuitDuel : +string ReceiptId
+  c_CircuitDuel : +string OpponentId
+  c_CircuitDuel : +string EncounterId
+  c_CircuitDuel : +string EpisodeId
+  c_CircuitDuel : +int Difficulty
+  c_CircuitDuel : +bool Tournament
+  class c_CircuitReward[&quot;CircuitReward&quot;]
+  c_CircuitReward : +string ReceiptId
+  c_CircuitReward : +string[] CardIds
+  c_CircuitReward : +string ChosenCardId
+  c_CircuitReward : +bool AdvancesStage
+  class c_CircuitRun[&quot;CircuitRun&quot;]
+  c_CircuitRun : +int Version
+  c_CircuitRun : +int WorldLayoutVersion
+  c_CircuitRun : +uint Seed
+  c_CircuitRun : +int Number
+  c_CircuitRun : +int StageDuelWins
+  c_CircuitRun : +int TournamentRound
+  c_CircuitRun : +int RewardNumber
+  c_CircuitRun : +int DuelNumber
+  c_CircuitRun : +string StarterId
+  c_CircuitRun : +string[] ActiveDeck
+  c_CircuitRun : … 10 more
+  class c_CircuitState[&quot;CircuitState&quot;]
+  c_CircuitState : +CircuitProfile Profile
+  c_CircuitState : +CircuitRun Run
+  class c_CircuitRules[&quot;CircuitRules&quot;]
+  &lt;&lt;static&gt;&gt; c_CircuitRules
+  c_CircuitRules : +int MaximumCards$
+  c_CircuitRules : +int MaximumDifficulty$
+  c_CircuitRules : +int CurrentRunVersion$
+  c_CircuitRules : +int CurrentWorldLayoutVersion$
+  c_CircuitRules : +int CurrentRoomRevision$
+  c_CircuitRules : +int CurrentProfileVersion$
+  c_CircuitRules : +int MaximumDecks$
+  c_CircuitRules : +int MaximumDeckName$
+  c_CircuitRules : +int MaximumDeckCards$
+  c_CircuitRules : +PreviewDistrict(…) Result~CircuitLocation[]~$
+  c_CircuitRules : … 61 more
+  c_CircuitEpisodeRecord --&gt; c_CircuitDuelOutcome : Outcome
+  c_CircuitEventRecord --&gt; c_CircuitEventStatus : Status
+  c_CircuitTaskStatus --&gt; c_CircuitTaskState : Status
+  c_CircuitLocation --&gt; c_CircuitLocationKind : Kind
+  c_CircuitProfile --&gt; &quot;*&quot; c_CircuitEpisodeRecord : EpisodeRecords
+  c_CircuitProfile --&gt; &quot;*&quot; c_CircuitEventRecord : EventRecords
+  c_CircuitProfile --&gt; &quot;*&quot; c_CircuitDeck : Decks
+  c_CircuitRun --&gt; &quot;*&quot; c_CircuitVisitRecord : VisitRecords
+  c_CircuitRun --&gt; c_CircuitDuelOutcome : Ending
+  c_CircuitRun --&gt; &quot;*&quot; c_CircuitLocation : Locations
+  c_CircuitRun --&gt; c_CircuitDuel : PendingDuel
+  c_CircuitRun --&gt; c_CircuitReward : PendingReward
+  c_CircuitState --&gt; c_CircuitProfile : Profile
+  c_CircuitState --&gt; c_CircuitRun : Run
+</pre></div>
+<p class="caption">18 types. Files: <code>CircuitDefinition.cs</code>, <code>CircuitGraph.cs</code>, <code>CircuitRules.cs</code>, <code>CircuitValidation.cs</code>.</p>
+
+<h3 id="toolkit-embergrove-expedition-progression-embergrove-expedition-1">EmberGrove.Expedition.Progression — namespace EmberGrove.Expedition (1 of 2)</h3>
+<div class="diagram"><pre class="mermaid">
+classDiagram
+  class c_CampaignRules[&quot;CampaignRules&quot;]
+  &lt;&lt;static&gt;&gt; c_CampaignRules
+  c_CampaignRules : +IsAvailable(ProfileState, CampaignDefinition) bool$
+  c_CampaignRules : +AvailableCampaigns(ProfileState, WorldDefinition) CampaignDefinition[]$
+  c_CampaignRules : +AvailableExpeditions(…) ExpeditionDefinition[]$
+  c_CampaignRules : +Start(ProfileState, uint, …) RunResult~RunState~$
+  c_CampaignRules : +StartFacts(RunState) ProgressFact[]$
+  c_CampaignRules : +OutcomeFacts(RunState) ProgressFact[]$
+  c_CampaignRules : … 1 more
+  class c_CombatProgressFacts[&quot;CombatProgressFacts&quot;]
+  &lt;&lt;static&gt;&gt; c_CombatProgressFacts
+  c_CombatProgressFacts : +Build(CombatState, CombatState, …) ProgressFact[]$
+  class c_RunPhase[&quot;RunPhase&quot;]
+  &lt;&lt;enumeration&gt;&gt; c_RunPhase
+  class c_RouteKind[&quot;RouteKind&quot;]
+  &lt;&lt;enumeration&gt;&gt; c_RouteKind
+  class c_EncounterDefinition[&quot;EncounterDefinition&quot;]
+  c_EncounterDefinition : +string Id
+  c_EncounterDefinition : +string Description
+  c_EncounterDefinition : +string IntentHint
+  c_EncounterDefinition : +int EnemyLife
+  c_EncounterDefinition : +DeckEntry[] Deck
+  class c_RelicDefinition[&quot;RelicDefinition&quot;]
+  c_RelicDefinition : +string Id
+  c_RelicDefinition : +string Rules
+  c_RelicDefinition : +int MaxLifeBonus
+  c_RelicDefinition : +int UpgradesAfterFight
+  class c_DeckPresetDefinition[&quot;DeckPresetDefinition&quot;]
+  c_DeckPresetDefinition : +string Id
+  c_DeckPresetDefinition : +string Description
+  c_DeckPresetDefinition : +DeckEntry[] Deck
+  class c_ContentPack[&quot;ContentPack&quot;]
+  c_ContentPack : +int Version
+  c_ContentPack : +string Title
+  c_ContentPack : +int StartingLife
+  c_ContentPack : +int CampHeal
+  c_ContentPack : +int MaximumUpgrade
+  c_ContentPack : +CombatConfig MatchRules
+  c_ContentPack : +int MatchDeckSize
+  c_ContentPack : +CardDefinition[] Cards
+  c_ContentPack : +DeckEntry[] StarterDeck
+  c_ContentPack : +EncounterDefinition[] Encounters
+  c_ContentPack : … 13 more
+  class c_RouteNode[&quot;RouteNode&quot;]
+  c_RouteNode : +string Id
+  c_RouteNode : +string Description
+  c_RouteNode : +string EncounterId
+  c_RouteNode : +RouteKind Kind
+  c_RouteNode : +string StorySceneId
+  c_RouteNode : +bool RewardCards
+  c_RouteNode : +bool RewardRelic
+  c_RouteNode : +int HealAmount
+  class c_RunState[&quot;RunState&quot;]
+  c_RunState : +int CurrentSaveVersion$
+  c_RunState : +int SaveVersion
+  c_RunState : +int ContentVersion
+  c_RunState : +int Stage
+  c_RunState : +int Life
+  c_RunState : +int MaxLife
+  c_RunState : +int BattlesWon
+  c_RunState : +int PendingUpgrades
+  c_RunState : +uint Seed
+  c_RunState : +RunPhase Phase
+  c_RunState : … 10 more
+  class c_RunResult[&quot;RunResult‹T›&quot;]
+  &lt;&lt;struct&gt;&gt; c_RunResult
+  c_RunResult : +bool IsSuccess
+  c_RunResult : +string Error
+  c_RunResult : +T Value
+  c_RunResult : +Ok(T) RunResult~T~$
+  c_RunResult : +Fail(string) RunResult~T~$
+  c_RunResult : +Map~U~(Func~T, U~) RunResult~U~
+  c_RunResult : +Bind~U~(Func~T, RunResult~U~~) RunResult~U~
+  class c_RunRules[&quot;RunRules&quot;]
+  &lt;&lt;static&gt;&gt; c_RunRules
+  c_RunRules : +New(uint, ContentPack, …) RunState$
+  c_RunRules : +Routes(RunState, ContentPack) RouteNode[]$
+  c_RunRules : +Stages(RunState, ContentPack) RouteStageDefinition[]$
+  c_RunRules : +CurrentStage(RunState, ContentPack) RouteStageDefinition$
+  c_RunRules : +EnemyLife(RunState, ContentPack, EncounterDefinition) int$
+  c_RunRules : +ChooseRoute(RunState, string, ContentPack) RunResult~RunState~$
+  c_RunRules : +CompleteBattle(RunState, bool, …) RunResult~RunState~$
+  c_RunRules : +PickReward(RunState, int, ContentPack) RunResult~RunState~$
+  c_RunRules : +PickRelic(RunState, string, ContentPack) RunResult~RunState~$
+  c_RunRules : +UpgradeCard(RunState, int, ContentPack) RunResult~RunState~$
+  c_RunRules : … 2 more
+  class c_WorldScope[&quot;WorldScope&quot;]
+  &lt;&lt;enumeration&gt;&gt; c_WorldScope
+  class c_WorldConditionKind[&quot;WorldConditionKind&quot;]
+  &lt;&lt;enumeration&gt;&gt; c_WorldConditionKind
+  class c_WorldRewardKind[&quot;WorldRewardKind&quot;]
+  &lt;&lt;enumeration&gt;&gt; c_WorldRewardKind
+  class c_WorldUnlockKind[&quot;WorldUnlockKind&quot;]
+  &lt;&lt;enumeration&gt;&gt; c_WorldUnlockKind
+  class c_CosmeticSlot[&quot;CosmeticSlot&quot;]
+  &lt;&lt;enumeration&gt;&gt; c_CosmeticSlot
+  class c_WorldAwardKind[&quot;WorldAwardKind&quot;]
+  &lt;&lt;enumeration&gt;&gt; c_WorldAwardKind
+  class c_WorldCondition[&quot;WorldCondition&quot;]
+  c_WorldCondition : +WorldConditionKind Kind
+  c_WorldCondition : +string Key
+  c_WorldCondition : +WorldScope Scope
+  c_WorldCondition : +long Amount
+  class c_WorldReward[&quot;WorldReward&quot;]
+  c_WorldReward : +WorldRewardKind Kind
+  c_WorldReward : +string Id
+  c_WorldReward : +bool Value
+  class c_WorldEntry[&quot;WorldEntry&quot;]
+  c_WorldEntry : +string Id
+  c_WorldEntry : +string Body
+  class c_FlagDefinition[&quot;FlagDefinition&quot;]
+  class c_CodexDefinition[&quot;CodexDefinition&quot;]
+  c_CodexDefinition : +string Category
+  class c_CardDefinition[&quot;CardDefinition · EmberGrove.Expedition&quot;]
+  &lt;&lt;external&gt;&gt; c_CardDefinition
+  class c_DeckEntry[&quot;DeckEntry · EmberGrove.Expedition&quot;]
+  &lt;&lt;external&gt;&gt; c_DeckEntry
+  class c_CombatConfig[&quot;CombatConfig · EmberGrove.Expedition&quot;]
+  &lt;&lt;external&gt;&gt; c_CombatConfig
+  class c_WorldDefinition[&quot;WorldDefinition · same namespace&quot;]
+  &lt;&lt;external&gt;&gt; c_WorldDefinition
+  c_EncounterDefinition --&gt; &quot;*&quot; c_DeckEntry : Deck
+  c_DeckPresetDefinition --&gt; &quot;*&quot; c_DeckEntry : Deck
+  c_ContentPack --&gt; &quot;*&quot; c_CardDefinition : Cards
+  c_ContentPack --&gt; &quot;*&quot; c_DeckEntry : StarterDeck
+  c_ContentPack --&gt; c_CombatConfig : MatchRules
+  c_ContentPack --&gt; &quot;*&quot; c_EncounterDefinition : Encounters
+  c_ContentPack --&gt; &quot;*&quot; c_RelicDefinition : Relics
+  c_ContentPack --&gt; &quot;*&quot; c_DeckPresetDefinition : DeckPresets, SoloDeckPresets
+  c_ContentPack --&gt; c_WorldDefinition : World
+  c_RouteNode --&gt; c_RouteKind : Kind
+  c_RunState --&gt; &quot;*&quot; c_DeckEntry : Deck
+  c_RunState --&gt; c_RunPhase : Phase
+  c_WorldCondition --&gt; c_WorldScope : Scope
+  c_WorldCondition --&gt; c_WorldConditionKind : Kind
+  c_WorldReward --&gt; c_WorldRewardKind : Kind
+  c_WorldEntry &lt;|-- c_FlagDefinition
+  c_WorldEntry &lt;|-- c_CodexDefinition
+</pre></div>
+<p class="caption">23 types; 4 referenced types from elsewhere, tagged external and named with where they live. Files: <code>CampaignRules.cs</code>, <code>CombatProgressFacts.cs</code>, <code>ExpeditionRun.cs</code>, <code>WorldDefinitions.cs</code>.</p>
+
+<h3 id="toolkit-embergrove-expedition-progression-embergrove-expedition-2">EmberGrove.Expedition.Progression — namespace EmberGrove.Expedition (2 of 2)</h3>
+<div class="diagram"><pre class="mermaid">
+classDiagram
+  class c_UnlockDefinition[&quot;UnlockDefinition&quot;]
+  c_UnlockDefinition : +WorldUnlockKind Kind
+  c_UnlockDefinition : +string DeckPresetId
+  c_UnlockDefinition : +string ExpeditionId
+  c_UnlockDefinition : +CosmeticSlot CosmeticSlot
+  c_UnlockDefinition : +string AccentHtml
+  c_UnlockDefinition : +int PatternIndex
+  class c_SpeakerDefinition[&quot;SpeakerDefinition&quot;]
+  c_SpeakerDefinition : +string PortraitId
+  class c_StoryLineDefinition[&quot;StoryLineDefinition&quot;]
+  c_StoryLineDefinition : +string Id
+  c_StoryLineDefinition : +string Text
+  c_StoryLineDefinition : +string AudioId
+  c_StoryLineDefinition : +string PortraitId
+  class c_CampaignDefinition[&quot;CampaignDefinition&quot;]
+  c_CampaignDefinition : +int Order
+  c_CampaignDefinition : +string RequiredUnlockId
+  c_CampaignDefinition : +string ArtworkId
+  c_CampaignDefinition : +string[] RouteStageIds
+  class c_ExpeditionDefinition[&quot;ExpeditionDefinition&quot;]
+  c_ExpeditionDefinition : +string CampaignId
+  c_ExpeditionDefinition : +string MusicId
+  c_ExpeditionDefinition : +int EnemyLifeBonus
+  class c_StoryChoiceDefinition[&quot;StoryChoiceDefinition&quot;]
+  c_StoryChoiceDefinition : +string Id
+  c_StoryChoiceDefinition : +string NextSceneId
+  c_StoryChoiceDefinition : +WorldCondition[] Conditions
+  c_StoryChoiceDefinition : +WorldReward[] Rewards
+  class c_StorySceneDefinition[&quot;StorySceneDefinition&quot;]
+  c_StorySceneDefinition : +string TriggerKey
+  c_StorySceneDefinition : +string RouteId
+  c_StorySceneDefinition : +string CampaignId
+  c_StorySceneDefinition : +string ExpeditionId
+  c_StorySceneDefinition : +StoryLineDefinition[] Lines
+  c_StorySceneDefinition : +WorldScope Scope
+  c_StorySceneDefinition : +bool Repeatable
+  c_StorySceneDefinition : +WorldCondition[] Conditions
+  c_StorySceneDefinition : +StoryChoiceDefinition[] Choices
+  class c_TutorialDefinition[&quot;TutorialDefinition&quot;]
+  c_TutorialDefinition : +string TriggerKey
+  c_TutorialDefinition : +string Objective
+  c_TutorialDefinition : +WorldScope Scope
+  c_TutorialDefinition : +WorldCondition[] Conditions
+  c_TutorialDefinition : +WorldReward[] Rewards
+  class c_AchievementDefinition[&quot;AchievementDefinition&quot;]
+  c_AchievementDefinition : +WorldCondition[] Conditions
+  c_AchievementDefinition : +WorldReward[] Rewards
+  class c_RouteStageDefinition[&quot;RouteStageDefinition&quot;]
+  c_RouteStageDefinition : +bool ShuffleNodes
+  c_RouteStageDefinition : +RouteNode[] Nodes
+  class c_WorldDefinition[&quot;WorldDefinition&quot;]
+  c_WorldDefinition : +int Version
+  c_WorldDefinition : +string Title
+  c_WorldDefinition : +RouteStageDefinition[] RouteStages
+  c_WorldDefinition : +RouteStageDefinition[] CampaignRouteStages
+  c_WorldDefinition : +CampaignDefinition[] Campaigns
+  c_WorldDefinition : +ExpeditionDefinition[] Expeditions
+  c_WorldDefinition : +SpeakerDefinition[] Speakers
+  c_WorldDefinition : +StorySceneDefinition[] StoryScenes
+  c_WorldDefinition : +CodexDefinition[] Codex
+  c_WorldDefinition : +TutorialDefinition[] Tutorials
+  c_WorldDefinition : … 14 more
+  class c_ProfileCounter[&quot;ProfileCounter&quot;]
+  c_ProfileCounter : +string Key
+  c_ProfileCounter : +WorldScope Scope
+  c_ProfileCounter : +long Value
+  class c_ReceiptCursor[&quot;ReceiptCursor&quot;]
+  c_ReceiptCursor : +string SessionId
+  c_ReceiptCursor : +long Ordinal
+  class c_StoryChoiceRecord[&quot;StoryChoiceRecord&quot;]
+  c_StoryChoiceRecord : +string SceneId
+  c_StoryChoiceRecord : +long SessionOrdinal
+  class c_ProfileState[&quot;ProfileState&quot;]
+  c_ProfileState : +int Version
+  c_ProfileState : +long Revision
+  c_ProfileState : +long RetiredThroughOrdinal
+  c_ProfileState : +List~string~ Flags
+  c_ProfileState : +List~string~ UnlockedIds
+  c_ProfileState : +List~string~ CodexIds
+  c_ProfileState : +List~string~ ActiveTutorialIds
+  c_ProfileState : +List~string~ CompletedTutorialIds
+  c_ProfileState : +List~string~ AchievementIds
+  c_ProfileState : +List~string~ CompletedSceneIds
+  c_ProfileState : … 4 more
+  class c_ProgressFact[&quot;ProgressFact&quot;]
+  c_ProgressFact : +string Key
+  c_ProgressFact : +long Amount
+  class c_ProgressEnvelope[&quot;ProgressEnvelope&quot;]
+  c_ProgressEnvelope : +string SessionId
+  c_ProgressEnvelope : +string RouteId
+  c_ProgressEnvelope : +string CampaignId
+  c_ProgressEnvelope : +string ExpeditionId
+  c_ProgressEnvelope : +long SessionOrdinal
+  c_ProgressEnvelope : +WorldScope Scope
+  c_ProgressEnvelope : +ProgressFact[] Facts
+  class c_WorldAward[&quot;WorldAward&quot;]
+  c_WorldAward : +WorldAwardKind Kind
+  c_WorldAward : +string Id
+  c_WorldAward : +string Body
+  class c_ProfileResolution[&quot;ProfileResolution&quot;]
+  c_ProfileResolution : +ProfileState Profile
+  c_ProfileResolution : +long SessionOrdinal
+  c_ProfileResolution : +bool Duplicate
+  c_ProfileResolution : +string NextSceneId
+  c_ProfileResolution : +List~WorldAward~ Awards
+  class c_AchievementProgress[&quot;AchievementProgress&quot;]
+  c_AchievementProgress : +AchievementDefinition Definition
+  c_AchievementProgress : +bool Completed
+  c_AchievementProgress : +long Current
+  c_AchievementProgress : +float Fraction
+  class c_WorldResult[&quot;WorldResult‹T›&quot;]
+  &lt;&lt;struct&gt;&gt; c_WorldResult
+  c_WorldResult : +bool IsSuccess
+  c_WorldResult : +string Error
+  c_WorldResult : +T Value
+  c_WorldResult : +Ok(T) WorldResult~T~$
+  c_WorldResult : +Fail(string) WorldResult~T~$
+  c_WorldResult : +Map~U~(Func~T, U~) WorldResult~U~
+  c_WorldResult : +Bind~U~(Func~T, WorldResult~U~~) WorldResult~U~
+  class c_ProfileRules[&quot;ProfileRules&quot;]
+  &lt;&lt;static&gt;&gt; c_ProfileRules
+  c_ProfileRules : +int ReceiptLimit$
+  c_ProfileRules : +long MaximumCounter$
+  c_ProfileRules : +New(WorldDefinition) ProfileState$
+  c_ProfileRules : +BeginSession(…) WorldResult~ProfileResolution~$
+  c_ProfileRules : +ApplyBatch(…) WorldResult~ProfileResolution~$
+  c_ProfileRules : +Counter(ProfileState, string, WorldScope) long$
+  c_ProfileRules : +Meets(ProfileState, IEnumerable~WorldCondition~) bool$
+  c_ProfileRules : +EligibleScenes(…) StorySceneDefinition[]$
+  c_ProfileRules : +ActiveTutorials(ProfileState, WorldDefinition) TutorialDefinition[]$
+  c_ProfileRules : +AchievementProgress(…) AchievementProgress[]$
+  c_ProfileRules : … 2 more
+  class c_StoryRules[&quot;StoryRules&quot;]
+  &lt;&lt;static&gt;&gt; c_StoryRules
+  c_StoryRules : +AvailableChoices(…) StoryChoiceDefinition[]$
+  c_StoryRules : +Choose(ProfileState, string, …) WorldResult~ProfileResolution~$
+  class c_RouteNode[&quot;RouteNode · same namespace&quot;]
+  &lt;&lt;external&gt;&gt; c_RouteNode
+  class c_WorldScope[&quot;WorldScope · same namespace&quot;]
+  &lt;&lt;external&gt;&gt; c_WorldScope
+  class c_WorldUnlockKind[&quot;WorldUnlockKind · same namespace&quot;]
+  &lt;&lt;external&gt;&gt; c_WorldUnlockKind
+  class c_CosmeticSlot[&quot;CosmeticSlot · same namespace&quot;]
+  &lt;&lt;external&gt;&gt; c_CosmeticSlot
+  class c_WorldAwardKind[&quot;WorldAwardKind · same namespace&quot;]
+  &lt;&lt;external&gt;&gt; c_WorldAwardKind
+  class c_WorldCondition[&quot;WorldCondition · same namespace&quot;]
+  &lt;&lt;external&gt;&gt; c_WorldCondition
+  class c_WorldReward[&quot;WorldReward · same namespace&quot;]
+  &lt;&lt;external&gt;&gt; c_WorldReward
+  class c_WorldEntry[&quot;WorldEntry · same namespace&quot;]
+  &lt;&lt;external&gt;&gt; c_WorldEntry
+  class c_FlagDefinition[&quot;FlagDefinition · same namespace&quot;]
+  &lt;&lt;external&gt;&gt; c_FlagDefinition
+  class c_CodexDefinition[&quot;CodexDefinition · same namespace&quot;]
+  &lt;&lt;external&gt;&gt; c_CodexDefinition
+  c_WorldEntry &lt;|-- c_UnlockDefinition
+  c_UnlockDefinition --&gt; c_WorldUnlockKind : Kind
+  c_UnlockDefinition --&gt; c_CosmeticSlot : CosmeticSlot
+  c_WorldEntry &lt;|-- c_SpeakerDefinition
+  c_WorldEntry &lt;|-- c_CampaignDefinition
+  c_WorldEntry &lt;|-- c_ExpeditionDefinition
+  c_StoryChoiceDefinition --&gt; &quot;*&quot; c_WorldCondition : Conditions
+  c_StoryChoiceDefinition --&gt; &quot;*&quot; c_WorldReward : Rewards
+  c_WorldEntry &lt;|-- c_StorySceneDefinition
+  c_StorySceneDefinition --&gt; c_WorldScope : Scope
+  c_StorySceneDefinition --&gt; &quot;*&quot; c_WorldCondition : Conditions
+  c_StorySceneDefinition --&gt; &quot;*&quot; c_StoryLineDefinition : Lines
+  c_StorySceneDefinition --&gt; &quot;*&quot; c_StoryChoiceDefinition : Choices
+  c_WorldEntry &lt;|-- c_TutorialDefinition
+  c_TutorialDefinition --&gt; c_WorldScope : Scope
+  c_TutorialDefinition --&gt; &quot;*&quot; c_WorldCondition : Conditions
+  c_TutorialDefinition --&gt; &quot;*&quot; c_WorldReward : Rewards
+  c_WorldEntry &lt;|-- c_AchievementDefinition
+  c_AchievementDefinition --&gt; &quot;*&quot; c_WorldCondition : Conditions
+  c_AchievementDefinition --&gt; &quot;*&quot; c_WorldReward : Rewards
+  c_WorldEntry &lt;|-- c_RouteStageDefinition
+  c_RouteStageDefinition --&gt; &quot;*&quot; c_RouteNode : Nodes
+  c_WorldDefinition --&gt; &quot;*&quot; c_WorldReward : InitialRewards
+  c_WorldDefinition --&gt; &quot;*&quot; c_FlagDefinition : Flags
+  c_WorldDefinition --&gt; &quot;*&quot; c_CodexDefinition : Codex
+  c_WorldDefinition --&gt; &quot;*&quot; c_UnlockDefinition : Unlocks
+  c_WorldDefinition --&gt; &quot;*&quot; c_SpeakerDefinition : Speakers
+  c_WorldDefinition --&gt; &quot;*&quot; c_CampaignDefinition : Campaigns
+  c_WorldDefinition --&gt; &quot;*&quot; c_ExpeditionDefinition : Expeditions
+  c_WorldDefinition --&gt; &quot;*&quot; c_StorySceneDefinition : StoryScenes
+  c_WorldDefinition --&gt; &quot;*&quot; c_TutorialDefinition : Tutorials
+  c_WorldDefinition --&gt; &quot;*&quot; c_AchievementDefinition : Achievements
+  c_WorldDefinition --&gt; &quot;*&quot; c_RouteStageDefinition : RouteStages, CampaignRouteStages
+  c_ProfileCounter --&gt; c_WorldScope : Scope
+  c_ProfileState --&gt; &quot;*&quot; c_ProfileCounter : Counters
+  c_ProfileState --&gt; &quot;*&quot; c_ReceiptCursor : Receipts
+  c_ProfileState --&gt; &quot;*&quot; c_StoryChoiceRecord : StoryChoices
+  c_ProgressEnvelope --&gt; c_WorldScope : Scope
+  c_ProgressEnvelope --&gt; &quot;*&quot; c_ProgressFact : Facts
+  c_WorldAward --&gt; c_WorldAwardKind : Kind
+  c_ProfileResolution --&gt; c_ProfileState : Profile
+  c_ProfileResolution --&gt; &quot;*&quot; c_WorldAward : Awards
+  c_AchievementProgress --&gt; c_AchievementDefinition : Definition
+</pre></div>
+<p class="caption">23 types; 10 referenced types from elsewhere, tagged external and named with where they live. Files: <code>WorldDefinitions.cs</code>, <code>WorldProfile.cs</code>.</p>
+
+<h3 id="toolkit-cardforge-content-embergrove-expedition">CardForge.Content — namespace EmberGrove.Expedition</h3>
+<div class="diagram"><pre class="mermaid">
+classDiagram
+  class c_ContentManifest[&quot;ContentManifest&quot;]
+  c_ContentManifest : +int Version
+  c_ContentManifest : +string Id
+  c_ContentManifest : +string Description
+  c_ContentManifest : +string Author
+  c_ContentManifest : +string ContentVersion
+  c_ContentManifest : +string MinimumGameVersion
+  c_ContentManifest : +string CombatFile
+  c_ContentManifest : +string WorldFile
+  c_ContentManifest : +string MediaFile
+  c_ContentManifest : +CircuitPackDefinition Circuit
+  class c_CircuitPackDefinition[&quot;CircuitPackDefinition&quot;]
+  c_CircuitPackDefinition : +int Version
+  c_CircuitPackDefinition : +string DialogueFile
+  class c_MediaAssetDefinition[&quot;MediaAssetDefinition&quot;]
+  c_MediaAssetDefinition : +string Id
+  c_MediaAssetDefinition : +string Path
+  c_MediaAssetDefinition : +string Title
+  c_MediaAssetDefinition : +string Transcript
+  c_MediaAssetDefinition : +float Volume
+  c_MediaAssetDefinition : +bool Loop
+  c_MediaAssetDefinition : +int AtlasColumns
+  c_MediaAssetDefinition : +int AtlasRows
+  c_MediaAssetDefinition : +int AtlasIndex
+  c_MediaAssetDefinition : +MatchesTranscript(string) bool
+  class c_MediaThemeDefinition[&quot;MediaThemeDefinition&quot;]
+  c_MediaThemeDefinition : +string Title
+  c_MediaThemeDefinition : +string BackdropId
+  c_MediaThemeDefinition : +string FontId
+  c_MediaThemeDefinition : +string Accent
+  c_MediaThemeDefinition : +string Paper
+  c_MediaThemeDefinition : +string Quiet
+  c_MediaThemeDefinition : +string Panel
+  c_MediaThemeDefinition : +string BackdropTint
+  c_MediaThemeDefinition : +string MusicMenuId
+  c_MediaThemeDefinition : +string MusicBattleId
+  c_MediaThemeDefinition : … 9 more
+  class c_MenuPaletteDefinition[&quot;MenuPaletteDefinition&quot;]
+  c_MenuPaletteDefinition : +string Id
+  c_MenuPaletteDefinition : +string WaybookPalette
+  c_MenuPaletteDefinition : +MenuColourDefinition[] Colours
+  c_MenuPaletteDefinition : +string[] ThemeRoles$
+  c_MenuPaletteDefinition : +string[] MenuRoles$
+  c_MenuPaletteDefinition : +Find(string) string
+  c_MenuPaletteDefinition : +Validate(MediaThemeDefinition) string[]$
+  class c_MenuColourDefinition[&quot;MenuColourDefinition&quot;]
+  c_MenuColourDefinition : +string Role
+  class c_WaybookPresentationDefinition[&quot;WaybookPresentationDefinition&quot;]
+  c_WaybookPresentationDefinition : +int Version
+  c_WaybookPresentationDefinition : +string Title
+  c_WaybookPresentationDefinition : +string BookmarkLabel
+  c_WaybookPresentationDefinition : +string ListLabel
+  c_WaybookPresentationDefinition : +string WebLabel
+  c_WaybookPresentationDefinition : +string NextLabel
+  c_WaybookPresentationDefinition : +string LaterLabel
+  c_WaybookPresentationDefinition : +string DoneLabel
+  c_WaybookPresentationDefinition : +string GoLabel
+  c_WaybookPresentationDefinition : +string StopLabel
+  c_WaybookPresentationDefinition : … 8 more
+  class c_MenuArtSlotDefinition[&quot;MenuArtSlotDefinition&quot;]
+  c_MenuArtSlotDefinition : +string Role
+  c_MenuArtSlotDefinition : +string Fit
+  c_MenuArtSlotDefinition : +float Opacity
+  class c_MediaDefinition[&quot;MediaDefinition&quot;]
+  c_MediaDefinition : +int Version
+  c_MediaDefinition : +MediaAssetDefinition[] Assets
+  c_MediaDefinition : +MediaThemeDefinition Theme
+  c_MediaDefinition : +Find(string) MediaAssetDefinition
+  c_MediaDefinition : +Validate() string[]
+  class c_LoadedContentPack[&quot;LoadedContentPack&quot;]
+  c_LoadedContentPack : +ContentManifest Manifest
+  c_LoadedContentPack : +ContentPack Content
+  c_LoadedContentPack : +MediaDefinition Media
+  c_LoadedContentPack : +CircuitDialogue Dialogue
+  c_LoadedContentPack : +string Root
+  class c_ContentPackFiles[&quot;ContentPackFiles&quot;]
+  &lt;&lt;static&gt;&gt; c_ContentPackFiles
+  c_ContentPackFiles : +string ActiveCombatHash$
+  c_ContentPackFiles : +string MenuPaletteOverride$
+  c_ContentPackFiles : +ParseManifest(string) ContentManifest$
+  c_ContentPackFiles : +SafeRelativePath(string) bool$
+  c_ContentPackFiles : +Location(string, string) string$
+  c_ContentPackFiles : +DefaultRoot() string$
+  c_ContentPackFiles : +Load(string, Action~LoadedContentPack~, Action~string~) IEnumerator$
+  c_ContentPackFiles : +LoadDialogue(string, string, …) IEnumerator$
+  class c_ExpeditionContent[&quot;ExpeditionContent&quot;]
+  &lt;&lt;static&gt;&gt; c_ExpeditionContent
+  c_ExpeditionContent : +Load() ContentPack$
+  c_ExpeditionContent : +Parse(string) ContentPack$
+  class c_WorldContent[&quot;WorldContent&quot;]
+  &lt;&lt;static&gt;&gt; c_WorldContent
+  c_WorldContent : +Load() WorldDefinition$
+  c_WorldContent : +Parse(string) WorldDefinition$
+  c_WorldContent : +Serialize(WorldDefinition, bool) string$
+  class c_CircuitDialogue[&quot;CircuitDialogue · CardForge.Circuit&quot;]
+  &lt;&lt;external&gt;&gt; c_CircuitDialogue
+  class c_ContentPack[&quot;ContentPack · EmberGrove.Expedition.Progression&quot;]
+  &lt;&lt;external&gt;&gt; c_ContentPack
+  c_ContentManifest --&gt; c_CircuitPackDefinition : Circuit
+  c_MediaThemeDefinition --&gt; &quot;*&quot; c_MenuPaletteDefinition : MenuPalettes, SelectedMenuPalette
+  c_MediaThemeDefinition --&gt; c_WaybookPresentationDefinition : Waybook
+  c_MenuPaletteDefinition --&gt; &quot;*&quot; c_MenuColourDefinition : Colours
+  c_WaybookPresentationDefinition --&gt; &quot;*&quot; c_MenuArtSlotDefinition : ArtSlots
+  c_MediaDefinition --&gt; &quot;*&quot; c_MediaAssetDefinition : Assets
+  c_MediaDefinition --&gt; c_MediaThemeDefinition : Theme
+  c_LoadedContentPack --&gt; c_CircuitDialogue : Dialogue
+  c_LoadedContentPack --&gt; c_ContentManifest : Manifest
+  c_LoadedContentPack --&gt; c_MediaDefinition : Media
+  c_LoadedContentPack --&gt; c_ContentPack : Content
+</pre></div>
+<p class="caption">13 types; 2 referenced types from elsewhere, tagged external and named with where they live. Files: <code>ContentPackFiles.cs</code>, <code>ExpeditionContent.cs</code>, <code>WorldContent.cs</code>.</p>
+
+<h3 id="toolkit-embergrove-expedition-networking-1">EmberGrove.Expedition.Networking — namespace EmberGrove.Expedition.Networking (1 of 2)</h3>
+<div class="diagram"><pre class="mermaid">
+classDiagram
+  class c_ExpeditionFingerprint[&quot;ExpeditionFingerprint&quot;]
+  &lt;&lt;static&gt;&gt; c_ExpeditionFingerprint
+  c_ExpeditionFingerprint : +Compute(…) string$
+  class c_ExpeditionAuthority[&quot;ExpeditionAuthority&quot;]
+  c_ExpeditionAuthority : +string MatchId
+  c_ExpeditionAuthority : +string Fingerprint
+  c_ExpeditionAuthority : +long Revision
+  c_ExpeditionAuthority : +ValidatePresets(Catalog, IReadOnlyDictionary~string, DeckEntry[]~)$
+  c_ExpeditionAuthority : +ViewFor(int) WireView
+  c_ExpeditionAuthority : +Receive(int, WirePacket) Result~WireView~
+  class c_ExpeditionNetworkSession[&quot;ExpeditionNetworkSession&quot;]
+  c_ExpeditionNetworkSession : +Action~ExpeditionSnapshot~ SnapshotChanged
+  c_ExpeditionNetworkSession : +ExpeditionSnapshot CurrentSnapshot
+  c_ExpeditionNetworkSession : +int Seat
+  c_ExpeditionNetworkSession : +bool IsHost
+  c_ExpeditionNetworkSession : +bool Connected
+  c_ExpeditionNetworkSession : +bool Pending
+  c_ExpeditionNetworkSession : +string Status
+  c_ExpeditionNetworkSession : +string Error
+  c_ExpeditionNetworkSession : +string RoomCode
+  c_ExpeditionNetworkSession : +string RoomId
+  c_ExpeditionNetworkSession : … 33 more
+  class c_RelayReadinessPolicy[&quot;RelayReadinessPolicy&quot;]
+  c_RelayReadinessPolicy : +int BudgetMilliseconds
+  c_RelayReadinessPolicy : +int ProbeMilliseconds
+  c_RelayReadinessPolicy : +int PauseMilliseconds
+  class c_RelayReadinessException[&quot;RelayReadinessException&quot;]
+  &lt;&lt;InvalidOperationException&gt;&gt; c_RelayReadinessException
+  class c_NetworkLink[&quot;NetworkLink&quot;]
+  &lt;&lt;abstract&gt;&gt; c_NetworkLink
+  c_NetworkLink : +Send(byte[]) Task
+  c_NetworkLink : +Receive() Task~byte[]~
+  c_NetworkLink : +Dispose()
+  class c_TcpNetworkLink[&quot;TcpNetworkLink&quot;]
+  c_TcpNetworkLink : +Receive() Task~byte[]~
+  c_TcpNetworkLink : +Dispose()
+  class c_WebSocketNetworkLink[&quot;WebSocketNetworkLink&quot;]
+  c_WebSocketNetworkLink : +Receive() Task~byte[]~
+  c_WebSocketNetworkLink : +Dispose()
+  c_WebSocketNetworkLink : … 1 more
+  class c_ExpeditionProtocol[&quot;ExpeditionProtocol&quot;]
+  &lt;&lt;static&gt;&gt; c_ExpeditionProtocol
+  c_ExpeditionProtocol : +int Version$
+  c_ExpeditionProtocol : +int MaxPacketBytes$
+  c_ExpeditionProtocol : +int MaxHandles$
+  c_ExpeditionProtocol : +int MaxEvents$
+  c_ExpeditionProtocol : +int DefaultPort$
+  c_ExpeditionProtocol : +int RelayVersion$
+  c_ExpeditionProtocol : +int RelayInviteLength$
+  c_ExpeditionProtocol : +int RelayAccessMaxLength$
+  c_ExpeditionProtocol : +int NamedRelayVersion$
+  c_ExpeditionProtocol : +int RelaySetupMaxBytes$
+  c_ExpeditionProtocol : … 10 more
+  class c_WireCommand[&quot;WireCommand&quot;]
+  c_WireCommand : +ActionKind Kind
+  c_WireCommand : +int Player
+  c_WireCommand : +int TargetId
+  c_WireCommand : +int Lane
+  c_WireCommand : +Rank Rank
+  c_WireCommand : +Copy() WireCommand
+  c_WireCommand : +ToCommand() CombatCommand
+  c_WireCommand : +From(CombatCommand) WireCommand$
+  class c_WireEvent[&quot;WireEvent&quot;]
+  c_WireEvent : +CombatEventKind Kind
+  c_WireEvent : +int Player
+  c_WireEvent : +int SourceId
+  c_WireEvent : +int TargetId
+  c_WireEvent : +int Lane
+  c_WireEvent : +int Amount
+  c_WireEvent : +TerrainKind Terrain
+  class c_WireCard[&quot;WireCard&quot;]
+  c_WireCard : +int Handle
+  c_WireCard : +int UpgradeLevel
+  c_WireCard : +int Health
+  c_WireCard : +int Shield
+  c_WireCard : +int Lane
+  c_WireCard : +string DefinitionId
+  c_WireCard : +Zone Zone
+  c_WireCard : +Rank Rank
+  c_WireCard : +bool Ready
+  class c_WireSide[&quot;WireSide&quot;]
+  c_WireSide : +int Team
+  c_WireSide : +int MaxLife
+  c_WireSide : +int Shield
+  c_WireSide : +int Pulse
+  c_WireSide : +int DeckCount
+  c_WireSide : +int HandCount
+  c_WireSide : +int DiscardCount
+  c_WireSide : +int CardsPlayedThisTurn
+  c_WireSide : +bool MomentumEarnedThisTurn
+  class c_NetworkProgressFact[&quot;NetworkProgressFact&quot;]
+  c_NetworkProgressFact : +string Key
+  c_NetworkProgressFact : +long Amount
+  class c_WireView[&quot;WireView&quot;]
+  c_WireView : +string MatchId
+  c_WireView : +long Revision
+  c_WireView : +int ViewerPlayer
+  c_WireView : +int Turn
+  c_WireView : +int Round
+  c_WireView : +int TurnsThisRound
+  c_WireView : +int Winner
+  c_WireView : +int HandleCapacity
+  c_WireView : +CombatConfig Config
+  c_WireView : +TerrainKind[] Terrain
+  c_WireView : … 7 more
+  class c_WirePacket[&quot;WirePacket&quot;]
+  c_WirePacket : +int Protocol
+  c_WirePacket : +string Kind
+  c_WirePacket : +string MatchId
+  c_WirePacket : +string DeckId
+  c_WirePacket : +string ErrorCode
+  c_WirePacket : +string Message
+  c_WirePacket : +string RoomCode
+  c_WirePacket : +string RoomId
+  c_WirePacket : +long Sequence
+  c_WirePacket : +WireCommand Command
+  c_WirePacket : … 1 more
+  class c_RelayRoomSetup[&quot;RelayRoomSetup&quot;]
+  c_RelayRoomSetup : +int Protocol
+  c_RelayRoomSetup : +string Kind
+  c_RelayRoomSetup : +string Name
+  c_RelayRoomSetup : +string RoomId
+  c_RelayRoomSetup : +bool IsPrivate
+  class c_Rank[&quot;Rank · EmberGrove.Expedition&quot;]
+  &lt;&lt;external&gt;&gt; c_Rank
+  class c_TerrainKind[&quot;TerrainKind · EmberGrove.Expedition&quot;]
+  &lt;&lt;external&gt;&gt; c_TerrainKind
+  class c_ActionKind[&quot;ActionKind · EmberGrove.Expedition&quot;]
+  &lt;&lt;external&gt;&gt; c_ActionKind
+  class c_CombatEventKind[&quot;CombatEventKind · EmberGrove.Expedition&quot;]
+  &lt;&lt;external&gt;&gt; c_CombatEventKind
+  class c_Catalog[&quot;Catalog · EmberGrove.Expedition&quot;]
+  &lt;&lt;external&gt;&gt; c_Catalog
+  class c_DeckEntry[&quot;DeckEntry · EmberGrove.Expedition&quot;]
+  &lt;&lt;external&gt;&gt; c_DeckEntry
+  class c_CombatConfig[&quot;CombatConfig · EmberGrove.Expedition&quot;]
+  &lt;&lt;external&gt;&gt; c_CombatConfig
+  class c_CombatState[&quot;CombatState · EmberGrove.Expedition&quot;]
+  &lt;&lt;external&gt;&gt; c_CombatState
+  class c_CombatCommand[&quot;CombatCommand · EmberGrove.Expedition&quot;]
+  &lt;&lt;external&gt;&gt; c_CombatCommand
+  class c_CombatEvent[&quot;CombatEvent · EmberGrove.Expedition&quot;]
+  &lt;&lt;external&gt;&gt; c_CombatEvent
+  class c_TrustedAdmission[&quot;TrustedAdmission · same namespace&quot;]
+  &lt;&lt;external&gt;&gt; c_TrustedAdmission
+  class c_ExpeditionSnapshot[&quot;ExpeditionSnapshot · same namespace&quot;]
+  &lt;&lt;external&gt;&gt; c_ExpeditionSnapshot
+  c_ExpeditionAuthority --&gt; c_Catalog : catalog
+  c_ExpeditionAuthority --&gt; c_CombatState : state
+  c_ExpeditionAuthority --&gt; c_CombatCommand : lastCommand
+  c_ExpeditionAuthority --&gt; &quot;*&quot; c_CombatEvent : lastEvents
+  c_ExpeditionNetworkSession --&gt; c_Catalog : catalog
+  c_ExpeditionNetworkSession --&gt; &quot;*&quot; c_DeckEntry : presets
+  c_ExpeditionNetworkSession --&gt; c_CombatConfig : config
+  c_ExpeditionNetworkSession --&gt; c_ExpeditionAuthority : authority
+  c_ExpeditionNetworkSession --&gt; c_RelayReadinessPolicy : RelayReadiness
+  c_ExpeditionNetworkSession --&gt; c_NetworkLink : link
+  c_ExpeditionNetworkSession --&gt; &quot;*&quot; c_WirePacket : localCommands, trustedPending
+  c_ExpeditionNetworkSession --&gt; c_TrustedAdmission : trustedAdmission
+  c_ExpeditionNetworkSession --&gt; c_ExpeditionSnapshot : CurrentSnapshot
+  c_NetworkLink &lt;|-- c_TcpNetworkLink
+  c_NetworkLink &lt;|-- c_WebSocketNetworkLink
+  c_WireCommand --&gt; c_Rank : Rank
+  c_WireCommand --&gt; c_ActionKind : Kind
+  c_WireEvent --&gt; c_TerrainKind : Terrain
+  c_WireEvent --&gt; c_CombatEventKind : Kind
+  c_WireCard --&gt; c_Rank : Rank
+  c_WireView --&gt; &quot;*&quot; c_TerrainKind : Terrain
+  c_WireView --&gt; c_CombatConfig : Config
+  c_WireView --&gt; &quot;*&quot; c_WireCommand : LegalCommands, LastCommand
+  c_WireView --&gt; &quot;*&quot; c_WireEvent : Events
+  c_WireView --&gt; &quot;*&quot; c_WireCard : Cards
+  c_WireView --&gt; &quot;*&quot; c_WireSide : Players
+  c_WireView --&gt; &quot;*&quot; c_NetworkProgressFact : ProgressFacts
+  c_WirePacket --&gt; c_WireCommand : Command
+  c_WirePacket --&gt; c_WireView : View
+</pre></div>
+<p class="caption">17 types; 12 referenced types from elsewhere, tagged external and named with where they live; 7 more referenced types not drawn. Files: <code>ExpeditionAuthority.cs</code>, <code>ExpeditionNetworkSession.cs</code>, <code>NetworkContracts.cs</code>.</p>
+
+<h3 id="toolkit-embergrove-expedition-networking-2">EmberGrove.Expedition.Networking — namespace EmberGrove.Expedition.Networking (2 of 2)</h3>
+<div class="diagram"><pre class="mermaid">
+classDiagram
+  class c_RelayRoomInfo[&quot;RelayRoomInfo&quot;]
+  c_RelayRoomInfo : +string Id
+  class c_RelayRoomList[&quot;RelayRoomList&quot;]
+  c_RelayRoomList : +int Protocol
+  c_RelayRoomList : +string Kind
+  c_RelayRoomList : +RelayRoomInfo[] Rooms
+  class c_RelayRoomRules[&quot;RelayRoomRules&quot;]
+  &lt;&lt;static&gt;&gt; c_RelayRoomRules
+  c_RelayRoomRules : +NormalizeName(string) string$
+  c_RelayRoomRules : +ValidatePassword(string, bool) string$
+  c_RelayRoomRules : +ValidId(string) bool$
+  class c_TrustedIdentityAssertion[&quot;TrustedIdentityAssertion&quot;]
+  c_TrustedIdentityAssertion : +int Version
+  c_TrustedIdentityAssertion : +string Provider
+  c_TrustedIdentityAssertion : +string Assertion
+  c_TrustedIdentityAssertion : +string RequestId
+  c_TrustedIdentityAssertion : +string ServerInstance
+  c_TrustedIdentityAssertion : +Copy() TrustedIdentityAssertion
+  class c_TrustedAdmission[&quot;TrustedAdmission&quot;]
+  c_TrustedAdmission : +int Protocol
+  c_TrustedAdmission : +string RulesVersion
+  c_TrustedAdmission : +int ContentVersion
+  c_TrustedAdmission : +string ContentSha256
+  c_TrustedAdmission : +string Fingerprint
+  c_TrustedAdmission : +string DeckId
+  c_TrustedAdmission : +TrustedIdentityAssertion Identity
+  class c_TrustedTicket[&quot;TrustedTicket&quot;]
+  c_TrustedTicket : +string MatchId
+  c_TrustedTicket : +int Seat
+  c_TrustedTicket : +string Token
+  c_TrustedTicket : +long Session
+  class c_TrustedQueueAdmission[&quot;TrustedQueueAdmission&quot;]
+  c_TrustedQueueAdmission : +int QueueProtocol
+  c_TrustedQueueAdmission : +TrustedAdmission Admission
+  class c_TrustedQueueTicket[&quot;TrustedQueueTicket&quot;]
+  c_TrustedQueueTicket : +int QueueProtocol
+  c_TrustedQueueTicket : +string QueueId
+  c_TrustedQueueTicket : +string Token
+  c_TrustedQueueTicket : +long Session
+  c_TrustedQueueTicket : +string State
+  c_TrustedQueueTicket : +TrustedTicket Match
+  class c_TrustedLobbyAdmission[&quot;TrustedLobbyAdmission&quot;]
+  c_TrustedLobbyAdmission : +int LobbyProtocol
+  c_TrustedLobbyAdmission : +string LobbySha256
+  c_TrustedLobbyAdmission : +TrustedAdmission Admission
+  class c_TrustedLobbyCommand[&quot;TrustedLobbyCommand&quot;]
+  c_TrustedLobbyCommand : +long Sequence
+  c_TrustedLobbyCommand : +string Kind
+  c_TrustedLobbyCommand : +string TableId
+  c_TrustedLobbyCommand : +long TableRevision
+  c_TrustedLobbyCommand : +string MatchId
+  c_TrustedLobbyCommand : +float X
+  c_TrustedLobbyCommand : +float Z
+  class c_TrustedLobbyMember[&quot;TrustedLobbyMember&quot;]
+  c_TrustedLobbyMember : +string Id
+  c_TrustedLobbyMember : +int Slot
+  c_TrustedLobbyMember : +string State
+  c_TrustedLobbyMember : +string TableId
+  c_TrustedLobbyMember : +float X
+  c_TrustedLobbyMember : +float Z
+  class c_TrustedLobbyTable[&quot;TrustedLobbyTable&quot;]
+  c_TrustedLobbyTable : +string Id
+  c_TrustedLobbyTable : +long Revision
+  c_TrustedLobbyTable : +string Owner
+  c_TrustedLobbyTable : +string Challenger
+  c_TrustedLobbyTable : +bool Playing
+  class c_TrustedLobbyTicket[&quot;TrustedLobbyTicket&quot;]
+  c_TrustedLobbyTicket : +int LobbyProtocol
+  c_TrustedLobbyTicket : +string LobbyId
+  c_TrustedLobbyTicket : +string Token
+  c_TrustedLobbyTicket : +long Session
+  c_TrustedLobbyTicket : +long Revision
+  c_TrustedLobbyTicket : +long Accepted
+  c_TrustedLobbyTicket : +string Error
+  c_TrustedLobbyTicket : +TrustedLobbyMember[] Members
+  c_TrustedLobbyTicket : +TrustedLobbyTable[] Tables
+  c_TrustedLobbyTicket : +TrustedTicket Match
+  class c_TrustedProblem[&quot;TrustedProblem&quot;]
+  c_TrustedProblem : +string Error
+  class c_ExpeditionSnapshot[&quot;ExpeditionSnapshot&quot;]
+  c_ExpeditionSnapshot : +CombatState State
+  c_ExpeditionSnapshot : +CombatCommand[] LegalCommands
+  c_ExpeditionSnapshot : +CombatEvent[] Events
+  c_ExpeditionSnapshot : +ProgressFact[] ProgressFacts
+  c_ExpeditionSnapshot : +CombatCommand? LastCommand
+  c_ExpeditionSnapshot : +long Revision
+  c_ExpeditionSnapshot : +int ViewerPlayer
+  c_ExpeditionSnapshot : +bool Initial
+  c_ExpeditionSnapshot : +string MatchId
+  class c_ExpeditionWireCodec[&quot;ExpeditionWireCodec&quot;]
+  &lt;&lt;static&gt;&gt; c_ExpeditionWireCodec
+  c_ExpeditionWireCodec : +EncodeTrusted~T~(T) byte[]$
+  c_ExpeditionWireCodec : +DecodeTrusted~T~(byte[]) T$
+  c_ExpeditionWireCodec : +Encode(WirePacket) byte[]$
+  c_ExpeditionWireCodec : +Decode(byte[]) WirePacket$
+  class c_ExpeditionProjection[&quot;ExpeditionProjection&quot;]
+  &lt;&lt;static&gt;&gt; c_ExpeditionProjection
+  c_ExpeditionProjection : +ToSnapshot(WireView, Catalog, bool) ExpeditionSnapshot$
+  c_ExpeditionProjection : +Validate(WireView, Catalog) List~string~$
+  class c_CombatState[&quot;CombatState · EmberGrove.Expedition&quot;]
+  &lt;&lt;external&gt;&gt; c_CombatState
+  class c_CombatCommand[&quot;CombatCommand · EmberGrove.Expedition&quot;]
+  &lt;&lt;external&gt;&gt; c_CombatCommand
+  class c_CombatEvent[&quot;CombatEvent · EmberGrove.Expedition&quot;]
+  &lt;&lt;external&gt;&gt; c_CombatEvent
+  class c_ProgressFact[&quot;ProgressFact · EmberGrove.Expedition.Progression&quot;]
+  &lt;&lt;external&gt;&gt; c_ProgressFact
+  c_RelayRoomList --&gt; &quot;*&quot; c_RelayRoomInfo : Rooms
+  c_TrustedAdmission --&gt; c_TrustedIdentityAssertion : Identity
+  c_TrustedQueueAdmission --&gt; c_TrustedAdmission : Admission
+  c_TrustedQueueTicket --&gt; c_TrustedTicket : Match
+  c_TrustedLobbyAdmission --&gt; c_TrustedAdmission : Admission
+  c_TrustedLobbyTicket --&gt; c_TrustedTicket : Match
+  c_TrustedLobbyTicket --&gt; &quot;*&quot; c_TrustedLobbyMember : Members
+  c_TrustedLobbyTicket --&gt; &quot;*&quot; c_TrustedLobbyTable : Tables
+  c_ExpeditionSnapshot --&gt; c_CombatState : State
+  c_ExpeditionSnapshot --&gt; &quot;*&quot; c_CombatCommand : LegalCommands, LastCommand
+  c_ExpeditionSnapshot --&gt; &quot;*&quot; c_CombatEvent : Events
+  c_ExpeditionSnapshot --&gt; &quot;*&quot; c_ProgressFact : ProgressFacts
+</pre></div>
+<p class="caption">17 types; 4 referenced types from elsewhere, tagged external and named with where they live. Files: <code>NetworkContracts.cs</code>.</p>
+
+<h3 id="toolkit-cardforge-samples">CardForge.Samples — namespace CardForge.Samples</h3>
+<div class="diagram"><pre class="mermaid">
+classDiagram
+  class c_MinimalNetwork[&quot;MinimalNetwork&quot;]
+  &lt;&lt;static&gt;&gt; c_MinimalNetwork
+  c_MinimalNetwork : +Run() string$
+  class c_MinimalProgression[&quot;MinimalProgression&quot;]
+  &lt;&lt;static&gt;&gt; c_MinimalProgression
+  c_MinimalProgression : +Content() ContentPack$
+  c_MinimalProgression : +Run() string$
+  class c_MinimalTactics[&quot;MinimalTactics&quot;]
+  &lt;&lt;static&gt;&gt; c_MinimalTactics
+  c_MinimalTactics : +Catalog() Catalog$
+  c_MinimalTactics : +Deck() DeckEntry[]$
+  c_MinimalTactics : +Run() string$
+</pre></div>
+<p class="caption">3 types. Files: <code>MinimalNetwork.cs</code>, <code>MinimalProgression.cs</code>, <code>MinimalTactics.cs</code>.</p>
+
+<h3 id="toolkit-cardforge-samples-editor">CardForge.Samples.Editor — namespace CardForge.Samples.Editor</h3>
+<div class="diagram"><pre class="mermaid">
+classDiagram
+  class c_RunExamples[&quot;RunExamples&quot;]
+  &lt;&lt;static&gt;&gt; c_RunExamples
+  c_RunExamples : +Run()$
+</pre></div>
+<p class="caption">1 types. Files: <code>RunExamples.cs</code>.</p>
+
+</section>
+<section id="game"><h2><span class="num">04</span>Game namespaces</h2>
+<p class="lead">The game's own scripts by assembly and namespace: every top-level type, tagged with its Unity base class where it has one. A class split over several files is one box with its file and member counts; its files are mapped in <a href="#partials">§05</a>. Members and arrows read as in <a href="#toolkit">§03</a>. QA types compiled into the same assembly from <code>Assets/Tests</code> appear with the namespace they declare.</p>
+<h3 id="game-embergrove">EmberGrove — Assembly-CSharp</h3>
+<div class="diagram"><pre class="mermaid">
+classDiagram
+  class c_DuelUi[&quot;DuelUi&quot;]
+  &lt;&lt;static&gt;&gt; c_DuelUi
+  c_DuelUi : +Color Ink$
+  c_DuelUi : +Color Raised$
+  c_DuelUi : +Color TextColor$
+  c_DuelUi : +Color Danger$
+  c_DuelUi : +Sprite Glow$
+  c_DuelUi : +Sprite Ring$
+  c_DuelUi : +Sprite Shard$
+  c_DuelUi : +Sprite Hexagon$
+  c_DuelUi : +Sprite Rounded$
+  c_DuelUi : +Light(Transform, string, …) Image$
+  c_DuelUi : … 9 more
+  class c_DuelUiInsetBorder[&quot;DuelUiInsetBorder&quot;]
+  &lt;&lt;Outline&gt;&gt; c_DuelUiInsetBorder
+  c_DuelUiInsetBorder : +ModifyMesh(VertexHelper)
+  class c_DuelPointer[&quot;DuelPointer&quot;]
+  &lt;&lt;MonoBehaviour&gt;&gt; c_DuelPointer
+  c_DuelPointer : +Action Enter
+  c_DuelPointer : +Action Exit
+  c_DuelPointer : +Action RightClick
+  c_DuelPointer : +OnPointerEnter(PointerEventData)
+  c_DuelPointer : +OnPointerExit(PointerEventData)
+  c_DuelPointer : +OnPointerClick(PointerEventData)
+  class c_DuelHoverLift[&quot;DuelHoverLift&quot;]
+  &lt;&lt;MonoBehaviour&gt;&gt; c_DuelHoverLift
+  c_DuelHoverLift : +OnPointerEnter(PointerEventData)
+  c_DuelHoverLift : +OnPointerExit(PointerEventData)
+</pre></div>
+<p class="caption">4 types. Folders: <code>Game/EmberGrove/Assets/Runtime</code>.</p>
+
+<h3 id="game-embergrove-audio">EmberGrove.Audio — Assembly-CSharp</h3>
+<div class="diagram"><pre class="mermaid">
+classDiagram
+  class c_DuelAudioOutcome[&quot;DuelAudioOutcome&quot;]
+  &lt;&lt;enumeration&gt;&gt; c_DuelAudioOutcome
+  class c_GameAudioDirector[&quot;GameAudioDirector&quot;]
+  &lt;&lt;MonoBehaviour&gt;&gt; c_GameAudioDirector
+  c_GameAudioDirector : +int LoadedClipCount
+  c_GameAudioDirector : +int PlayedCueCount
+  c_GameAudioDirector : +string LastCueName
+  c_GameAudioDirector : +bool IsMuted
+  c_GameAudioDirector : +SetBusVolume(float)
+  c_GameAudioDirector : +OverrideCue(string, AudioClip, float) bool
+  c_GameAudioDirector : +Initialize()
+  c_GameAudioDirector : +SetMuted(bool)
+  c_GameAudioDirector : +StopAll()
+  c_GameAudioDirector : +PlaySelect()
+  c_GameAudioDirector : … 4 more
+</pre></div>
+<p class="caption">2 types. Folders: <code>Game/EmberGrove/Assets/Runtime</code>.</p>
+
+<h3 id="game-embergrove-expedition">EmberGrove.Expedition — Assembly-CSharp</h3>
+<div class="diagram"><pre class="mermaid">
+classDiagram
+  class c_CardArtworkCache[&quot;CardArtworkCache&quot;]
+  &lt;&lt;static&gt;&gt; c_CardArtworkCache
+  c_CardArtworkCache : +long BudgetBytes$
+  c_CardArtworkCache : +long ResidentBytes$
+  c_CardArtworkCache : +int ResidentTextureCount$
+  c_CardArtworkCache : +Acquire(string, MediaDefinition) Lease$
+  c_CardArtworkCache : +TryCell(int, int, …) bool$
+  class c_ExpeditionApp[&quot;ExpeditionApp&quot;]
+  &lt;&lt;partial&gt;&gt; c_ExpeditionApp
+  c_ExpeditionApp : 365 members over 10 files
+  class c_PracticeTutorialStep[&quot;PracticeTutorialStep&quot;]
+  &lt;&lt;enumeration&gt;&gt; c_PracticeTutorialStep
+  class c_PracticeTutorialContent[&quot;PracticeTutorialContent&quot;]
+  c_PracticeTutorialContent : +int Version
+  c_PracticeTutorialContent : +string Title
+  c_PracticeTutorialContent : +string PlayerCardId
+  c_PracticeTutorialContent : +string OpponentCardId
+  c_PracticeTutorialContent : +string ChooseCard
+  c_PracticeTutorialContent : +string PlaceCard
+  c_PracticeTutorialContent : +string EndTurn
+  c_PracticeTutorialContent : +string Waiting
+  c_PracticeTutorialContent : +string ChooseUnit
+  c_PracticeTutorialContent : +string AttackUnit
+  c_PracticeTutorialContent : … 10 more
+  class c_HostedSessionKind[&quot;HostedSessionKind&quot;]
+  &lt;&lt;enumeration&gt;&gt; c_HostedSessionKind
+  class c_ExpeditionView[&quot;ExpeditionView&quot;]
+  &lt;&lt;partial&gt;&gt; c_ExpeditionView
+  c_ExpeditionView : 698 members over 23 files
+  class c_FairMatchSetup[&quot;FairMatchSetup&quot;]
+  &lt;&lt;static&gt;&gt; c_FairMatchSetup
+  class c_HostedMenuRole[&quot;HostedMenuRole&quot;]
+  &lt;&lt;enumeration&gt;&gt; c_HostedMenuRole
+  class c_ExpeditionFocusMotion[&quot;ExpeditionFocusMotion&quot;]
+  &lt;&lt;MonoBehaviour&gt;&gt; c_ExpeditionFocusMotion
+  c_ExpeditionFocusMotion : +Func~bool~ Reduced
+  c_ExpeditionFocusMotion : +Func~bool~ PresentationEnabled
+  c_ExpeditionFocusMotion : +Color Accent
+  c_ExpeditionFocusMotion : +bool TableCard
+  c_ExpeditionFocusMotion : +HostedMenuRole Role
+  c_ExpeditionFocusMotion : +RectTransform HighlightTarget
+  c_ExpeditionFocusMotion : +bool IsEmphasized
+  c_ExpeditionFocusMotion : +EnsureMarker()
+  c_ExpeditionFocusMotion : +OnPointerEnter(PointerEventData)
+  c_ExpeditionFocusMotion : +OnPointerExit(PointerEventData)
+  c_ExpeditionFocusMotion : … 6 more
+  class c_ExpeditionFocusRowPointer[&quot;ExpeditionFocusRowPointer&quot;]
+  &lt;&lt;MonoBehaviour&gt;&gt; c_ExpeditionFocusRowPointer
+  c_ExpeditionFocusRowPointer : +ExpeditionFocusMotion Motion
+  c_ExpeditionFocusRowPointer : +OnPointerEnter(PointerEventData)
+  c_ExpeditionFocusRowPointer : +OnPointerExit(PointerEventData)
+  class c_ExpeditionFocusOutline[&quot;ExpeditionFocusOutline&quot;]
+  &lt;&lt;MaskableGraphic&gt;&gt; c_ExpeditionFocusOutline
+  c_ExpeditionFocusOutline : +bool TableCard
+  class c_ExpeditionTheme[&quot;ExpeditionTheme&quot;]
+  &lt;&lt;ScriptableObject&gt;&gt; c_ExpeditionTheme
+  c_ExpeditionTheme : +string Series
+  c_ExpeditionTheme : +string Title
+  c_ExpeditionTheme : +string Tagline
+  c_ExpeditionTheme : +string BeginLabel
+  c_ExpeditionTheme : +string ContinueLabel
+  c_ExpeditionTheme : +string JournalLabel
+  c_ExpeditionTheme : +Texture2D Backdrop
+  c_ExpeditionTheme : +CardArtworkOverride[] CardArtwork
+  c_ExpeditionTheme : +TMP_FontAsset Font
+  c_ExpeditionTheme : +float TextScale
+  c_ExpeditionTheme : … 14 more
+  class c_CardArtworkOverride[&quot;CardArtworkOverride&quot;]
+  c_CardArtworkOverride : +string CardId
+  c_CardArtworkOverride : +Sprite Artwork
+  class c_BattleAimGraphic[&quot;BattleAimGraphic&quot;]
+  &lt;&lt;MaskableGraphic&gt;&gt; c_BattleAimGraphic
+  c_BattleAimGraphic : +SetPreview(Rect, Rect, …)
+  class c_ExpeditionControllerGlyphFamily[&quot;ExpeditionControllerGlyphFamily&quot;]
+  &lt;&lt;enumeration&gt;&gt; c_ExpeditionControllerGlyphFamily
+  class c_ExpeditionNavigationGlyph[&quot;ExpeditionNavigationGlyph&quot;]
+  &lt;&lt;MaskableGraphic&gt;&gt; c_ExpeditionNavigationGlyph
+  c_ExpeditionNavigationGlyph : +string Kind
+  class c_ExpeditionCardGesture[&quot;ExpeditionCardGesture&quot;]
+  &lt;&lt;MonoBehaviour&gt;&gt; c_ExpeditionCardGesture
+  c_ExpeditionCardGesture : +Action Click
+  c_ExpeditionCardGesture : +Action Cancel
+  c_ExpeditionCardGesture : +Func~Vector2, bool~ Begin
+  c_ExpeditionCardGesture : +Action~Vector2~ Drag
+  c_ExpeditionCardGesture : +Func~bool~ CanDrag
+  c_ExpeditionCardGesture : +ScrollRect Scroll
+  c_ExpeditionCardGesture : +float HoldSeconds
+  c_ExpeditionCardGesture : +OnPointerDown(PointerEventData)
+  c_ExpeditionCardGesture : +OnPointerUp(PointerEventData)
+  c_ExpeditionCardGesture : +OnPointerClick(PointerEventData)
+  c_ExpeditionCardGesture : … 6 more
+  class c_MenuNavigationRows[&quot;MenuNavigationRows&quot;]
+  class c_ExpeditionSettingsSlider[&quot;ExpeditionSettingsSlider&quot;]
+  &lt;&lt;Slider&gt;&gt; c_ExpeditionSettingsSlider
+  c_ExpeditionSettingsSlider : +OnPointerDown(PointerEventData)
+  c_ExpeditionSettingsSlider : +OnInitializePotentialDrag(PointerEventData)
+  c_ExpeditionSettingsSlider : +OnBeginDrag(PointerEventData)
+  c_ExpeditionSettingsSlider : +OnDrag(PointerEventData)
+  c_ExpeditionSettingsSlider : +OnPointerUp(PointerEventData)
+  c_ExpeditionSettingsSlider : +OnEndDrag(PointerEventData)
+  c_ExpeditionSettingsSlider : +OnCancel(BaseEventData)
+  class c_ExpeditionSettingAdjustment[&quot;ExpeditionSettingAdjustment&quot;]
+  &lt;&lt;MonoBehaviour&gt;&gt; c_ExpeditionSettingAdjustment
+  c_ExpeditionSettingAdjustment : +Action Previous
+  c_ExpeditionSettingAdjustment : +Adjust(int)
+  class c_WindowPreference[&quot;WindowPreference&quot;]
+  &lt;&lt;enumeration&gt;&gt; c_WindowPreference
+  class c_PerformancePreference[&quot;PerformancePreference&quot;]
+  &lt;&lt;enumeration&gt;&gt; c_PerformancePreference
+  class c_PlayerSettings[&quot;PlayerSettings&quot;]
+  c_PlayerSettings : +int Version
+  c_PlayerSettings : +float MasterVolume
+  c_PlayerSettings : +float MusicVolume
+  c_PlayerSettings : +float SfxVolume
+  c_PlayerSettings : +float VoiceVolume
+  c_PlayerSettings : +bool Muted
+  c_PlayerSettings : +bool HighContrast
+  c_PlayerSettings : +bool AutoAdvance
+  c_PlayerSettings : +bool BatterySaver
+  c_PlayerSettings : +bool Subtitles
+  c_PlayerSettings : … 13 more
+  class c_PlayerSettingsRules[&quot;PlayerSettingsRules&quot;]
+  &lt;&lt;static&gt;&gt; c_PlayerSettingsRules
+  c_PlayerSettingsRules : +Normalize(PlayerSettings) PlayerSettings$
+  class c_PracticeNarration[&quot;PracticeNarration&quot;]
+  &lt;&lt;MonoBehaviour&gt;&gt; c_PracticeNarration
+  c_PracticeNarration : +bool Available
+  c_PracticeNarration : +Replay()
+  class c_PracticeVoiceAvailability[&quot;PracticeVoiceAvailability&quot;]
+  &lt;&lt;MonoBehaviour&gt;&gt; c_PracticeVoiceAvailability
+  c_PracticeVoiceAvailability : +Initialize(Func~bool~, Action~bool~)
+  class c_WorldTableContext[&quot;WorldTableContext&quot;]
+  c_WorldTableContext : +float Width$
+  c_WorldTableContext : +float Height$
+  c_WorldTableContext : +float TableSlotWidth$
+  c_WorldTableContext : +float TableSlotHeight$
+  c_WorldTableContext : +float TableCardInset$
+  c_WorldTableContext : +float TableBorderInset$
+  c_WorldTableContext : +int CardSortingOrder$
+  c_WorldTableContext : +int ProjectionSortingOrder$
+  c_WorldTableContext : +Camera Camera
+  c_WorldTableContext : +Transform Anchor
+  c_WorldTableContext : … 10 more
+  class c_WorldTablePresentation[&quot;WorldTablePresentation&quot;]
+  &lt;&lt;MonoBehaviour&gt;&gt; c_WorldTablePresentation
+  c_WorldTablePresentation : +GameObject AuthoringLibrary
+  c_WorldTablePresentation : +GameObject CreatureTemplate
+  c_WorldTablePresentation : +GameObject EmberTemplate
+  c_WorldTablePresentation : +GameObject BloomfireTemplate
+  c_WorldTablePresentation : +Appearance[] Appearances
+  c_WorldTablePresentation : +Transform[] LaneAnchors
+  c_WorldTablePresentation : +Transform[] SlotAnchors
+  c_WorldTablePresentation : +Vector2 ReferenceSize
+  c_WorldTablePresentation : +int CreatureCount
+  c_WorldTablePresentation : +int TerrainCount
+  c_WorldTablePresentation : … 14 more
+  class c_ExpeditionHarness[&quot;ExpeditionHarness&quot;]
+  &lt;&lt;partial&gt;&gt; c_ExpeditionHarness
+  c_ExpeditionHarness : 124 members over 2 files
+  class c_GameAudioDirector[&quot;GameAudioDirector · EmberGrove.Audio&quot;]
+  &lt;&lt;external&gt;&gt; c_GameAudioDirector
+  class c_CircuitDuelOutcome[&quot;CircuitDuelOutcome · CardForge.Circuit&quot;]
+  &lt;&lt;external&gt;&gt; c_CircuitDuelOutcome
+  class c_LoadedContentPack[&quot;LoadedContentPack · CardForge.Content&quot;]
+  &lt;&lt;external&gt;&gt; c_LoadedContentPack
+  class c_CardDefinition[&quot;CardDefinition · EmberGrove.Expedition&quot;]
+  &lt;&lt;external&gt;&gt; c_CardDefinition
+  class c_Catalog[&quot;Catalog · EmberGrove.Expedition&quot;]
+  &lt;&lt;external&gt;&gt; c_Catalog
+  class c_CombatState[&quot;CombatState · EmberGrove.Expedition&quot;]
+  &lt;&lt;external&gt;&gt; c_CombatState
+  class c_CombatCommand[&quot;CombatCommand · EmberGrove.Expedition&quot;]
+  &lt;&lt;external&gt;&gt; c_CombatCommand
+  class c_LessonDefinition[&quot;LessonDefinition · EmberGrove.Expedition&quot;]
+  &lt;&lt;external&gt;&gt; c_LessonDefinition
+  class c_LessonStep[&quot;LessonStep · EmberGrove.Expedition&quot;]
+  &lt;&lt;external&gt;&gt; c_LessonStep
+  class c_LessonBinding[&quot;LessonBinding · EmberGrove.Expedition&quot;]
+  &lt;&lt;external&gt;&gt; c_LessonBinding
+  class c_ExpeditionNetworkSession[&quot;ExpeditionNetworkSession · EmberGrove.Expedition.Networking&quot;]
+  &lt;&lt;external&gt;&gt; c_ExpeditionNetworkSession
+  class c_ContentPack[&quot;ContentPack · EmberGrove.Expedition.Progression&quot;]
+  &lt;&lt;external&gt;&gt; c_ContentPack
+  c_ExpeditionApp --&gt; c_PracticeTutorialStep : PracticeStep
+  c_ExpeditionApp --&gt; c_PracticeTutorialContent : PracticeContent
+  c_ExpeditionApp --&gt; c_HostedSessionKind : Kind
+  c_ExpeditionApp --&gt; c_ExpeditionView : View
+  c_ExpeditionApp --&gt; c_GameAudioDirector : audioDirector
+  c_ExpeditionApp --&gt; c_PlayerSettings : Settings, previousDisplay
+  c_ExpeditionApp --&gt; c_WorldTableContext : WorldTable
+  c_ExpeditionApp --&gt; c_CircuitDuelOutcome : BattleOutcome, sessionCompleted
+  c_ExpeditionApp --&gt; c_LoadedContentPack : LoadedPack
+  c_ExpeditionApp --&gt; c_CardDefinition : SelectedDefinition
+  c_ExpeditionApp --&gt; c_Catalog : legalCatalog, Catalog
+  c_ExpeditionApp --&gt; c_CombatState : scoredState, legalState, …
+  c_ExpeditionApp --&gt; &quot;*&quot; c_CombatCommand : AuthoredFeedbackCommand, AuthoredLessonCommand, …
+  c_ExpeditionApp --&gt; c_LessonDefinition : AuthoredLesson
+  c_ExpeditionApp --&gt; c_LessonStep : AuthoredLessonStep
+  c_ExpeditionApp --&gt; &quot;*&quot; c_LessonBinding : lessonBindings
+  c_ExpeditionApp --&gt; c_ExpeditionNetworkSession : network
+  c_ExpeditionApp --&gt; c_ContentPack : Content
+  c_ExpeditionView --&gt; c_ExpeditionApp : app
+  c_ExpeditionView --&gt; c_PracticeTutorialStep : observedPracticeStep
+  c_ExpeditionView --&gt; c_ExpeditionTheme : theme, Theme
+  c_ExpeditionView --&gt; c_BattleAimGraphic : targetRibbon
+  c_ExpeditionView --&gt; c_ExpeditionControllerGlyphFamily : glyphFamily
+  c_ExpeditionView --&gt; c_MenuNavigationRows : menuNavigation
+  c_ExpeditionView --&gt; c_WindowPreference : displayMode
+  c_ExpeditionView --&gt; c_WorldTablePresentation : LivingTable
+  c_ExpeditionView --&gt; &quot;*&quot; c_CombatCommand : renderSelection, VisibleSelectionCommands, …
+  c_ExpeditionFocusMotion --&gt; c_HostedMenuRole : Role
+  c_ExpeditionFocusMotion --&gt; c_ExpeditionFocusOutline : outline
+  c_ExpeditionFocusRowPointer --&gt; c_ExpeditionFocusMotion : Motion
+  c_ExpeditionTheme --&gt; &quot;*&quot; c_CardArtworkOverride : CardArtwork
+  c_PlayerSettings --&gt; c_WindowPreference : WindowMode
+  c_PlayerSettings --&gt; c_PerformancePreference : Performance
+  c_PracticeNarration --&gt; c_ExpeditionApp : app
+  c_WorldTableContext --&gt; c_WorldTablePresentation : PresentationPrefab
+  c_WorldTablePresentation --&gt; c_WorldTableContext : context
+  c_ExpeditionHarness --&gt; c_ExpeditionApp : app
+</pre></div>
+<p class="caption">29 types; 12 referenced types from elsewhere, tagged external and named with where they live; 6 more referenced types not drawn. Folders: <code>Game/EmberGrove/Assets/Runtime</code>, <code>Game/EmberGrove/Assets/Tests/Runtime</code>.</p>
+
+<h3 id="game-embergrove-exploration">EmberGrove.Exploration — Assembly-CSharp</h3>
+<div class="diagram"><pre class="mermaid">
+classDiagram
+  class c_AuthoredCircuitDistrict[&quot;AuthoredCircuitDistrict&quot;]
+  &lt;&lt;MonoBehaviour&gt;&gt; c_AuthoredCircuitDistrict
+  c_AuthoredCircuitDistrict : +IsometricSectorVisuals.AuthoredDistrict Binding
+  c_AuthoredCircuitDistrict : +Validate(float)
+  class c_AuthoredCircuitRoom[&quot;AuthoredCircuitRoom&quot;]
+  &lt;&lt;MonoBehaviour&gt;&gt; c_AuthoredCircuitRoom
+  c_AuthoredCircuitRoom : +string RoomId
+  c_AuthoredCircuitRoom : +int Revision
+  c_AuthoredCircuitRoom : +string Kind
+  c_AuthoredCircuitRoom : +IsometricSectorVisuals.AuthoredVenue Binding
+  c_AuthoredCircuitRoom : +Validate(float)
+  class c_CircuitSave[&quot;CircuitSave&quot;]
+  c_CircuitSave : +int Version
+  c_CircuitSave : +CircuitState State
+  c_CircuitSave : +bool ReducedMotion
+  c_CircuitSave : +bool HasWorldPosition
+  c_CircuitSave : +bool WelcomeSeen
+  c_CircuitSave : +bool PracticeCompleted
+  c_CircuitSave : +float Zoom
+  c_CircuitSave : +float WorldX
+  c_CircuitSave : +float WorldZ
+  c_CircuitSave : +int FocusStage
+  c_CircuitSave : … 3 more
+  class c_CircuitPersistence[&quot;CircuitPersistence&quot;]
+  class c_CircuitWorldLayout[&quot;CircuitWorldLayout&quot;]
+  &lt;&lt;static&gt;&gt; c_CircuitWorldLayout
+  c_CircuitWorldLayout : +int DistrictStride$
+  c_CircuitWorldLayout : +int Width$
+  c_CircuitWorldLayout : +int MaximumVisibleDistricts$
+  c_CircuitWorldLayout : +SelectTemplate(CircuitRun, SectorDefinition[]) SectorDefinition$
+  c_CircuitWorldLayout : +WindowFirstStage(CircuitState, int) int$
+  c_CircuitWorldLayout : +OriginCellZ(int) long$
+  c_CircuitWorldLayout : +Position(CircuitLocation, int) GridPoint$
+  c_CircuitWorldLayout : +GatePosition(int, int) GridPoint$
+  c_CircuitWorldLayout : +StageAtLocalZ(float, int) int$
+  c_CircuitWorldLayout : +Build(CircuitState, CircuitDefinition, …) SectorDefinition$
+  class c_IsometricCombatBridge[&quot;IsometricCombatBridge&quot;]
+  &lt;&lt;MonoBehaviour&gt;&gt; c_IsometricCombatBridge
+  c_IsometricCombatBridge : +bool Active
+  c_IsometricCombatBridge : +string Error
+  c_IsometricCombatBridge : +ExpeditionApp Session
+  c_IsometricCombatBridge : +bool ReducedMotion
+  c_IsometricCombatBridge : +CircuitDuelOutcome Outcome
+  c_IsometricCombatBridge : +string ReceiptId
+  c_IsometricCombatBridge : +string[] PlayerDeck
+  c_IsometricCombatBridge : +uint EncounterSeed
+  c_IsometricCombatBridge : +string ContentRoot
+  c_IsometricCombatBridge : +HostedSessionKind Kind
+  c_IsometricCombatBridge : … 11 more
+  class c_IsometricSectorVisuals[&quot;IsometricSectorVisuals&quot;]
+  &lt;&lt;partial&gt;&gt; c_IsometricSectorVisuals
+  c_IsometricSectorVisuals : 312 members over 6 files
+  class c_IsometricSlice[&quot;IsometricSlice&quot;]
+  &lt;&lt;partial&gt;&gt; c_IsometricSlice
+  c_IsometricSlice : 994 members over 19 files
+  class c_TravellerPreferenceText[&quot;TravellerPreferenceText&quot;]
+  &lt;&lt;MonoBehaviour&gt;&gt; c_TravellerPreferenceText
+  c_TravellerPreferenceText : +Apply(TMP_Text, float)
+  class c_LodgeWaybookBinding[&quot;LodgeWaybookBinding&quot;]
+  &lt;&lt;MonoBehaviour&gt;&gt; c_LodgeWaybookBinding
+  c_LodgeWaybookBinding : +int Revision
+  c_LodgeWaybookBinding : +Transform PageSurface
+  c_LodgeWaybookBinding : +Vector2 PageSize
+  c_LodgeWaybookBinding : +Transform CameraFraming
+  c_LodgeWaybookBinding : +GameObject Decoration
+  c_LodgeWaybookBinding : +Validate()
+  class c_TravellerPicture[&quot;TravellerPicture&quot;]
+  &lt;&lt;enumeration&gt;&gt; c_TravellerPicture
+  class c_TravellerPictures[&quot;TravellerPictures&quot;]
+  &lt;&lt;static&gt;&gt; c_TravellerPictures
+  c_TravellerPictures : +ConfigureArtwork(System.Func~string, Sprite~)$
+  c_TravellerPictures : +Draw(Transform, string, …) TravellerPictureGraphic$
+  c_TravellerPictures : +Artwork(string) Sprite$
+  c_TravellerPictures : +Paint(…)$
+  class c_TravellerPictureGraphic[&quot;TravellerPictureGraphic&quot;]
+  &lt;&lt;MaskableGraphic&gt;&gt; c_TravellerPictureGraphic
+  c_TravellerPictureGraphic : +TravellerPicture Kind
+  class c_TravellerPictureElement[&quot;TravellerPictureElement&quot;]
+  &lt;&lt;VisualElement&gt;&gt; c_TravellerPictureElement
+  c_TravellerPictureElement : +TravellerPicture Kind
+  c_TravellerPictureElement : +Color Tint
+  class c_TravellerButtonMotion[&quot;TravellerButtonMotion&quot;]
+  &lt;&lt;MonoBehaviour&gt;&gt; c_TravellerButtonMotion
+  c_TravellerButtonMotion : +Action Attended
+  c_TravellerButtonMotion : +bool IsFocused
+  c_TravellerButtonMotion : +bool IsHighlighted
+  c_TravellerButtonMotion : +Configure(Button, Func~bool~, …)
+  c_TravellerButtonMotion : +SetRestColor(Color)
+  c_TravellerButtonMotion : +SetHighContrast(bool)
+  c_TravellerButtonMotion : +Press()
+  c_TravellerButtonMotion : +OnPointerEnter(PointerEventData)
+  c_TravellerButtonMotion : +OnPointerExit(PointerEventData)
+  c_TravellerButtonMotion : +OnPointerDown(PointerEventData)
+  c_TravellerButtonMotion : … 3 more
+  class c_TravellerPanelMotion[&quot;TravellerPanelMotion&quot;]
+  &lt;&lt;MonoBehaviour&gt;&gt; c_TravellerPanelMotion
+  c_TravellerPanelMotion : +bool Settled
+  c_TravellerPanelMotion : +Begin(Func~bool~, bool, int)
+  class c_TravellerWaybookFrame[&quot;TravellerWaybookFrame&quot;]
+  &lt;&lt;MaskableGraphic&gt;&gt; c_TravellerWaybookFrame
+  c_TravellerWaybookFrame : +bool HighContrast
+  class c_CircuitPersistenceVerification[&quot;CircuitPersistenceVerification&quot;]
+  &lt;&lt;static&gt;&gt; c_CircuitPersistenceVerification
+  c_CircuitPersistenceVerification : +RunBatch()$
+  class c_CircuitSliceChecks[&quot;CircuitSliceChecks&quot;]
+  &lt;&lt;partial&gt;&gt; c_CircuitSliceChecks
+  c_CircuitSliceChecks : 735 members over 10 files
+  class c_PlayerSettings[&quot;PlayerSettings · EmberGrove.Expedition&quot;]
+  &lt;&lt;external&gt;&gt; c_PlayerSettings
+  class c_WorldTableContext[&quot;WorldTableContext · EmberGrove.Expedition&quot;]
+  &lt;&lt;external&gt;&gt; c_WorldTableContext
+  class c_CircuitDefinition[&quot;CircuitDefinition · CardForge.Circuit&quot;]
+  &lt;&lt;external&gt;&gt; c_CircuitDefinition
+  class c_CircuitDialogue[&quot;CircuitDialogue · CardForge.Circuit&quot;]
+  &lt;&lt;external&gt;&gt; c_CircuitDialogue
+  class c_CircuitOpeningDefinition[&quot;CircuitOpeningDefinition · CardForge.Circuit&quot;]
+  &lt;&lt;external&gt;&gt; c_CircuitOpeningDefinition
+  class c_CircuitEventDefinition[&quot;CircuitEventDefinition · CardForge.Circuit&quot;]
+  &lt;&lt;external&gt;&gt; c_CircuitEventDefinition
+  class c_CircuitEpisodeDefinition[&quot;CircuitEpisodeDefinition · CardForge.Circuit&quot;]
+  &lt;&lt;external&gt;&gt; c_CircuitEpisodeDefinition
+  class c_CircuitDuelOutcome[&quot;CircuitDuelOutcome · CardForge.Circuit&quot;]
+  &lt;&lt;external&gt;&gt; c_CircuitDuelOutcome
+  class c_CircuitLocation[&quot;CircuitLocation · CardForge.Circuit&quot;]
+  &lt;&lt;external&gt;&gt; c_CircuitLocation
+  class c_CircuitState[&quot;CircuitState · CardForge.Circuit&quot;]
+  &lt;&lt;external&gt;&gt; c_CircuitState
+  class c_LessonDefinition[&quot;LessonDefinition · EmberGrove.Expedition&quot;]
+  &lt;&lt;external&gt;&gt; c_LessonDefinition
+  class c_ExpeditionNetworkSession[&quot;ExpeditionNetworkSession · EmberGrove.Expedition.Networking&quot;]
+  &lt;&lt;external&gt;&gt; c_ExpeditionNetworkSession
+  c_CircuitSave --&gt; c_CircuitState : State
+  c_IsometricCombatBridge --&gt; c_PlayerSettings : ResultSettings
+  c_IsometricCombatBridge --&gt; c_WorldTableContext : Table
+  c_IsometricCombatBridge --&gt; c_CircuitDuelOutcome : Outcome
+  c_IsometricCombatBridge --&gt; c_LessonDefinition : Lesson
+  c_IsometricCombatBridge --&gt; c_ExpeditionNetworkSession : LobbySession
+  c_IsometricSectorVisuals --&gt; &quot;*&quot; c_AuthoredCircuitDistrict : ReusableDistricts
+  c_IsometricSectorVisuals --&gt; &quot;*&quot; c_AuthoredCircuitRoom : boundRooms
+  c_IsometricSlice --&gt; c_AuthoredCircuitRoom : lobbyRoom
+  c_IsometricSlice --&gt; c_CircuitPersistence : circuitPersistence
+  c_IsometricSlice --&gt; c_IsometricCombatBridge : combat, Combat
+  c_IsometricSlice --&gt; c_IsometricSectorVisuals : visuals
+  c_IsometricSlice --&gt; c_LodgeWaybookBinding : waybookBinding
+  c_IsometricSlice --&gt; &quot;*&quot; c_TravellerButtonMotion : preferenceButtons
+  c_IsometricSlice --&gt; c_PlayerSettings : worldPreferences
+  c_IsometricSlice --&gt; c_WorldTableContext : activeWorldTable
+  c_IsometricSlice --&gt; c_CircuitDefinition : circuitDefinition, adventureTaskDefinition
+  c_IsometricSlice --&gt; c_CircuitDialogue : circuitDialogue, LoadedCircuitDialogue
+  c_IsometricSlice --&gt; c_CircuitOpeningDefinition : ClubOpening
+  c_IsometricSlice --&gt; c_CircuitEventDefinition : CurrentAdventureEvent
+  c_IsometricSlice --&gt; c_CircuitEpisodeDefinition : CurrentEpisode
+  c_IsometricSlice --&gt; c_CircuitDuelOutcome : adventureEpisodeOutcome
+  c_IsometricSlice --&gt; c_CircuitLocation : NextCircuitPlayLocation, CircuitLocation
+  c_IsometricSlice --&gt; c_CircuitState : circuit, adventureTaskState
+  c_IsometricSlice --&gt; &quot;*&quot; c_LessonDefinition : SelectedLesson, CategoryLessons, …
+  c_IsometricSlice --&gt; c_ExpeditionNetworkSession : lobbySession
+  c_TravellerPictureGraphic --&gt; c_TravellerPicture : Kind
+  c_TravellerPictureElement --&gt; c_TravellerPicture : kind, Kind
+  c_CircuitSliceChecks --&gt; c_IsometricSlice : slice
+  c_CircuitSliceChecks --&gt; c_WorldTableContext : livingTableContext
+</pre></div>
+<p class="caption">19 types; 12 referenced types from elsewhere, tagged external and named with where they live; 15 more referenced types not drawn. Folders: <code>Game/EmberGrove/Assets/Runtime/Exploration</code>, <code>Game/EmberGrove/Assets/Tests</code>, <code>Game/EmberGrove/Assets/Tests/Runtime</code>.</p>
+
+<h3 id="game-embergrove-playtesting">EmberGrove.Playtesting — Assembly-CSharp</h3>
+<div class="diagram"><pre class="mermaid">
+classDiagram
+  class c_PlaytestAction[&quot;PlaytestAction&quot;]
+  c_PlaytestAction : +string Type
+  c_PlaytestAction : +string Mode
+  c_PlaytestAction : +string ErrorCode
+  c_PlaytestAction : +int Turn
+  c_PlaytestAction : +uint Seed
+  c_PlaytestAction : +float Seconds
+  c_PlaytestAction : +bool Success
+  class c_PlaytestFeedback[&quot;PlaytestFeedback&quot;]
+  c_PlaytestFeedback : +int Clarity
+  c_PlaytestFeedback : +int Impact
+  c_PlaytestFeedback : +string Text
+  class c_PlaytestReport[&quot;PlaytestReport&quot;]
+  c_PlaytestReport : +int SchemaVersion
+  c_PlaytestReport : +string SessionId
+  c_PlaytestReport : +string Label
+  c_PlaytestReport : +string StartedUtc
+  c_PlaytestReport : +string StoppedUtc
+  c_PlaytestReport : +int TotalActions
+  c_PlaytestReport : +int FailedActions
+  c_PlaytestReport : +int MatchesStarted
+  c_PlaytestReport : +int MatchesCompleted
+  c_PlaytestReport : +int MatchesAbandoned
+  c_PlaytestReport : … 4 more
+  class c_IPlaytestReportCodec[&quot;IPlaytestReportCodec&quot;]
+  &lt;&lt;interface&gt;&gt; c_IPlaytestReportCodec
+  c_IPlaytestReportCodec : +Encode(PlaytestReport) string
+  class c_UnityPlaytestReportCodec[&quot;UnityPlaytestReportCodec&quot;]
+  c_UnityPlaytestReportCodec : +Encode(PlaytestReport) string
+  class c_PlaytestSessionService[&quot;PlaytestSessionService&quot;]
+  c_PlaytestSessionService : +int MaxEvents$
+  c_PlaytestSessionService : +int MaxFeedbackEntries$
+  c_PlaytestSessionService : +int MaxFeedbackLength$
+  c_PlaytestSessionService : +string OutputDirectory
+  c_PlaytestSessionService : +string LastReportPath
+  c_PlaytestSessionService : +string LastError
+  c_PlaytestSessionService : +bool IsRecording
+  c_PlaytestSessionService : +string SessionId
+  c_PlaytestSessionService : +int EventCount
+  c_PlaytestSessionService : +int DroppedEventCount
+  c_PlaytestSessionService : … 9 more
+  c_PlaytestReport --&gt; &quot;*&quot; c_PlaytestAction : Events
+  c_PlaytestReport --&gt; &quot;*&quot; c_PlaytestFeedback : Feedback
+  c_IPlaytestReportCodec &lt;|.. c_UnityPlaytestReportCodec
+  c_PlaytestSessionService --&gt; c_PlaytestReport : report
+  c_PlaytestSessionService --&gt; c_IPlaytestReportCodec : codec
+</pre></div>
+<p class="caption">6 types. Folders: <code>Game/EmberGrove/Assets/Runtime</code>.</p>
+
+<h3 id="game-embergrove-editor-editor">EmberGrove.Editor — Assembly-CSharp-Editor</h3>
+<div class="diagram"><pre class="mermaid">
+classDiagram
+  class c_CurrentCardWorkshop[&quot;CurrentCardWorkshop&quot;]
+  &lt;&lt;EditorWindow&gt;&gt; c_CurrentCardWorkshop
+  c_CurrentCardWorkshop : +Open()$
+  class c_IsometricSliceBuild[&quot;IsometricSliceBuild&quot;]
+  &lt;&lt;static&gt;&gt; c_IsometricSliceBuild
+  c_IsometricSliceBuild : +CreateCircuitScene()$
+  c_IsometricSliceBuild : +StageCircuitContent()$
+  c_IsometricSliceBuild : +ExtractSelectedRooms()$
+  c_IsometricSliceBuild : +UseSelectedRooms()$
+  c_IsometricSliceBuild : +CreateLodgeWaybook()$
+  c_IsometricSliceBuild : +CreateAlternateTableRoom()$
+  c_IsometricSliceBuild : +CreateReusableDistrict()$
+  c_IsometricSliceBuild : +ExtractRoomSet(…) AuthoredCircuitRoom[]$
+  c_IsometricSliceBuild : +BindRoomSet(…)$
+  c_IsometricSliceBuild : +CircuitWindows()$
+  c_IsometricSliceBuild : … 10 more
+  class c_AndroidNetworkQaLinker[&quot;AndroidNetworkQaLinker&quot;]
+  c_AndroidNetworkQaLinker : +int callbackOrder
+  c_AndroidNetworkQaLinker : +GenerateAdditionalLinkXmlFile(…) string
+  class c_WorldTablePresentation[&quot;WorldTablePresentation · Assembly-CSharp&quot;]
+  &lt;&lt;external&gt;&gt; c_WorldTablePresentation
+  class c_CardDefinition[&quot;CardDefinition · EmberGrove.Expedition&quot;]
+  &lt;&lt;external&gt;&gt; c_CardDefinition
+  c_CurrentCardWorkshop --&gt; c_WorldTablePresentation : presentation
+  c_CurrentCardWorkshop --&gt; &quot;*&quot; c_CardDefinition : cards
+</pre></div>
+<p class="caption">3 types; 2 referenced types from elsewhere, tagged external and named with where they live. Folders: <code>Game/EmberGrove/Assets/Editor</code>.</p>
+
+</section>
+<section id="partials"><h2><span class="num">05</span>Partial-class maps</h2>
+<p class="lead">Every class declared in more than one file, and what each file adds. Member counts include every visibility; a field declaration with several names counts each name.</p>
+<div class="scrollx"><table>
+<tr><th>Class</th><th>Assembly</th><th class="num">Files</th><th class="num">Members</th><th class="num">Methods</th></tr>
+<tr><td><a href="#partial-assembly-csharp-embergrove-expedition-expeditionview">ExpeditionView</a></td><td><code>Assembly-CSharp</code></td><td class="num">23</td><td class="num">698</td><td class="num">540</td></tr>
+<tr><td><a href="#partial-assembly-csharp-embergrove-exploration-isometricslice">IsometricSlice</a></td><td><code>Assembly-CSharp</code></td><td class="num">19</td><td class="num">994</td><td class="num">680</td></tr>
+<tr><td><a href="#partial-assembly-csharp-embergrove-expedition-expeditionapp">ExpeditionApp</a></td><td><code>Assembly-CSharp</code></td><td class="num">10</td><td class="num">365</td><td class="num">194</td></tr>
+<tr><td><a href="#partial-assembly-csharp-embergrove-exploration-circuitslicechecks">CircuitSliceChecks</a></td><td><code>Assembly-CSharp</code></td><td class="num">10</td><td class="num">735</td><td class="num">697</td></tr>
+<tr><td><a href="#partial-assembly-csharp-embergrove-exploration-isometricsectorvisuals">IsometricSectorVisuals</a></td><td><code>Assembly-CSharp</code></td><td class="num">6</td><td class="num">312</td><td class="num">234</td></tr>
+<tr><td><a href="#partial-cardforge-circuit-cardforge-circuit-circuitrules">CircuitRules</a></td><td><code>CardForge.Circuit</code></td><td class="num">3</td><td class="num">354</td><td class="num">345</td></tr>
+<tr><td><a href="#partial-assembly-csharp-embergrove-expedition-expeditionharness">ExpeditionHarness</a></td><td><code>Assembly-CSharp</code></td><td class="num">2</td><td class="num">124</td><td class="num">95</td></tr>
+</table></div>
+
+<h3 id="partial-assembly-csharp-embergrove-expedition-expeditionview">ExpeditionView — Assembly-CSharp</h3>
+<div class="diagram"><pre class="mermaid">
+flowchart LR
+  c[&quot;ExpeditionView&lt;br/&gt;23 files&lt;br/&gt;698 members&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Runtime_ExpeditionApp_Session_cs[&quot;ExpeditionApp.Session.cs&lt;br/&gt;1 methods, 0 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Runtime_ExpeditionTheme_cs[&quot;ExpeditionTheme.cs&lt;br/&gt;6 methods, 8 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Runtime_ExpeditionView_BattlePresentation_cs[&quot;ExpeditionView.BattlePresentation.cs&lt;br/&gt;30 methods, 11 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Runtime_ExpeditionView_Connection_cs[&quot;ExpeditionView.Connection.cs&lt;br/&gt;39 methods, 15 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Runtime_ExpeditionView_Cosmetics_cs[&quot;ExpeditionView.Cosmetics.cs&lt;br/&gt;2 methods, 0 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Runtime_ExpeditionView_Glyphs_cs[&quot;ExpeditionView.Glyphs.cs&lt;br/&gt;39 methods, 12 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Runtime_ExpeditionView_Input_cs[&quot;ExpeditionView.Input.cs&lt;br/&gt;20 methods, 7 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Runtime_ExpeditionView_Journey_cs[&quot;ExpeditionView.Journey.cs&lt;br/&gt;43 methods, 9 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Runtime_ExpeditionView_Layout_cs[&quot;ExpeditionView.Layout.cs&lt;br/&gt;23 methods, 8 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Runtime_ExpeditionView_Media_cs[&quot;ExpeditionView.Media.cs&lt;br/&gt;2 methods, 0 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Runtime_ExpeditionView_Motion_cs[&quot;ExpeditionView.Motion.cs&lt;br/&gt;32 methods, 0 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Runtime_ExpeditionView_Navigation_cs[&quot;ExpeditionView.Navigation.cs&lt;br/&gt;88 methods, 22 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Runtime_ExpeditionView_PortraitJourney_cs[&quot;ExpeditionView.PortraitJourney.cs&lt;br/&gt;6 methods, 0 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Runtime_ExpeditionView_Practice_cs[&quot;ExpeditionView.Practice.cs&lt;br/&gt;32 methods, 2 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Runtime_ExpeditionView_Settings_cs[&quot;ExpeditionView.Settings.cs&lt;br/&gt;34 methods, 10 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Runtime_ExpeditionView_SettingsNavigation_cs[&quot;ExpeditionView.SettingsNavigation.cs&lt;br/&gt;10 methods, 6 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Runtime_ExpeditionView_Shell_cs[&quot;ExpeditionView.Shell.cs&lt;br/&gt;10 methods, 11 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Runtime_ExpeditionView_Transitions_cs[&quot;ExpeditionView.Transitions.cs&lt;br/&gt;20 methods, 12 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Runtime_ExpeditionView_World_cs[&quot;ExpeditionView.World.cs&lt;br/&gt;2 methods, 1 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Runtime_ExpeditionView_WorldCardTile_cs[&quot;ExpeditionView.WorldCardTile.cs&lt;br/&gt;1 methods, 0 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Runtime_ExpeditionView_WorldMenus_cs[&quot;ExpeditionView.WorldMenus.cs&lt;br/&gt;27 methods, 2 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Runtime_ExpeditionView_WorldTable_cs[&quot;ExpeditionView.WorldTable.cs&lt;br/&gt;34 methods, 7 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Runtime_ExpeditionView_cs[&quot;ExpeditionView.cs&lt;br/&gt;39 methods, 15 fields and properties&quot;]
+</pre></div>
+<p class="caption">First file's folder: <code>Game/EmberGrove/Assets/Runtime</code>; a file elsewhere shows its folder.</p>
+
+<h3 id="partial-assembly-csharp-embergrove-exploration-isometricslice">IsometricSlice — Assembly-CSharp</h3>
+<div class="diagram"><pre class="mermaid">
+flowchart LR
+  c[&quot;IsometricSlice&lt;br/&gt;19 files&lt;br/&gt;994 members&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Runtime_Exploration_IsometricSlice_Audio_cs[&quot;IsometricSlice.Audio.cs&lt;br/&gt;28 methods, 29 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Runtime_Exploration_IsometricSlice_Circuit_cs[&quot;IsometricSlice.Circuit.cs&lt;br/&gt;89 methods, 47 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Runtime_Exploration_IsometricSlice_CircuitUi_cs[&quot;IsometricSlice.CircuitUi.cs&lt;br/&gt;106 methods, 10 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Runtime_Exploration_IsometricSlice_DeckBuilder_cs[&quot;IsometricSlice.DeckBuilder.cs&lt;br/&gt;124 methods, 41 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Runtime_Exploration_IsometricSlice_Hud_cs[&quot;IsometricSlice.Hud.cs&lt;br/&gt;38 methods, 25 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Runtime_Exploration_IsometricSlice_Learning_cs[&quot;IsometricSlice.Learning.cs&lt;br/&gt;15 methods, 2 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Runtime_Exploration_IsometricSlice_Lessons_cs[&quot;IsometricSlice.Lessons.cs&lt;br/&gt;23 methods, 10 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Runtime_Exploration_IsometricSlice_Onboarding_cs[&quot;IsometricSlice.Onboarding.cs&lt;br/&gt;38 methods, 15 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Runtime_Exploration_IsometricSlice_Preferences_cs[&quot;IsometricSlice.Preferences.cs&lt;br/&gt;4 methods, 5 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Runtime_Exploration_IsometricSlice_Presentation_cs[&quot;IsometricSlice.Presentation.cs&lt;br/&gt;10 methods, 8 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Runtime_Exploration_IsometricSlice_Progress_cs[&quot;IsometricSlice.Progress.cs&lt;br/&gt;5 methods, 5 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Runtime_Exploration_IsometricSlice_Settings_cs[&quot;IsometricSlice.Settings.cs&lt;br/&gt;2 methods, 0 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Runtime_Exploration_IsometricSlice_Table_cs[&quot;IsometricSlice.Table.cs&lt;br/&gt;19 methods, 22 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Runtime_Exploration_IsometricSlice_Title_cs[&quot;IsometricSlice.Title.cs&lt;br/&gt;12 methods, 8 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Runtime_Exploration_IsometricSlice_Versus_cs[&quot;IsometricSlice.Versus.cs&lt;br/&gt;25 methods, 15 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Runtime_Exploration_IsometricSlice_Waybook_cs[&quot;IsometricSlice.Waybook.cs&lt;br/&gt;36 methods, 10 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Runtime_Exploration_IsometricSlice_WaybookMenu_cs[&quot;IsometricSlice.WaybookMenu.cs&lt;br/&gt;34 methods, 19 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Runtime_Exploration_IsometricSlice_World_cs[&quot;IsometricSlice.World.cs&lt;br/&gt;14 methods, 8 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Runtime_Exploration_IsometricSlice_cs[&quot;IsometricSlice.cs&lt;br/&gt;58 methods, 35 fields and properties&quot;]
+</pre></div>
+<p class="caption">First file's folder: <code>Game/EmberGrove/Assets/Runtime/Exploration</code>; a file elsewhere shows its folder.</p>
+
+<h3 id="partial-assembly-csharp-embergrove-expedition-expeditionapp">ExpeditionApp — Assembly-CSharp</h3>
+<div class="diagram"><pre class="mermaid">
+flowchart LR
+  c[&quot;ExpeditionApp&lt;br/&gt;10 files&lt;br/&gt;365 members&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Runtime_ExpeditionApp_Lessons_cs[&quot;ExpeditionApp.Lessons.cs&lt;br/&gt;11 methods, 15 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Runtime_ExpeditionApp_Media_cs[&quot;ExpeditionApp.Media.cs&lt;br/&gt;16 methods, 14 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Runtime_ExpeditionApp_Network_cs[&quot;ExpeditionApp.Network.cs&lt;br/&gt;43 methods, 46 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Runtime_ExpeditionApp_Practice_cs[&quot;ExpeditionApp.Practice.cs&lt;br/&gt;20 methods, 10 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Runtime_ExpeditionApp_Queries_cs[&quot;ExpeditionApp.Queries.cs&lt;br/&gt;18 methods, 20 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Runtime_ExpeditionApp_Session_cs[&quot;ExpeditionApp.Session.cs&lt;br/&gt;8 methods, 14 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Runtime_ExpeditionApp_Settings_cs[&quot;ExpeditionApp.Settings.cs&lt;br/&gt;22 methods, 14 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Runtime_ExpeditionApp_WorldMenu_cs[&quot;ExpeditionApp.WorldMenu.cs&lt;br/&gt;7 methods, 2 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Runtime_ExpeditionApp_cs[&quot;ExpeditionApp.cs&lt;br/&gt;48 methods, 34 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Runtime_WorldTableContext_cs[&quot;WorldTableContext.cs&lt;br/&gt;1 methods, 2 fields and properties&quot;]
+</pre></div>
+<p class="caption">First file's folder: <code>Game/EmberGrove/Assets/Runtime</code>; a file elsewhere shows its folder.</p>
+
+<h3 id="partial-assembly-csharp-embergrove-exploration-circuitslicechecks">CircuitSliceChecks — Assembly-CSharp</h3>
+<div class="diagram"><pre class="mermaid">
+flowchart LR
+  c[&quot;CircuitSliceChecks&lt;br/&gt;10 files&lt;br/&gt;735 members&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Tests_Runtime_CircuitSliceChecks_Artwork_cs[&quot;CircuitSliceChecks.Artwork.cs&lt;br/&gt;37 methods, 0 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Tests_Runtime_CircuitSliceChecks_BattlePolish_cs[&quot;CircuitSliceChecks.BattlePolish.cs&lt;br/&gt;101 methods, 0 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Tests_Runtime_CircuitSliceChecks_DeckBuilder_cs[&quot;CircuitSliceChecks.DeckBuilder.cs&lt;br/&gt;36 methods, 0 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Tests_Runtime_CircuitSliceChecks_Lessons_cs[&quot;CircuitSliceChecks.Lessons.cs&lt;br/&gt;65 methods, 0 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Tests_Runtime_CircuitSliceChecks_MenuRules_cs[&quot;CircuitSliceChecks.MenuRules.cs&lt;br/&gt;8 methods, 0 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Tests_Runtime_CircuitSliceChecks_Saves_cs[&quot;CircuitSliceChecks.Saves.cs&lt;br/&gt;22 methods, 12 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Tests_Runtime_CircuitSliceChecks_Story_cs[&quot;CircuitSliceChecks.Story.cs&lt;br/&gt;53 methods, 0 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Tests_Runtime_CircuitSliceChecks_Versus_cs[&quot;CircuitSliceChecks.Versus.cs&lt;br/&gt;62 methods, 0 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Tests_Runtime_CircuitSliceChecks_WorldTable_cs[&quot;CircuitSliceChecks.WorldTable.cs&lt;br/&gt;121 methods, 6 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Tests_Runtime_CircuitSliceChecks_cs[&quot;CircuitSliceChecks.cs&lt;br/&gt;192 methods, 20 fields and properties&quot;]
+</pre></div>
+<p class="caption">First file's folder: <code>Game/EmberGrove/Assets/Tests/Runtime</code>; a file elsewhere shows its folder.</p>
+
+<h3 id="partial-assembly-csharp-embergrove-exploration-isometricsectorvisuals">IsometricSectorVisuals — Assembly-CSharp</h3>
+<div class="diagram"><pre class="mermaid">
+flowchart LR
+  c[&quot;IsometricSectorVisuals&lt;br/&gt;6 files&lt;br/&gt;312 members&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Runtime_Exploration_IsometricSectorVisuals_Authored_cs[&quot;IsometricSectorVisuals.Authored.cs&lt;br/&gt;128 methods, 22 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Runtime_Exploration_IsometricSectorVisuals_Civic_cs[&quot;IsometricSectorVisuals.Civic.cs&lt;br/&gt;12 methods, 4 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Runtime_Exploration_IsometricSectorVisuals_Meshes_cs[&quot;IsometricSectorVisuals.Meshes.cs&lt;br/&gt;5 methods, 2 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Runtime_Exploration_IsometricSectorVisuals_Models_cs[&quot;IsometricSectorVisuals.Models.cs&lt;br/&gt;32 methods, 19 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Runtime_Exploration_IsometricSectorVisuals_Venues_cs[&quot;IsometricSectorVisuals.Venues.cs&lt;br/&gt;8 methods, 0 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Runtime_Exploration_IsometricSectorVisuals_cs[&quot;IsometricSectorVisuals.cs&lt;br/&gt;49 methods, 31 fields and properties&quot;]
+</pre></div>
+<p class="caption">First file's folder: <code>Game/EmberGrove/Assets/Runtime/Exploration</code>; a file elsewhere shows its folder.</p>
+
+<h3 id="partial-cardforge-circuit-cardforge-circuit-circuitrules">CircuitRules — CardForge.Circuit</h3>
+<div class="diagram"><pre class="mermaid">
+flowchart LR
+  c[&quot;CircuitRules&lt;br/&gt;3 files&lt;br/&gt;354 members&quot;]
+  c --&gt; f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Circuit_CircuitGraph_cs[&quot;CircuitGraph.cs&lt;br/&gt;32 methods, 0 fields and properties&quot;]
+  c --&gt; f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Circuit_CircuitRules_cs[&quot;CircuitRules.cs&lt;br/&gt;110 methods, 9 fields and properties&quot;]
+  c --&gt; f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Circuit_CircuitValidation_cs[&quot;CircuitValidation.cs&lt;br/&gt;203 methods, 0 fields and properties&quot;]
+</pre></div>
+<p class="caption">First file's folder: <code>Toolkit/Packages/com.catsplat.cardforge/Runtime/Circuit</code>; a file elsewhere shows its folder.</p>
+
+<h3 id="partial-assembly-csharp-embergrove-expedition-expeditionharness">ExpeditionHarness — Assembly-CSharp</h3>
+<div class="diagram"><pre class="mermaid">
+flowchart LR
+  c[&quot;ExpeditionHarness&lt;br/&gt;2 files&lt;br/&gt;124 members&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Tests_Runtime_ExpeditionHarness_Network_cs[&quot;ExpeditionHarness.Network.cs&lt;br/&gt;78 methods, 15 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Tests_Runtime_ExpeditionHarness_cs[&quot;ExpeditionHarness.cs&lt;br/&gt;17 methods, 14 fields and properties&quot;]
+</pre></div>
+<p class="caption">First file's folder: <code>Game/EmberGrove/Assets/Tests/Runtime</code>; a file elsewhere shows its folder.</p>
+
+</section>
+</main>
+<footer>Bloomfire Wiki · GENERATED by <code>Tools/Documentation/structure_wiki.py</code> from tracked sources; there is no page source · Found a mistake? Fix the code or the generator, then rebuild.</footer>
+</body>
+</html>

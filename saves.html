@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Saves &amp; Settings — Bloomfire Wiki</title>
+<link rel="stylesheet" href="wiki.css">
+<script src="mermaid.min.js" defer></script>
+<script src="wiki.js" defer></script>
+</head>
+<body>
+<nav class="wiki">
+  <a class="home" href="index.html">🔥 Bloomfire Wiki</a>
+  <div class="grp"><span class="grp-t">Start here</span>
+    <a href="codebase-tour.html">Codebase Tour</a>
+    <a href="glossary.html">Glossary</a>
+  </div>
+  <div class="grp"><span class="grp-t">Game systems</span>
+    <a href="rules.html">Rules Engine</a>
+    <a href="world.html">World &amp; Journal</a>
+    <a href="sessions.html">Hosted Sessions</a>
+    <a href="ui.html">UI &amp; Menus</a>
+    <a href="networking.html">Networking</a>
+    <a href="content.html">Content &amp; Media</a>
+    <a class="on" href="saves.html">Saves &amp; Settings</a>
+  </div>
+  <div class="grp"><span class="grp-t">Code health</span>
+    <a href="diagrams.html">Diagrams</a>
+    <a href="complexity.html">Complexity</a>
+    <a href="findings.html">Findings</a>
+  </div>
+  <div class="grp"><span class="grp-t">Ship &amp; maintain</span>
+    <a href="qa.html">QA &amp; Rehearsals</a>
+    <a href="builds.html">Builds &amp; Tools</a>
+    <a href="maintaining.html">Maintaining</a>
+  </div>
+</nav>
+<header class="page"><h1>What the game <span class="flame">remembers</span></h1><p class="tag">The three things the game writes to disk (Circuit progress, player settings and opt-in playtest reports), how each is written and recovered, and what is deliberately never saved.</p></header>
+<main>
+  <div class="tldr"><h4>In 60 seconds</h4><ul>
+    <li><b>Three writers, no more.</b> In <code>Game/EmberGrove/Assets/Runtime</code> and the toolkit's <code>Runtime</code> folders, the only file or PlayerPrefs writes are <code>CircuitPersistence.Save</code>, <code>ExpeditionApp.SavePreferences</code> and <code>PlaytestSessionService.Persist</code>. QA builds add the testing-save preferences and reset folder in <code>CircuitSliceChecks.Saves</code>.</li>
+    <li><b>Progress is one JSON file.</b> <code>CircuitSave</code> (wrapper version 5) holds the whole <code>CircuitState</code> plus a few presentation fields, in <code>bloomfire-circuit-v2.json</code> under <code>Application.persistentDataPath</code>.</li>
+    <li><b>Restore tries four files in order</b>: the primary, its <code>.previous</code>, the legacy <code>bloomfire-circuit-v1.json</code>, its <code>.previous</code>. Unreadable files are kept and copied aside as <code>*.corrupt-&lt;UTC&gt;-&lt;guid&gt;</code>; a file from a newer game blocks every write.</li>
+    <li><b>Writes are atomic.</b> A save goes to <code>*.tmp</code>, is flushed to disk, then <code>File.Replace</code> swaps it in and rotates the old file to <code>.previous</code>.</li>
+    <li><b>Settings are PlayerPrefs, not files.</b> <code>PlayerSettings</code> is JSON under the key <code>EmberGrove.PlayerSettings.v1</code>; rehearsals get their own keys with a <code>.qa.&lt;hash&gt;</code> suffix. A battle's <code>CombatState</code> and every network session live only in memory.</li>
+  </ul></div>
+
+  <div class="prereq"><h4>Before you start</h4><ul>
+    <li>The rules of the saved state itself (schema versions, migrations, what <code>CircuitRules.Recover</code> repairs) belong to the toolkit's <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Toolkit/Packages/com.catsplat.cardforge/Runtime/Circuit/README.md#saves-and-recovery">Circuit saves and recovery</a> and to MAINTAINING's <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/MAINTAINING.md#supported-circuit-deck-upgrades">deck upgrades</a> and <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/MAINTAINING.md#supported-circuit-world-layouts">world layouts</a> sections. This page covers the file layer around them.</li>
+    <li>Where those folders and keys are on each operating system is in MAINTAINING's <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/MAINTAINING.md#internal-preview-candidate">internal preview candidate</a> section; backing up player data is in <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/BACKUP_AND_RESTORE.md#release-artifacts-and-player-data">Backup and restore</a>.</li>
+    <li>How <code>CircuitState</code> changes through <code>ApplyCircuit</code> is on <a href="world.html">World &amp; Journal</a>.</li>
+  </ul></div>
+
+  <section id="anatomy"><h2><span class="num">01</span>Where the pieces live</h2>
+    <p class="lead">The file logic is small and deliberately free of Unity; the game owns when to save, and the toolkit owns what a valid saved state is.</p>
+    <div class="scrollx"><table>
+      <tr><th>File</th><th>What it owns</th></tr>
+      <tr><td><code>Game/EmberGrove/Assets/Runtime/Exploration/CircuitPersistence.cs</code></td><td><code>CircuitSave</code> (the wrapper) and <code>CircuitPersistence</code> (<code>Restore</code>, <code>Save</code>, <code>WriteBlockReason</code>, <code>HasRejectedSaves</code>, <code>DecksRepaired</code>). Uses only <code>System.*</code> and <code>CardForge.Circuit</code>; JSON is passed in as a string and a deserializer delegate.</td></tr>
+      <tr><td><code>Game/EmberGrove/Assets/Runtime/Exploration/IsometricSlice.Circuit.cs</code></td><td>Paths (<code>CircuitStorageRoot</code>, <code>CircuitPath</code>, <code>PreviousCircuitPath</code>), <code>RestoreCircuit</code>, <code>SaveCircuit</code>, <code>SaveCircuitWrite</code>, <code>CaptureCircuitSave</code>, <code>ApplyCircuit</code></td></tr>
+      <tr><td><code>Toolkit/…/Runtime/Circuit/CircuitRules.cs</code>, <code>CircuitValidation.cs</code></td><td>The partial class <code>CircuitRules</code>: <code>CurrentProfileVersion</code>, <code>CurrentRunVersion</code>, <code>CurrentWorldLayoutVersion</code>, <code>HasNewerRoomRevision</code>, <code>DecksRepaired</code>, and <code>Recover</code> (in <code>CircuitValidation.cs</code>)</td></tr>
+      <tr><td><code>Game/EmberGrove/Assets/Runtime/PlayerSettings.cs</code></td><td><code>PlayerSettings</code> and <code>PlayerSettingsRules.Normalize</code></td></tr>
+      <tr><td><code>Game/EmberGrove/Assets/Runtime/ExpeditionApp.Settings.cs</code></td><td><code>PreferenceKey</code>, <code>ReadPreferences</code>, <code>SavePreferences</code>, <code>ApplyRuntimePreferences</code>, the save debounce and the display trial</td></tr>
+      <tr><td><code>Game/EmberGrove/Assets/Runtime/Exploration/IsometricSlice.Preferences.cs</code></td><td>The world's use of the same settings (<code>LoadWorldPreferences</code>, <code>ApplyWorldPreferences</code>)</td></tr>
+      <tr><td><code>Game/EmberGrove/Assets/Runtime/PlaytestSessionService.cs</code></td><td><code>PlaytestReport</code> and its writer</td></tr>
+      <tr><td><code>Game/EmberGrove/Assets/Tests/CircuitPersistenceVerification.cs</code>, <code>Tools/CircuitPersistenceChecks/</code></td><td>The save scenarios and the portable runner (<a href="#portable">§07</a>)</td></tr>
+      <tr><td><code>Game/EmberGrove/Assets/Tests/Runtime/CircuitSliceChecks.Saves.cs</code></td><td>QA-only: the testing save, isolated rehearsal folders, lifecycle rehearsals</td></tr>
+    </table></div>
+  </section>
+
+  <section id="inventory"><h2><span class="num">02</span>What is saved, and where</h2>
+    <p class="lead">Each durable thing has one writer and one location. Everything below is per operating-system user: there is one profile per account.</p>
+    <div class="scrollx"><table>
+      <tr><th>What</th><th>Writer</th><th>Location</th><th>Format</th></tr>
+      <tr><td>Circuit progress</td><td><code>CircuitPersistence.Save</code></td><td><code>persistentDataPath/bloomfire-circuit-v2.json</code> and its recovery files</td><td><code>JsonUtility</code> JSON of <code>CircuitSave</code>, UTF-8 without BOM</td></tr>
+      <tr><td>Player settings</td><td><code>ExpeditionApp.SavePreferences</code></td><td>PlayerPrefs key <code>EmberGrove.PlayerSettings.v1</code>, plus two legacy int keys</td><td><code>JsonUtility</code> JSON of <code>PlayerSettings</code></td></tr>
+      <tr><td>Playtest reports (opt-in)</td><td><code>PlaytestSessionService.Persist</code></td><td><code>persistentDataPath/Playtests/playtest-&lt;guid&gt;.json</code></td><td><code>JsonUtility</code> JSON of <code>PlaytestReport</code></td></tr>
+      <tr><td>A creator's content pack (not a save)</td><td>Copied in by hand</td><td><code>persistentDataPath/ContentOverride</code></td><td>See <a href="content.html#loader">content.html §04</a></td></tr>
+      <tr><td>QA testing save (QA builds only)</td><td><code>CircuitPersistence.Save</code></td><td><code>persistentDataPath/testing-all-cards/</code></td><td>Same as Circuit progress</td></tr>
+    </table></div>
+  </section>
+
+  <section id="wrapper"><h2><span class="num">03</span>The CircuitSave wrapper and its versions</h2>
+    <p class="lead"><code>CircuitSave</code> is a serializable class around the toolkit's <code>CircuitState</code>. Its own <code>Version</code> is separate from the profile and run versions nested inside the state; all of them are checked on restore.</p>
+    <div class="scrollx"><table>
+      <tr><th>Field</th><th>Meaning</th></tr>
+      <tr><td><code>Version</code></td><td>The wrapper version. <code>CaptureCircuitSave</code> writes 5; <code>RecoverCandidate</code> accepts 1–5. It has no default, so a file without one reads as 0 and is rejected.</td></tr>
+      <tr><td><code>State</code></td><td>The complete <code>CircuitState</code> (profile and run)</td></tr>
+      <tr><td><code>HasWorldPosition</code>, <code>WorldX</code>, <code>WorldZ</code>, <code>FocusStage</code></td><td>Where the traveller stood, relative to the district at <code>FocusStage</code>. Used only when <code>Version &gt;= 2</code>, a run exists and the numbers are finite.</td></tr>
+      <tr><td><code>Zoom</code>, <code>FollowCamera</code>, <code>ReducedMotion</code></td><td>Camera and motion choices. <code>Zoom</code> is clamped to 0.7–1.5 on restore.</td></tr>
+      <tr><td><code>WelcomeSeen</code>, <code>PracticeCompleted</code>, <code>OpeningBeatId</code>, <code>CompletedLessonIds</code>, <code>ReadLessonIds</code></td><td>Onboarding and lesson progress that lives outside <code>CircuitState</code></td></tr>
+      <tr><td><code>ClubNickname</code>, <code>ClubBadgeId</code></td><td>Local presentation only; never used as a review or session identity</td></tr>
+    </table></div>
+    <p><b>A save is "from a newer game"</b> (<code>SavedByNewerVersion</code>) when the wrapper version is above 5, or the profile, run or world-layout version is above <code>CircuitRules.CurrentProfileVersion</code>, <code>CurrentRunVersion</code> or <code>CurrentWorldLayoutVersion</code>, or <code>CircuitRules.HasNewerRoomRevision</code> is true for the run. Older nested versions are upgraded in memory by <code>CircuitRules.Recover</code>; reading never rewrites the file, and the next ordinary save keeps the old bytes as <code>.previous</code>. The per-version behaviour is owned by the guides linked under <i>Before you start</i>.</p>
+  </section>
+
+  <section id="files"><h2><span class="num">04</span>File names and folders</h2>
+    <p class="lead"><code>CircuitPersistence</code> is constructed with two paths, the primary and the legacy file, and derives every other name from them.</p>
+    <div class="scrollx"><table>
+      <tr><th>Name</th><th>Role</th></tr>
+      <tr><td><code>bloomfire-circuit-v2.json</code></td><td>The primary save (<code>CircuitPath</code>)</td></tr>
+      <tr><td><code>bloomfire-circuit-v2.json.previous</code></td><td>The file the last save replaced</td></tr>
+      <tr><td><code>bloomfire-circuit-v2.json.tmp</code></td><td>A save being written; replaced into the primary when complete</td></tr>
+      <tr><td><code>bloomfire-circuit-v1.json</code> and <code>.previous</code></td><td>The legacy save (<code>PreviousCircuitPath</code>). Read as a fallback; the game never writes or deletes it (only the QA testing reset below moves one).</td></tr>
+      <tr><td><code>&lt;rejected file&gt;.corrupt-&lt;yyyyMMddTHHmmssfffZ&gt;-&lt;guid&gt;</code></td><td>A copy of each file restore could not read, made before the next save. Nothing deletes these.</td></tr>
+    </table></div>
+    <h3>Which folder (<code>CircuitStorageRoot</code>)</h3>
+    <ul>
+      <li><b>Players:</b> <code>Application.persistentDataPath</code>. These file names are frozen identifiers (<a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CODE_ARCHITECTURE_GUIDE.md#product-names">product names</a>).</li>
+      <li><b>QA testing save</b> (<code>UNITY_EDITOR</code> or <code>CIRCUIT_QA</code> only, when <code>CircuitSliceChecks.TestingAllCards</code>): the subfolder <code>testing-all-cards</code>. <code>SaveCircuit</code> refuses to write anywhere else while it is on (<code>InTestingFolder</code>).</li>
+      <li><b>Lifecycle and story rehearsals:</b> <code>CircuitSliceChecks.LifecycleSaveDirectory</code>, which is <code>&lt;-circuit-verify output&gt;/saves</code> (or a story folder inside that output) and throws if it would land inside the player's <code>persistentDataPath</code>.</li>
+      <li><b>Other rehearsals</b> (<code>-circuit-verify</code> or <code>-expedition-net-verify</code> without a lifecycle folder): <code>CircuitSavesSuppressed</code> is true, so restore is skipped and <code>SaveCircuit</code> returns success without writing.</li>
+    </ul>
+    <p>Starting the testing save again from Settings sets <code>TestingResetWanted</code>; on the next start <code>CircuitSliceChecks.ApplyTestingReset</code> moves its four save files into a <code>reset-&lt;UTC&gt;</code> folder beside them. Nothing is deleted.</p>
+  </section>
+
+  <section id="restore"><h2><span class="num">05</span>Restoring: the candidate order</h2>
+    <p class="lead"><code>CircuitPersistence.Restore(definition, deserialize, warning, out restoredPath)</code> walks four candidates in a fixed order. The first usable one wins, but it keeps reading the rest so that a newer-version file anywhere still blocks writes.</p>
+    <div class="diagram"><pre class="mermaid">
+stateDiagram-v2
+  direction TB
+  state "Next candidate" as Next
+  state "Read and deserialize" as Read
+  state "RecoverCandidate" as Recover
+  state "Rejected, path kept in rejectedPaths" as Rejected
+  state "WriteBlockReason set" as Blocked
+  state "Restored" as Restored
+  [*] --&gt; Next
+  Next --&gt; Next: file missing
+  Next --&gt; Read: file exists
+  Read --&gt; Blocked: SavedByNewerVersion
+  Read --&gt; Next: a save is already restored
+  Read --&gt; Recover: nothing restored yet
+  Read --&gt; Rejected: empty or malformed, nothing restored yet
+  Recover --&gt; Restored: version 1 to 5, collection present, CircuitRules.Recover ok
+  Recover --&gt; Rejected: any check fails
+  Blocked --&gt; Next
+  Rejected --&gt; Next
+  Restored --&gt; Next: keep checking for newer files
+  Next --&gt; [*]: all four inspected
+  note right of Next
+    v2.json, v2.json.previous,
+    v1.json, v1.json.previous
+  end note
+</pre></div>
+    <p class="caption">One pass of <code>CircuitPersistence.Restore</code>. "Rejected" covers <code>IOException</code>, <code>InvalidDataException</code>, <code>UnauthorizedAccessException</code>, <code>ArgumentException</code> (Unity's malformed JSON) and <code>FormatException</code>. If the rejected file is the primary, <code>preservePrevious</code> is set so the next save does not rotate it over the good backup.</p>
+    <p>Then <code>IsometricSlice.RestoreCircuit</code> finishes the job:</p>
+    <ol class="steps">
+      <li><b>Use what was restored.</b> <code>RestoreCircuitSaved</code> copies the state and the wrapper fields, and sets a notice: restored from a <code>.previous</code> or after a rejection ("restored from an earlier save"), decks repaired, nothing readable ("could not be read… original files will be kept"), or the <code>WriteBlockReason</code> text, which wins.</li>
+      <li><b>Fill gaps.</b> No profile → <code>CircuitRules.NewProfile</code>. No run → <code>RestoreCircuitStartRun</code> (the first playable saved deck, else the initial starter).</li>
+      <li><b>Close an interrupted match.</b> A saved <code>Run.PendingDuel</code> is resolved as <code>CircuitDuelOutcome.Interrupted</code>: the player is back at the challenge and no result is invented.</li>
+      <li><b>QA only.</b> <code>RestoreCircuitTesting</code> tops up the testing save with every card and records <code>TestingSaveSummary</code> for the Settings screen.</li>
+    </ol>
+    <div class="note">The save is read only after the content pack has loaded and a <code>CircuitDefinition</code> exists, because <code>Recover</code> needs the definition. A pack that fails to load leaves the save untouched (<a href="content.html#pipeline">content.html §02</a>).</div>
+  </section>
+
+  <section id="save"><h2><span class="num">06</span>Saving: tmp, Replace, .previous</h2>
+    <p class="lead">Most saves start in <code>ApplyCircuit</code>, which swaps in a new <code>CircuitState</code> from a <code>CircuitRules</code> call and then calls <code>SaveCircuit</code>. With <code>requireSaved: true</code> a failed write puts the previous state back so the player can retry.</p>
+    <div class="diagram"><pre class="mermaid">
+sequenceDiagram
+  participant S as IsometricSlice
+  participant R as CircuitRules
+  participant P as CircuitPersistence
+  participant D as Save folder
+  S-&gt;&gt;R: e.g. CommitEvent(...)
+  R--&gt;&gt;S: Result&lt;CircuitState&gt;
+  S-&gt;&gt;S: ApplyCircuit(result, requireSaved: true)
+  S-&gt;&gt;S: SaveCircuit checks lobby, suppression, testing folder and Ready
+  S-&gt;&gt;S: CaptureCircuitSave() writes Version 5
+  S-&gt;&gt;P: Save(JsonUtility.ToJson(save, true))
+  alt WriteBlockReason is set
+    P--&gt;&gt;S: throw IOException
+  else ordinary save
+    P-&gt;&gt;D: File.Copy each rejected file to .corrupt-UTC-guid
+    P-&gt;&gt;D: write v2.json.tmp, Flush(true)
+    P-&gt;&gt;D: File.Replace(tmp, v2.json, v2.json.previous)
+    Note over P,D: File.Move when v2.json is new, and no backup on the first save after a rejected primary
+    P--&gt;&gt;S: return
+  end
+  S-&gt;&gt;S: on IOException or UnauthorizedAccessException set circuitNotice
+  S-&gt;&gt;S: requireSaved and failed, so restore the previous state
+</pre></div>
+    <p class="caption">One save from a player choice. <code>SaveCircuitWrite</code> catches only I/O and access errors; anything else propagates.</p>
+    <h3>When the game saves</h3>
+    <div class="scrollx"><table>
+      <tr><th>Trigger</th><th>Code</th></tr>
+      <tr><td>Rule changes: events, visits, new runs, episode results, deck builder changes</td><td><code>ApplyCircuit</code> (several with <code>requireSaved: true</code>; new runs also with <code>restoreAtArrival</code>, which saves no position so a failed rebuild resumes at arrival)</td></tr>
+      <tr><td>Before and after a match</td><td><code>PlayCircuitDuel</code>: <code>ApplyCircuit(BeginDuel…)</code> saves the <code>PendingDuel</code>, then <code>ApplyCircuit(ResolveDuel…)</code> commits the outcome before the return animation</td></tr>
+      <tr><td>Presentation choices</td><td>Direct <code>SaveCircuit()</code> calls for camera, motion, zoom, lessons read, the onboarding badge and nickname, returning to the title page and returning from the settings session; <code>OpenModal</code> also calls <code>SaveProgress</code> whenever a window opens outside the title page</td></tr>
+      <tr><td>Leaving the app</td><td><code>OnApplicationPause(true)</code>, <code>OnApplicationQuit</code> and <code>OnDestroy</code> call <code>SaveProgress</code>; the Quit page calls <code>SaveBeforeQuit</code> and asks again if it fails</td></tr>
+      <tr><td>Never</td><td>While a Versus lobby is open (<code>LobbyActive</code>): <code>SaveCircuit</code> returns true without writing</td></tr>
+    </table></div>
+    <details class="why"><summary>Why rejected files are copied, not moved</summary>
+      <p>A rejected file may be the only copy of real progress that a later fix could read. <code>Save</code> copies every rejected candidate to a <code>.corrupt-</code> name before it replaces anything, and stops the whole write if a copy fails, leaving the originals and the good backup in place; the next attempt retries the copies. On the first save after a rejected primary, <code>File.Replace</code> is called with no backup name, so the corrupt bytes do not overwrite the usable <code>.previous</code>; later saves rotate normally.</p>
+    </details>
+  </section>
+
+  <section id="portable"><h2><span class="num">07</span>Testing the save code: the portable build</h2>
+    <p class="lead">Because <code>CircuitPersistence</code> has no Unity dependency, the same source file is compiled into a plain .NET program and exercised with real temporary files.</p>
+    <div class="grid c2">
+      <div class="card accent-green"><h4>Portable runner</h4><p><code>Tools/CircuitPersistenceChecks/CircuitPersistenceChecks.csproj</code> compiles <code>Result.cs</code>, the toolkit's <code>Core</code> and <code>Circuit</code> folders, <code>CircuitPersistence.cs</code> and <code>CircuitPersistenceVerification.cs</code> with <code>CIRCUIT_PERSISTENCE_PORTABLE</code>. <code>Program.cs</code> supplies a <code>System.Text.Json</code> <code>SaveCodec</code> that turns <code>JsonException</code> into <code>ArgumentException</code>, as Unity does. Run it as the <code>Persistence</code> suite of <code>Tools/Run-Checks.ps1</code>.</p></div>
+      <div class="card accent-violet"><h4>Unity runner</h4><p><code>CircuitPersistenceVerification.RunBatch</code> runs the same <code>RunScenarios</code> list with <code>JsonUtility</code> in a batch-mode editor, writing its report and fixtures under <code>Temp/ReleaseReview</code>. A few scenarios run in only one runner (<code>if (native)</code>).</p></div>
+    </div>
+    <p>The whole verification file is wrapped in <code>#if UNITY_EDITOR || CIRCUIT_PERSISTENCE_PORTABLE</code>, so no player compiles it. Lifecycle behaviour around real process exits (unload, quit during a battle, quit on a result, resume) is rehearsed separately by <code>CircuitSliceChecks.Saves</code> with <code>-circuit-lifecycle</code>; see <a href="qa.html">QA &amp; Rehearsals</a>. What the scenarios cover and how to run them is in the <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Tools/CircuitPersistenceChecks/README.md">Circuit save recovery checks README</a>.</p>
+  </section>
+
+  <section id="settings"><h2><span class="num">08</span>Player settings</h2>
+    <p class="lead"><code>PlayerSettings</code> is a flat serializable class of presentation preferences (volumes, mute, motion, contrast, text size and speed, subtitles, spoken help, input options, frame limit, window size and mode, performance). Its own comment is the rule: no setting takes part in combat or network state.</p>
+    <div class="scrollx"><table>
+      <tr><th>Piece</th><th>Behaviour</th></tr>
+      <tr><td><code>PlayerSettings.Version</code></td><td>Always 1; <code>Normalize</code> sets it</td></tr>
+      <tr><td><code>PlayerSettingsRules.Normalize</code></td><td>Clamps every float to its range (NaN or infinity becomes the default), resets <code>FrameLimit</code> to 60 unless it is 30, 60, 90 or 120, resets unknown enum values, and zeroes a window size outside 640×480 to 16384×16384. Every read and write goes through it.</td></tr>
+      <tr><td><code>EmberGrove.PlayerSettings.v1</code></td><td>The PlayerPrefs string holding the JSON. <code>ReadPreferences</code> ignores a value of 8192 characters or more, and returns defaults if parsing throws <code>ArgumentException</code>.</td></tr>
+      <tr><td><code>EmberGrove.Muted</code>, <code>EmberGrove.ReducedMotion</code></td><td>Legacy int keys. Read only when the JSON key is empty; always written alongside it.</td></tr>
+      <tr><td><code>PreferenceKey(key)</code></td><td>With <code>-expedition-net-verify &lt;path&gt;</code> or <code>-circuit-verify &lt;path&gt;</code>, appends <code>.qa.</code> and a 16-digit hex FNV-1a hash of the full path, so each rehearsal output gets its own keys. Rehearsals also read <code>Muted</code> as true.</td></tr>
+      <tr><td>Saving</td><td><code>ChangeSettings</code> applies at once and marks the settings dirty; <code>TickSettings</code> saves after <code>SettingsSaveDelay</code> (0.35 s). Closing Settings saves at once; <code>FlushSettings</code> saves pending changes on pause, quit and destroy, and when the world releases a hosted session (<code>IsometricCombatBridge.ReleaseSettings</code>).</td></tr>
+      <tr><td>Display trial</td><td><code>PreviewDisplay</code> changes resolution for 15 s; until <code>ConfirmDisplay</code>, <code>SaveSettings</code> writes the previous size and mode. <code>ResetPreferences</code> keeps the display size and mode.</td></tr>
+    </table></div>
+    <p><b>Two owners, one store.</b> Hosted sessions hold an <code>ExpeditionApp.Settings</code> instance; the world calls the static <code>ReadPreferences</code>, <code>SavePreferences</code> and <code>ApplyRuntimePreferences</code> from <code>IsometricSlice.Preferences</code>. <code>ApplyRuntimePreferences</code> sets High Contrast in <code>DuelUi.MenuColour</code>, <code>AudioListener.volume</code>, the quality level and the frame rate. On a first run with no settings key, <code>LoadWorldPreferences</code> folds the world save's <code>ReducedMotion</code> into settings once and saves them; after that the settings value wins, although <code>CircuitSave</code> still writes its own <code>ReducedMotion</code> field.</p>
+    <p>QA builds add two more keys through <code>PreferenceKey</code>: <code>Bloomfire.Testing.AllCards</code> and <code>Bloomfire.Testing.AllCards.Reset</code> (<code>CircuitSliceChecks.Saves</code>). Where PlayerPrefs live on each platform, and why moving the save folder does not reset them, is in <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/MAINTAINING.md#internal-preview-candidate">internal preview candidate</a>.</p>
+  </section>
+
+  <section id="playtest"><h2><span class="num">09</span>Playtest reports</h2>
+    <p class="lead"><code>PlaytestSessionService</code> records nothing until a player presses <b>START LOCAL PLAYTEST</b> in the feedback panel drawn by <code>ExpeditionView.Journey.cs</code> or <code>ExpeditionView.PortraitJourney.cs</code>. Each <code>ExpeditionApp</code> creates its own service: <code>PrepareTable</code> makes one for a table session, and <code>Start</code> makes one if none exists.</p>
+    <ul>
+      <li><b>File.</b> <code>persistentDataPath/Playtests/playtest-&lt;guid&gt;.json</code>, a <code>PlaytestReport</code> with <code>SchemaVersion = 1</code>, stamped with <code>Application.version</code> and <code>Application.productName</code>.</li>
+      <li><b>Write.</b> <code>Persist</code> writes a unique <code>.tmp-&lt;guid&gt;</code> file, flushes it, then <code>File.Replace</code> with no backup (or <code>File.Move</code> the first time), and always deletes the temporary file.</li>
+      <li><b>Checkpoints.</b> On start, every 20 actions, every match start, end or abandonment, each feedback form and stop. <code>Stop</code> runs on <code>OnApplicationQuit</code> and when a session finishes.</li>
+      <li><b>Bounds.</b> <code>MaxEvents</code>, <code>MaxFeedbackEntries</code> and <code>MaxFeedbackLength</code>; events past the limit are counted in <code>DroppedEvents</code>. Free text is trimmed and common e-mail and IP address patterns are redacted.</li>
+    </ul>
+    <p>Rehearsals construct the service with their own output folder. The report fields and the full bounds are owned by <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/PLAYTESTING_API.md#bounds-and-persistence">local playtest recording</a>.</p>
+  </section>
+
+  <section id="never"><h2><span class="num">10</span>What is never saved</h2>
+    <p class="lead">Some state is deliberately memory-only, so that a crash or quit can never leave a half-played match or a stale connection on disk.</p>
+    <div class="scrollx"><table>
+      <tr><th>State</th><th>Lives in</th><th>After a restart</th></tr>
+      <tr><td><code>CombatState</code> (a battle in progress)</td><td><code>ExpeditionApp.State</code>; on a host or trusted service, <code>ExpeditionAuthority</code></td><td>The saved <code>PendingDuel</code> is resolved as <code>Interrupted</code>; the challenge can be played again (<a href="#restore">§05</a>)</td></tr>
+      <tr><td>Network sessions, lobbies and their messages</td><td><code>ExpeditionNetworkSession</code> and the Versus lobby session</td><td>Gone; the toolkit's runtime code writes no files at all. See <a href="networking.html">Networking</a>.</td></tr>
+      <tr><td>Adventure progress made inside a Versus lobby</td><td>Not recorded</td><td><code>SaveCircuit</code> skips writing while <code>LobbyActive</code></td></tr>
+      <tr><td>The loaded content pack and decoded media</td><td><code>LoadedContentPack</code>, <code>CardArtworkCache</code></td><td>Reloaded from the pack root</td></tr>
+      <tr><td>The legal-action cache, open pages and navigation history</td><td><code>ExpeditionApp</code>, <code>IsometricSlice</code> (<code>circuitBackStack</code>)</td><td>The title page opens; the traveller's position comes from the save</td></tr>
+    </table></div>
+  </section>
+
+  <section id="moving"><h2><span class="num">11</span>Backups and moving between versions</h2>
+    <p class="lead">The game keeps one rolling backup and every rejected file; anything older is the player's own backup.</p>
+    <ul>
+      <li><b>Downgrades are blocked, not merged.</b> Opening an older build on a newer save shows the <code>WriteBlockReason</code> notice and refuses every write, even if an older compatible candidate could be displayed. Continue with the newer game.</li>
+      <li><b>Upgrades happen in memory.</b> The next ordinary save writes the new version and leaves the old bytes as <code>.previous</code>; the legacy <code>v1</code> file is never touched.</li>
+      <li><b>Git does not hold player data.</b> Saves, preferences and playtest reports must be backed up separately; see <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/BACKUP_AND_RESTORE.md#release-artifacts-and-player-data">release artifacts and player data</a>.</li>
+      <li><b>One account, one profile.</b> A different content pack folder does not create a separate save (<a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/TOOLKIT_AUTHORING_GUIDE.md#updating-an-installed-game">updating an installed game</a>).</li>
+    </ul>
+  </section>
+
+  <div class="honest"><h4>Keep this page honest</h4><ul>
+    <li><code>Game/EmberGrove/Assets/Runtime/Exploration/CircuitPersistence.cs</code> — <code>CircuitSave</code> fields, candidate order, <code>SavedByNewerVersion</code>, rejection, <code>.corrupt-</code> copies, <code>.tmp</code> and <code>File.Replace</code></li>
+    <li><code>Game/EmberGrove/Assets/Runtime/Exploration/IsometricSlice.Circuit.cs</code> — storage root, file names, <code>RestoreCircuit</code>, <code>SaveCircuit</code>, <code>CaptureCircuitSave</code>, <code>ApplyCircuit</code>, <code>PlayCircuitDuel</code></li>
+    <li><code>Game/EmberGrove/Assets/Runtime/Exploration/IsometricSlice.cs</code>, <code>IsometricSlice.Progress.cs</code> — pause, quit and destroy saves</li>
+    <li><code>Toolkit/Packages/com.catsplat.cardforge/Runtime/Circuit/CircuitRules.cs</code> — current version constants and <code>HasNewerRoomRevision</code>; <code>CircuitValidation.cs</code> — <code>Recover</code></li>
+    <li><code>Game/EmberGrove/Assets/Runtime/PlayerSettings.cs</code>, <code>ExpeditionApp.Settings.cs</code>, <code>Exploration/IsometricSlice.Preferences.cs</code> — settings fields, keys, QA suffix, debounce and display trial</li>
+    <li><code>Game/EmberGrove/Assets/Runtime/PlaytestSessionService.cs</code> — report path, checkpoints and bounds</li>
+    <li><code>Game/EmberGrove/Assets/Tests/Runtime/CircuitSliceChecks.Saves.cs</code> — testing save folder, reset, rehearsal folders</li>
+    <li><code>Game/EmberGrove/Assets/Tests/CircuitPersistenceVerification.cs</code>, <code>Tools/CircuitPersistenceChecks/*</code> — the portable and Unity runners</li>
+  </ul></div>
+</main>
+<footer>Bloomfire Wiki · page source <code>Docs/Wiki/saves.html</code>, built by <code>Tools/Documentation/structure_wiki.py</code> · Found a mistake? Fix it in the same commit as the code that made it one.</footer>
+</body>
+</html>

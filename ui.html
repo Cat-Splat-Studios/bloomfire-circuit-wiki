@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UI &amp; Menus — Bloomfire Wiki</title>
+<link rel="stylesheet" href="wiki.css">
+<script src="mermaid.min.js" defer></script>
+<script src="wiki.js" defer></script>
+</head>
+<body>
+<nav class="wiki">
+  <a class="home" href="index.html">🔥 Bloomfire Wiki</a>
+  <div class="grp"><span class="grp-t">Start here</span>
+    <a href="codebase-tour.html">Codebase Tour</a>
+    <a href="glossary.html">Glossary</a>
+  </div>
+  <div class="grp"><span class="grp-t">Game systems</span>
+    <a href="rules.html">Rules Engine</a>
+    <a href="world.html">World &amp; Journal</a>
+    <a href="sessions.html">Hosted Sessions</a>
+    <a class="on" href="ui.html">UI &amp; Menus</a>
+    <a href="networking.html">Networking</a>
+    <a href="content.html">Content &amp; Media</a>
+    <a href="saves.html">Saves &amp; Settings</a>
+  </div>
+  <div class="grp"><span class="grp-t">Code health</span>
+    <a href="diagrams.html">Diagrams</a>
+    <a href="complexity.html">Complexity</a>
+    <a href="findings.html">Findings</a>
+  </div>
+  <div class="grp"><span class="grp-t">Ship &amp; maintain</span>
+    <a href="qa.html">QA &amp; Rehearsals</a>
+    <a href="builds.html">Builds &amp; Tools</a>
+    <a href="maintaining.html">Maintaining</a>
+  </div>
+</nav>
+<header class="page"><h1>UI &amp; <span class="flame">menus</span></h1><p class="tag">How the two code-built uGUI menu stacks, the one UI Toolkit title page and the input routers fit together: who draws each screen, how a press reaches a focused control, and where the shared colour, type and spacing roles live.</p></header>
+<main>
+
+<div class="tldr"><h4>In 60 seconds</h4><ul>
+  <li><b>Two menu stacks, one at a time.</b> The lodge stack (<code>IsometricSlice</code> partials) draws the title, the field HUD, the journal windows, the task book and the deck builder. The hosted stack (<code>ExpeditionView</code> partials) draws the battle, pause, Versus and the full Settings screen. While a hosted session runs, the lodge stops reading input and hides its canvas (<a href="#two-stacks">§02</a>).</li>
+  <li><b>Almost everything is uGUI built in code</b> through the static factory <code>DuelUi</code>, which also holds the one role table both stacks read: <code>MenuColour</code>, <code>MenuType</code> and <code>MenuSpace</code> (<a href="#duelui">§04</a>). The exception is the title menu, which is UXML and USS on a world-space UI Toolkit panel laid on the notebook (<a href="#title">§05</a>).</li>
+  <li><b>Screens are thrown away and rebuilt.</b> <code>ExpeditionView.Render()</code> and <code>IsometricSlice.DrawModal()</code> destroy the old GameObjects and build new ones. Focus and scroll position survive by name, so GameObject names are load-bearing (<a href="#building">§03</a>).</li>
+  <li><b>Each stack has one input router, and Unity's own navigation is off.</b> The hosted router is <code>UpdateShellInput</code>, the lodge router is <code>UpdateFrameInput</code> → <code>NavigateModal</code>. Both use <code>MenuNavigationRows</code> to work out which control is above, below or beside the focused one (<a href="#input">§06</a>, <a href="#focus">§07</a>).</li>
+  <li><b>Much of it is still written twice:</b> two routers, two device enums, two focus painters, three glyph prefix mappings, two entrance motions. The planned move to UI Toolkit is in the roadmap (<a href="#duplication">§12</a>).</li>
+</ul></div>
+
+<div class="prereq"><h4>Before you start</h4><ul>
+  <li>Know uGUI's <code>EventSystem</code>, <code>Selectable</code> and <code>ScrollRect</code>, and the Input System's <code>Keyboard.current</code> / <code>Gamepad.current</code> device API. This page does not explain them.</li>
+  <li>Read <a href="sessions.html">Hosted Sessions</a> first if you do not know how a duel, practice, Versus or Settings visit becomes an <code>ExpeditionApp</code>. This page covers only what that session draws and how it reads input.</li>
+  <li>The player-facing rules (the one Back rule, every binding, what each setting does) are owned by <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/PLAYER_CONTROLS.md">PLAYER_CONTROLS</a>. The art-facing rules (menu roles, the dim, art slots) are owned by <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CIRCUIT_PRESENTATION.md">CIRCUIT_PRESENTATION</a>. This page links them and does not repeat them.</li>
+  <li>Paths in the tables are under <code>Game/EmberGrove/Assets/</code> unless they start with <code>Toolkit/</code>.</li>
+</ul></div>
+
+<section id="anatomy"><h2><span class="num">01</span>Where the pieces live</h2>
+<p class="lead">All menu code lives in the game's <code>Assembly-CSharp</code>. The toolkit contributes the content-pack schema a designer can use to restyle menus. Two large partial classes do most of the drawing. <code>IsometricSlice</code> has 19 partial files and <code>ExpeditionView</code> has 23, two of which are files named after other types.</p>
+<div class="scrollx"><table>
+<tr><th>Piece</th><th>Files</th><th>What it owns</th></tr>
+<tr><td><b>Lodge stack</b></td><td><code>Runtime/Exploration/IsometricSlice.*.cs</code>. The UI is mostly in <code>.Hud</code>, <code>.CircuitUi</code>, <code>.Title</code>, <code>.WaybookMenu</code>, <code>.Waybook</code>, <code>.DeckBuilder</code>, <code>.Lessons</code>, <code>.Onboarding</code>, <code>.Settings</code> and <code>.Preferences</code></td><td>The field HUD, the journal windows selected by the 28-value <code>CircuitPage</code> enum, the task book (list and trail), the deck builder and Your decks, the club opening and the title</td></tr>
+<tr><td><b>Hosted stack</b></td><td><code>Runtime/ExpeditionView*.cs</code>. Two more parts sit in <code>ExpeditionTheme.cs</code> and <code>ExpeditionApp.Session.cs</code></td><td>Battle board and hand, result, pause and its leave and retire questions, Help me play, Versus home and card library, deck choice and network rooms, full Settings, the on-screen controller keyboard</td></tr>
+<tr><td><b>Shared factory</b></td><td><code>Runtime/DuelUi.cs</code></td><td>uGUI primitives, the <code>MenuColour</code> / <code>MenuType</code> / <code>MenuSpace</code> role tables, <code>DuelUiInsetBorder</code> and <code>DuelPointer</code></td></tr>
+<tr><td><b>Shared row navigation</b></td><td><code>MenuNavigationRows</code>, at the end of <code>Runtime/ExpeditionView.Navigation.cs</code></td><td>Which control is up, down, left or right of another, for menus in both stacks</td></tr>
+<tr><td><b>Focus painters</b></td><td><code>Runtime/ExpeditionFocusMotion.cs</code> (hosted) and <code>Runtime/Exploration/TravellerUiMotion.cs</code> (lodge)</td><td>Focus, hover and press looks; <code>HostedMenuRole</code>; the lodge's window entrance <code>TravellerPanelMotion</code></td></tr>
+<tr><td><b>Written title</b></td><td><code>Resources/UI/WaybookPage.uxml</code>, <code>WaybookPage.uss</code>, <code>BloomfireTheme.tss</code>, <code>WaybookPanel.asset</code>, <code>WaybookPanelText.asset</code>; <code>Runtime/Exploration/LodgeWaybookBinding.cs</code>; <code>ExplorationPrototype/LodgeWaybook.prefab</code></td><td>The game's only UI Toolkit surface (<a href="#title">§05</a>)</td></tr>
+<tr><td><b>Hosted theme</b></td><td><code>Runtime/ExpeditionTheme.cs</code> and <code>Resources/Expedition/ExpeditionTheme.asset</code></td><td>Backdrop, font, the five theme colours, <code>MenuShade</code>, <code>BattleShade</code>, <code>ModalScrim</code> and cosmetic motion strengths</td></tr>
+<tr><td><b>Glyph art</b></td><td><code>Resources/InputGlyphs/*.png</code>, provenance in <code>InputGlyphs-PROVENANCE.md</code></td><td>Button and keycap sprites, named <code>&lt;family&gt;_&lt;control&gt;</code>, <code>key_*</code> or <code>dpad</code></td></tr>
+<tr><td><b>Pack schema</b></td><td><code>Toolkit/Packages/com.catsplat.cardforge/Runtime/Content/ContentPackFiles.cs</code></td><td><code>MediaThemeDefinition</code>, <code>MenuPaletteDefinition</code>, <code>WaybookPresentationDefinition</code> and <code>MenuArtSlotDefinition</code>: what a pack may change about menus</td></tr>
+<tr><td><b>Rehearsal checks</b></td><td><code>Tests/Runtime/CircuitSliceChecks.MenuRules.cs</code></td><td>Glyph family, row availability and palette rules (QA and editor builds only; see <a href="qa.html">QA &amp; Rehearsals</a>)</td></tr>
+</table></div>
+<p>The generated class diagrams for <code>Assembly-CSharp</code> are on <a href="diagrams.html">Diagrams</a>. The guide-level file map is the <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CODE_ARCHITECTURE_GUIDE.md#source-map">source map</a>, and the lodge book's files are listed in <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CIRCUIT_WAYBOOK.md#implementation-and-extension">CIRCUIT_WAYBOOK</a>.</p>
+</section>
+
+<section id="two-stacks"><h2><span class="num">02</span>Two stacks, one at a time</h2>
+<p class="lead">The lodge stack lives as long as the scene. The hosted stack is built fresh inside every hosted session and destroyed with it. They share a factory, a row navigator, a glyph resolver and the player's settings, but each has its own canvas, router and focus painter.</p>
+<div class="diagram"><pre class="mermaid">
+flowchart LR
+  subgraph LODGE["Lodge stack · IsometricSlice"]
+    LC["World interface canvas&lt;br/&gt;sortingOrder 1"]
+    LT["Title page&lt;br/&gt;UIDocument + WaybookPage.uxml"]
+    LRT["UpdateFrameInput → NavigateModal"]
+  end
+  BR["IsometricCombatBridge.Play&lt;br/&gt;one HostedSessionKind"]
+  subgraph HOSTED["Hosted stack · ExpeditionView"]
+    HC["Expedition canvas&lt;br/&gt;sortingOrder 100"]
+    HRT["UpdateShellInput"]
+  end
+  subgraph SHARED["Shared by both stacks"]
+    DU["DuelUi&lt;br/&gt;MenuColour · MenuType · MenuSpace"]
+    MN["MenuNavigationRows"]
+    GF["ExpeditionView.ResolveControllerGlyphFamily"]
+    PS["PlayerSettings through ExpeditionApp&lt;br/&gt;HighContrast · TextScale · ReducedMotion"]
+  end
+  LODGE --&gt;|"starts a hosted session"| BR
+  BR --&gt;|"adds ExpeditionApp, which adds the view"| HOSTED
+  LC --&gt; DU
+  HC --&gt; DU
+  LRT --&gt; MN
+  HRT --&gt; MN
+  LODGE -.-&gt; GF
+  HOSTED -.-&gt; GF
+  LODGE -.-&gt; PS
+  HOSTED -.-&gt; PS
+</pre></div>
+<p class="caption">The two stacks and what they share. Solid arrows are calls made while drawing or navigating; dotted arrows are reads of shared helpers and settings.</p>
+
+<h3>Which stack draws what</h3>
+<div class="scrollx"><table>
+<tr><th>Surface</th><th>Stack</th><th>Built by</th></tr>
+<tr><td>Title menu (the written notebook page)</td><td>Lodge, UI Toolkit</td><td><code>DrawCircuitTitle</code> → <code>DrawWaybookTitle</code> (<code>.Title</code>, <code>.WaybookMenu</code>)</td></tr>
+<tr><td>Field HUD: place and task, Menu and Map buttons, adventure bookmark, nearby prompt, input hints</td><td>Lodge</td><td><code>BuildHud</code> (<code>.Hud</code>)</td></tr>
+<tr><td>Journal windows: menu, map, location, dialogue, rewards, lessons, gates and the rest of <code>CircuitPage</code></td><td>Lodge</td><td><code>ShowCircuit</code> → <code>DrawModal</code> → <code>DrawCircuitModal</code> (<code>.CircuitUi</code>)</td></tr>
+<tr><td>Task book, list and trail views</td><td>Lodge</td><td><code>DrawAdventureTasks</code> (<code>.Waybook</code>)</td></tr>
+<tr><td>Deck builder and Your decks</td><td>Lodge</td><td><code>DrawCircuitBuilder</code> (<code>.DeckBuilder</code>), <code>DrawCircuitLibrary</code> (<code>.CircuitUi</code>)</td></tr>
+<tr><td>Club opening</td><td>Lodge</td><td><code>DrawClubOpening</code> (<code>.Onboarding</code>)</td></tr>
+<tr><td>Battle board, hand and result</td><td>Hosted</td><td><code>Battle</code>, <code>PortraitBattle</code> or <code>WorldTableBattle</code>; <code>BattleResult</code></td></tr>
+<tr><td>Pause, Help me play, leave and retire questions</td><td>Hosted</td><td><code>Pause</code>, <code>MoveHelp</code>, <code>LeaveConfirmation</code>, <code>RetirementConfirmation</code> (<code>.Journey</code>)</td></tr>
+<tr><td>Versus home and card library</td><td>Hosted, kind <code>Versus</code></td><td><code>WorldVersusHome</code>, <code>WorldCardLibrary</code> (<code>.WorldMenus</code>)</td></tr>
+<tr><td>Deck choice and network rooms</td><td>Hosted</td><td><code>DeckSelection</code>, <code>NetworkMenu</code>, <code>NamedRelayMenu</code> (<code>.Connection</code>)</td></tr>
+<tr><td>Full Settings</td><td>Hosted (also kind <code>Settings</code>)</td><td><code>SettingsScreen</code> (<code>.Settings</code>), see <a href="#settings">§10</a></td></tr>
+<tr><td>On-screen controller keyboard</td><td>Hosted</td><td><code>BuildControllerKeyboard</code> (<code>.Navigation</code>)</td></tr>
+</table></div>
+
+<h3>How the hand-off keeps one router live</h3>
+<ol class="steps">
+  <li>Lodge code calls <code>IsometricCombatBridge.Play</code>. While it runs, <code>inEncounter</code> is true, so <code>IsometricSlice.Update</code> runs <code>UpdateFrameEncounter</code> in place of the world and its input. That method can cancel a session that is still loading and commits a finished duel. It also hides the lodge canvas as soon as the hosted view exists.</li>
+  <li><code>Begin</code> creates a "Hosted session" GameObject with an <code>ExpeditionApp</code>. Its <code>Start</code> loads the content pack, then adds <code>ExpeditionView</code> and calls <code>Initialize</code>. That builds the "Expedition canvas" (sorting order 100) and adds an <code>EventSystem</code> with <code>InputSystemUIInputModule</code> only if the scene has none.</li>
+  <li><code>Play</code> first records a <code>RuntimePreferences</code> snapshot: quality, frame rate, audio volume, cursor, the EventSystem's <code>sendNavigationEvents</code> and its selection. It restores the snapshot when the session ends.</li>
+  <li><code>ExpeditionApp.FinishSession</code> disables the app and the view before it calls back. <code>Play</code> then waits one more frame after releasing, so the press that finished the session cannot also act in the lodge.</li>
+</ol>
+<p>The six session kinds and the bridge are on <a href="sessions.html#kinds">sessions.html §02</a>, and the full session lifecycle is on the rest of that page.</p>
+<div class="scrollx"><table>
+<tr><th>Stack</th><th>Canvas</th><th>Scaler</th><th>Content root</th></tr>
+<tr><td>Lodge</td><td>"World interface", screen-space overlay, sort order 1</td><td>Scale with screen size, 1280×800 landscape or 720×1280 portrait, match .5</td><td>A "Safe area" rect inside <code>Screen.safeArea</code></td></tr>
+<tr><td>Hosted</td><td>"Expedition canvas", screen-space overlay, sort order 100</td><td>Scale with screen size, 1920×1080, match .5</td><td>"Expedition composition", which <code>FitComposition</code> scales into the safe area (<a href="#layout">§09</a>)</td></tr>
+</table></div>
+</section>
+
+<section id="building"><h2><span class="num">03</span>How a screen is built</h2>
+<p class="lead">Neither stack updates a screen in place. A redraw destroys the old GameObjects and builds a new set from the current state. Only a few long-lived layers survive. Focus, scroll offsets and the page history are carried across the rebuild by name.</p>
+<h3>Hosted: <code>ExpeditionView.Render()</code></h3>
+<div class="diagram"><pre class="mermaid">
+flowchart TD
+  IN["ExpeditionApp changes state and calls View.Render&lt;br/&gt;or Update sees a new screen size"] --&gt; CAP["CapturePresentation · CaptureFocus&lt;br/&gt;scroll offsets and the focus path"]
+  CAP --&gt; TEAR["RenderTearDownPage&lt;br/&gt;destroy the old Expedition screen"]
+  TEAR --&gt; SCR["RenderScreen&lt;br/&gt;Battle · Handoff · WorldVersusHome"]
+  SCR --&gt; WIN["RenderWindow&lt;br/&gt;BuildConnectionScreens, or Pause · SettingsScreen · MoveHelp · Help · Feedback"]
+  WIN --&gt; SKIN["ApplyWorldMenuPresentation&lt;br/&gt;SkinWaybook · RewriteHostedMenuCopy"]
+  SKIN --&gt; TXT["ExpandTouchTargets in portrait&lt;br/&gt;ApplyThemeText × ReadingScale"]
+  TXT --&gt; RES["RestorePresentation&lt;br/&gt;scroll offsets back"]
+  RES --&gt; FIN["FinalizeShell"]
+  FIN --&gt; NAV["FinalizeNavigation&lt;br/&gt;RefreshNavigation · hints"]
+  FIN --&gt; PRE["FinalizePresentation&lt;br/&gt;one scrim · entrance · notices"]
+</pre></div>
+<p class="caption"><code>Render()</code> in <code>ExpeditionView.cs</code>. Every hosted screen goes through this order. <code>SettleControlTints</code>, <code>RefreshTableInput</code> and <code>BuildBattleGuidance</code> run after <code>FinalizeShell</code>. Which screen and window <code>RenderScreen</code> and <code>RenderWindow</code> pick is set out on <a href="sessions.html#screens">sessions.html §06</a>.</p>
+<ul>
+  <li><b>What survives a render:</b> the backdrop ("Persistent expedition environment"), the single "Stable menu scrim", the "Navigation hint dock" (<a href="#glyphs">§08</a>) and the "Independent notifications" layer that shows <code>app.Notice</code>.</li>
+  <li><b>Windows are shells around an input shield.</b> <code>Modal</code>, <code>PortraitPanel</code>, <code>WorldPanel</code> and <code>ConnectionPanel</code> each make a full-screen <code>DuelUi.Button</code> whose name ends in "shield". It has the clear colour <code>ShieldBlocksInput</code>, and the panel sits inside it. The shield blocks clicks to whatever is behind it. <code>RefreshModalPresentation</code> then hides every shield except the top one and puts one scrim under it. The rule for why only one dim is drawn is in <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CIRCUIT_PRESENTATION.md#the-dim-behind-an-open-menu">The dim behind an open menu</a>.</li>
+  <li><b>Two passes edit after building.</b> <code>SkinWaybook</code> repaints window panels and buttons by role. <code>RewriteHostedMenuCopy</code> then finds buttons and labels by GameObject name and replaces their text, so the words a player reads are not always the words the builder wrote.</li>
+</ul>
+<h3>Lodge: <code>IsometricSlice.DrawModal()</code></h3>
+<p><code>DrawModal</code> calls <code>DrawCircuitModal</code>, then <code>ApplyWorldPreferenceText</code> (text size and High Contrast), then <code>RebuildModalNavigation</code>. <code>DrawCircuitModal</code> sends the title and the club opening to their own surfaces. For every other page it hides the written title, keeps the "Circuit shade" and "Travel journal" shell while a window stays open, and destroys and redraws the page content. The page is chosen by a <code>switch</code> on <code>circuitPage</code>, split over <code>DrawCircuitModalPage</code>, <code>DrawCircuitModalStoryPage</code>, <code>DrawCircuitModalCardsPage</code> and <code>DrawCircuitModalChoicePage</code>.</p>
+<p>Page history is a list. <code>ShowCircuit</code> pushes a <code>CircuitPageState</code> onto <code>circuitBackStack</code>. The state holds the page, the focused button's name, and the builder, lesson and map state. The list is capped at 16 entries and never drops the first. <code>BackCircuitPage</code> pops an entry and <code>RestoreCircuitPage</code> redraws it. The journal's pages themselves are described on <a href="world.html#journal">world.html §06</a>. The field HUD is separate: <code>UpdateFrameLayout</code> calls <code>BuildHud</code>, which rebuilds the whole lodge canvas whenever the screen size or safe area changes.</p>
+<div class="note warn"><b>Names are load-bearing in both stacks.</b> A rename compiles and then fails at run time. These names are relied on:
+<ul>
+  <li>The "shield" suffix (<code>TopNavigationRoot</code>, <code>RefreshModalPresentation</code>, <code>ApplyWorldMenuPresentationPanels</code>).</li>
+  <li>The caption child "Label" (<code>ApplyThemeText</code>, <code>SkinWaybookButtonCaptions</code>).</li>
+  <li>The "Setting " row prefix (the focus highlight target).</li>
+  <li>Control names such as "Hand card <i>id</i>", "Unit <i>id</i>", "Cancel leave" and "Settings tab <i>n</i>" (first-focus rules, <a href="#focus">§07</a>).</li>
+  <li>Every name <code>RewriteHostedMenuCopy</code> rewrites.</li>
+  <li>The six title entry names (<a href="#title">§05</a>).</li>
+</ul>
+The rehearsals also find controls by name (<a href="qa.html">QA &amp; Rehearsals</a>).</div>
+</section>
+
+<section id="duelui"><h2><span class="num">04</span>DuelUi: the factory, roles and palettes</h2>
+<p class="lead"><code>DuelUi</code> is an internal static class in namespace <code>EmberGrove</code>. Both stacks build their uGUI controls through it, and both read their colours, type sizes and spacing from the three role tables nested inside it. A content pack can change some of those colours through a palette, and High Contrast overrides any palette.</p>
+<div class="scrollx"><table>
+<tr><th>Member</th><th>What it makes</th></tr>
+<tr><td><code>Rect</code></td><td>A <code>RectTransform</code> anchored top-left, with x, y, width and height in the caller's units (y measured downward)</td></tr>
+<tr><td><code>Box</code>, <code>Art</code></td><td>An <code>Image</code>: <code>Box</code> is rounded and sliced by default, <code>Art</code> is unrounded and shows a given sprite. Neither takes raycasts</td></tr>
+<tr><td><code>Label</code></td><td>A <code>TextMeshProUGUI</code> using the default TMP font, with ellipsis overflow and no raycast</td></tr>
+<tr><td><code>Button</code></td><td>A <code>Box</code> plus <code>UnityEngine.UI.Button</code> and a centred child label named "Label". Its <code>navigation</code> is <code>Navigation.Mode.None</code>, because the routers move focus themselves (<a href="#input">§06</a>)</td></tr>
+<tr><td><code>Border</code>, <code>Shadow</code></td><td>Add a <code>DuelUiInsetBorder</code> (a continuous stroke inside the control, kept sharp at fractional scale) or a drop shadow of <code>MenuSpace.ShadowDrop</code></td></tr>
+<tr><td><code>Rounded</code>, <code>Glow</code>, <code>Ring</code>, <code>Shard</code>, <code>Hexagon</code>; <code>Light</code>, <code>EtchedSigil</code></td><td>Procedural sprites, each generated once into a texture; and two decorations drawn from them</td></tr>
+<tr><td><code>DuelPointer</code></td><td>A component for pointer enter, exit and right-click, used by the hosted card and terrain hovers</td></tr>
+</table></div>
+<h3>The three role tables</h3>
+<ul>
+  <li><b><code>MenuColour</code></b> holds the theme defaults (<code>DefaultAccent</code> … <code>DefaultPanel</code>), their High Contrast counterparts, the control fills (<code>ControlRest</code>, <code>ControlActive</code>, <code>ControlPressed</code>, <code>ControlDisabled</code>), the surfaces (<code>Line</code>, <code>Edge</code>, <code>Rule</code>, <code>Page</code>, <code>Inset</code>), the waybook marks, and the scrims and shades with their alpha limits.</li>
+  <li><b><code>MenuType</code></b> holds one font size per job. Most come in <code>Landscape</code> and <code>Portrait</code> forms for the hosted compositions, and some in a <code>Short</code> form for the ultrawide settings sheet. <code>Circuit*</code> sizes are for the lodge journal and <code>Hud*</code> sizes for the field HUD.</li>
+  <li><b><code>MenuSpace</code></b> holds the insets, gaps and heights, under the prefixes <code>Exp*</code> (hosted windows), <code>Journal*</code> (the lodge journal) and <code>Hud*</code> (the field HUD), plus a few shared measures such as <code>FocusRing</code>, <code>EdgeWidth</code> and <code>ShadowDrop</code>, and the <code>SettingsWide*</code> measures.</li>
+</ul>
+<p>Each value is in the units of the surface that draws it, so the same job can have different numbers in the two stacks. The rules for choosing and adding a role are in <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CIRCUIT_PRESENTATION.md#menu-roles">Menu roles</a>: take an existing role instead of writing a number, and use IL comparison to prove that moving a site onto a role changed nothing.</p>
+<h3>How a palette and High Contrast reach a control</h3>
+<ol class="steps">
+  <li>A content pack's <code>media.json</code> may name a palette (<code>MediaThemeDefinition.MenuPalette</code> picks one of <code>MenuPalettes</code>). The format is in the <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Tools/ContentStudio/PACK_CONTRACT.md#media">pack contract</a>.</li>
+  <li>Each stack calls <code>DuelUi.MenuColour.Use(SelectedMenuPalette)</code> as its pack loads. The hosted stack does this in <code>ExpeditionView.ApplyExternalTheme</code>, the lodge in the <code>ContentPackFiles.Load</code> callback in <code>IsometricSlice.Circuit</code>.</li>
+  <li><code>Resolve</code> resets every writable role to the literal captured at start-up. Then, unless High Contrast is on, it writes the palette's colours over them, keeping each role's own alpha. The writable roles are exactly the names in the toolkit's <code>MenuPaletteDefinition.MenuRoles</code>. <code>Slot</code> throws for a name the table lacks, so a role the toolkit adds without a matching field fails the first time the table is used.</li>
+  <li><code>MenuColour.UseHighContrast</code> is called from <code>ExpeditionApp.ApplyRuntimePreferences</code>, which both stacks call when settings apply. The lodge also calls it at the top of <code>BuildHud</code>, because a hosted session may have changed the shared flag.</li>
+  <li>Most controls read the roles when they are built, so a menu already on screen keeps most of its colours until its next redraw. The exception is the lodge's <code>TravellerButtonMotion</code>, which reads the control fills again every frame.</li>
+</ol>
+<p>The five theme colours (Accent, Growth, Paper, Quiet, Panel) take separate routes. The hosted view copies them from the pack into a runtime copy of <code>ExpeditionTheme</code> in <code>ApplyExternalTheme</code>, and reads <code>Theme.Accent</code> and the others through its <code>bronze</code>, <code>green</code>, <code>paper</code> and <code>quiet</code> getters. The lodge reads them straight from the pack through <code>Packed(...)</code> in its <code>ink</code>, <code>ivory</code>, <code>muted</code> and <code>accent</code> getters, falling back to <code>MenuColour.Default*</code>. Both swap in the <code>*HighContrast</code> roles when High Contrast is on. The two stacks read High Contrast from different objects: the hosted view from <code>app.Settings.HighContrast</code>, the lodge from <code>WorldHighContrast</code>.</p>
+<h3>Colour roles on buttons</h3>
+<p>In the hosted stack, a button's colour job is the <code>HostedMenuRole</code> enum (<code>Control</code>, <code>Chosen</code>, <code>Danger</code>, <code>Primary</code>, <code>Card</code>, <code>Back</code>), stored on its <code>ExpeditionFocusMotion</code>. Builders set it with <code>AsPrimary</code>, <code>AsDanger</code>, <code>AsChosen</code>, <code>AsCard</code> or <code>HeaderBack</code>. <code>SkinWaybookButton</code> later paints the resting fill from that role, never from the button's name. The lodge's <code>AsPrimary</code> rests a button on <code>CircuitPrimaryRest</code> through <code>TravellerButtonMotion.SetRestColor</code>. Both stacks mix their main-action rest from the panel ground and <code>MenuColour.WaybookMark</code>, so the two match.</p>
+<h3>Art slots</h3>
+<p>The named art roles a pack may fill are listed once, in the toolkit's <code>WaybookPresentationDefinition.ArtRoles</code>. Only the lodge stack draws them, all through <code>IsometricSlice.DrawWaybookArt(parent, role, …)</code> in <code>.Waybook</code>. If the pack binds media to the role, it draws a <code>RawImage</code> at the slot's authored opacity and returns true; otherwise it returns false and the caller draws its procedural fallback. The callers are the journal frame and page and the dialogue panel and portrait (<code>.CircuitUi</code>), the task notes, packets, tape, stamps, route marks, task picture and mascot (<code>.Waybook</code>), and the club opening page (<code>.Onboarding</code>). The hosted stack's book frame is <code>TravellerWaybookFrame</code>, a mesh drawn in code that reads no slot. The contract for artists is in <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CIRCUIT_PRESENTATION.md#shared-menu-art-target">Shared menu art target</a> and the <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CIRCUIT_WAYBOOK.md#menu-art-replacement-contract">menu art replacement contract</a>.</p>
+</section>
+
+<section id="title"><h2><span class="num">05</span>The written title in UI Toolkit</h2>
+<p class="lead">The title menu is written on one leaf of the lodge notebook by a world-space UI Toolkit panel. A <code>UIDocument</code> is parented to the page surface of the authored <code>LodgeWaybook</code> prefab. The UXML owns the page's structure, the USS owns ink, type and state, and C# binds only what changes at run time. It is the only title: if the page cannot be built, the player sees a startup error naming the fault, not a fallback menu.</p>
+<ol class="steps">
+  <li><code>DrawCircuitTitle</code> calls <code>DrawWaybookTitle</code>. <code>ResolveLodgeWaybook</code> reads <code>IsometricSectorVisuals.LodgeWaybook</code> and runs <code>LodgeWaybookBinding.Validate()</code>.</li>
+  <li><code>EnsureWaybookPanelAssets</code> loads <code>UI/WaybookPage</code> twice from Resources, once as a <code>StyleSheet</code> and once as a <code>VisualTreeAsset</code>. It also loads <code>UI/WaybookPanel</code>, a <code>PanelSettings</code> asset with the theme <code>BloomfireTheme.tss</code> and the text settings <code>WaybookPanelText.asset</code>.</li>
+  <li><code>EnsureWaybookPanelDocument</code> uses a <code>UIDocument</code> under the binding if there is one. Otherwise it creates a runtime host named "Lodge waybook page", which is what happens on <code>main</code>: neither the prefab nor <code>CircuitJourney.unity</code> carries a <code>UIDocument</code>. The host is parented to <code>PageSurface</code> with <code>worldSpaceSizeMode = Dynamic</code>. <code>EnsureWaybookInput</code> adds a <code>PanelInputConfiguration</code> whose only event camera is the world camera, because the scene tags no Main Camera.</li>
+  <li>The tree is instantiated and <code>Q("Waybook page")</code> is added to the root at a width of 620 page units (<code>WaybookPageUnits</code>), with its height taken from <code>PageSize</code>. The state classes are toggled, the heading is written and the six entries are bound from <code>OrdinaryTitleChoices()</code> in <code>.Title</code>.</li>
+  <li><code>RestoreWaybookFocus</code> refocuses the remembered entry. It does nothing in pointer mode. Then <code>FitWaybookPanelToPage</code> scales the host so the panel's mesh width equals <code>PageSize.x</code>. The fit retries every 16 ms, up to 90 tries, until the panel has a mesh.</li>
+</ol>
+<p>If any step fails, it records the reason in <code>waybookFailure</code>, and <code>DrawCircuitTitle</code> calls <code>DrawStartupError</code> with that reason and a Quit button that a keyboard or controller can reach. Every other journal page, and <code>CloseModal</code>, calls <code>HideWaybookTitle</code>, so the page never stays in the world behind another window.</p>
+<div class="scrollx"><table>
+<tr><th>UXML element (name)</th><th>Classes</th><th>Bound from C#</th></tr>
+<tr><td>"Waybook page"</td><td><code>page</code> + <code>palette-berry</code>, <code>hc</code>, <code>still</code></td><td>Size and the three state classes</td></tr>
+<tr><td>"Waybook head" → "Waybook inscription", "Game title", "Game subtitle"</td><td><code>page__head</code>, <code>inscription</code>, <code>title</code>, <code>subtitle</code></td><td>The club nickname, and the place title split at "·" (<code>DrawWaybookTitleHeading</code>)</td></tr>
+<tr><td>"Waybook entries" → six <code>Button</code>s "Title continue", "Title learn", "Title new", "Title versus", "Title settings", "Title quit"</td><td><code>entry</code>, the first also <code>entry--primary</code></td><td>Label text, picture and click action (<code>DrawWaybookTitleEntries</code>)</td></tr>
+<tr><td>Inside each entry: "<i>name</i> mark", "<i>name</i> picture", "<i>name</i> label"</td><td><code>entry__mark</code>, <code>entry__picture</code>, <code>entry__label</code></td><td>The picture is a <code>TravellerPictureElement</code>; the label is written by <code>PageWrite</code></td></tr>
+<tr><td>"Waybook foot" → "Lodge sign" (picture and "Lodge bookplate"), "Title notice"</td><td><code>page__foot</code>, <code>bookplate__row</code>, <code>bookplate</code>, <code>notice</code></td><td>The notice is removed from the tree when there is nothing to say</td></tr>
+<tr><td>"Waybook card back", "Waybook compass", "Waybook page rule"</td><td><code>page__mark</code> with <code>page__mark--cards</code> or <code>page__mark--compass</code>; <code>rule</code></td><td>The card back and compass get pictures; every non-entry element has <code>picking-mode="Ignore"</code></td></tr>
+</table></div>
+<p><code>WaybookPage.uss</code> styles <code>.entry</code> with <code>:hover</code>, <code>:focus</code>, <code>:active</code> and <code>:disabled</code>. The focus mark is <code>.entry:focus .entry__mark</code>. The garden palette is the <code>:root</code> default. <code>.palette-berry</code> is chosen from <code>WaybookBerry</code>, <code>.hc</code> from <code>WorldHighContrast</code> and <code>.still</code> from <code>ReducedMotion</code>.</p>
+<ul>
+  <li><b>Input.</b> The lodge router hands the page navigation while <code>WaybookMenuActive</code> is true (<a href="#input">§06</a>). <code>NavigateWaybook</code> reuses the router's repeat timing. <code>MoveWaybookFocus</code> walks the single column vertically and ignores Left and Right. Tab cycles the entries, and <code>SubmitWaybookFocus</code> runs the entry that holds UI Toolkit focus. A pointer click arrives through the world-space raycast and <code>entry.clicked</code>.</li>
+  <li><b>Verification.</b> The rehearsal cannot find visual elements by GameObject name, so <code>.WaybookMenu</code> exposes internal probes: <code>ProbeWaybookControl</code>, <code>WaybookPointerRayHits</code>, <code>WaybookPagePlacement</code>, <code>WaybookLayoutReport</code>, <code>FocusWaybookControl</code> and <code>ActivateWaybookControl</code>.</li>
+  <li><b>Boundaries.</b> Spoken help says nothing on this page, because focus narration is keyed on uGUI <code>Button</code> instances. The entry names and words are a contract, because tests resolve controls by name and recordings match label text. The rules and the prefab contract are in <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CIRCUIT_PRESENTATION.md#the-lodge-waybook">The lodge waybook</a> and <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CIRCUIT_PRESENTATION.md#the-written-page">The written page</a>.</li>
+</ul>
+</section>
+
+<section id="input"><h2><span class="num">06</span>The input routers</h2>
+<p class="lead">Pointer and touch presses on a control go through Unity's <code>EventSystem</code> and <code>InputSystemUIInputModule</code> as usual. Everything else (moving focus, Submit, Back, Start, shoulders, scrolling) is read straight from the Input System devices once a frame, by one router per stack. Both routers set <code>EventSystem.sendNavigationEvents = false</code>, and <code>DuelUi</code> builds buttons with <code>Navigation.Mode.None</code>. Unity therefore never moves focus or submits on its own, and a press is handled once.</p>
+<h3>Hosted: from a device to the focused control</h3>
+<div class="diagram"><pre class="mermaid">
+flowchart TD
+  DEV["Keyboard · Gamepad · Mouse · Touchscreen&lt;br/&gt;Input System .current devices"]
+  DEV --&gt;|"click, tap, drag"| ES["InputSystemUIInputModule&lt;br/&gt;EventSystem pointer events"]
+  ES --&gt; PTR["Button.onClick · ExpeditionCardGesture&lt;br/&gt;ExpeditionSettingsSlider"]
+  DEV --&gt;|"read every frame"| USI["ExpeditionView.Update → UpdateShellInput"]
+  USI --&gt; REF["UpdateShellInputRefresh&lt;br/&gt;top shield changed → RefreshNavigation"]
+  REF --&gt; KIND["navigationDevice&lt;br/&gt;Pointer · Keyboard · Controller"]
+  KIND --&gt; CMD{"UpdateShellInputCommands&lt;br/&gt;one command per frame"}
+  CMD --&gt;|"East · Esc"| BACK["BackNavigation → HandleShellBack → app.Back"]
+  CMD --&gt;|"Start"| START["StartNavigation&lt;br/&gt;OpenPause · ResumeMatch"]
+  CMD --&gt;|"LB · RB"| SHO["ShoulderNavigation&lt;br/&gt;settings tabs · card pages · hand"]
+  CMD --&gt;|"South · Enter · Space"| SUB["SubmitNavigation"]
+  CMD --&gt;|"no command"| DIR["ResolveNavigationDirection&lt;br/&gt;UpdateShellInputStep"]
+  DIR --&gt; MOVE["MoveNavigation"]
+  MOVE --&gt; NB{"NavigationNeighbor"}
+  NB --&gt;|"settings.*"| TSN["TrySettingsNeighbor"]
+  NB --&gt;|"other menus"| MNR["MenuNavigationRows.Neighbor"]
+  NB --&gt;|"battle"| SPA["NavigationNeighborSpatial"]
+  TSN --&gt; SET["SetNavigationFocus&lt;br/&gt;EventSystem.SetSelectedGameObject"]
+  MNR --&gt; SET
+  SPA --&gt; SET
+  SET --&gt; RING["ExpeditionFocusMotion.OnSelect&lt;br/&gt;Reveal · ring and fill"]
+  SUB --&gt; ACT["Button.onClick.Invoke&lt;br/&gt;or the controller keyboard for a text field"]
+</pre></div>
+<p class="caption">One press through the hosted router, in <code>ExpeditionView.Navigation.cs</code>. Pointer presses take the left branch. The router only notes that the pointer is now in use, which hides the focus ring.</p>
+<ol class="steps">
+  <li><b>Refresh.</b> <code>UpdateShellInputRefresh</code> switches Unity navigation off again. If the top shield has changed, it saves the current focus and calls <code>RefreshNavigation</code>. If a control became available without a rebuild, for example when audio finishes loading, it updates the focus list and links.</li>
+  <li><b>Device.</b> A mouse click or touch press sets <code>NavigationDevice.Pointer</code>. Moving the mouse or turning the wheel does not change the mode. A controller press, the left stick or d-pad past .55, or the right stick past .5 sets <code>Controller</code>; if a text field is being typed into, that press leaves the field first. A navigation key sets <code>Keyboard</code>. Any keyboard or controller action hides the hover preview, and switching to either reveals the focused control.</li>
+  <li><b>Command.</b> <code>UpdateShellInputCommands</code> handles at most one command, in this order: Back (East or Esc), Start, the battle lock (while the player cannot act, nothing else is read), typing in a text field (only Tab acts), shoulders (and Q, E, Page Up and Page Down in the card library), then North or I (inspect, or erase on the on-screen keyboard), West, Tab, and Submit.</li>
+  <li><b>Direction.</b> With no command, arrows and WASD are combined as one logical direction (keys for the same direction count once, opposite keys cancel), or the d-pad and left stick are read. <code>ResolveNavigationDirection</code> ignores input under .3, needs .55 to start a new direction, and keeps a held direction while the stick stays near it. <code>UpdateShellInputStep</code> moves at once, repeats after .32 s, then every .12 s (every .04 s for a slider moving sideways). After a screen change, the direction must return to neutral before it moves again.</li>
+  <li><b>Scroll.</b> The right stick and Page Up / Page Down scroll the active <code>ScrollRect</code> directly.</li>
+</ol>
+<p>Back runs a chain before it leaves anything. <code>HandleShellBack</code> closes, innermost first: move help, the controller keyboard, a card inspection, a drag, a display trial, an armed settings reset, Settings, the relay room pages, the end-turn question, a leave question, the pause's More. <code>BackNavigation</code> then clears an armed concede, and only after that does <code>app.Back()</code> run. The player-facing rule is the <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/PLAYER_CONTROLS.md#one-back-rule">one Back rule</a>, and the bindings are in <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/PLAYER_CONTROLS.md#keyboard-and-controller">Keyboard and controller</a>. The router's many small <code>UpdateShellInput*</code> methods come from the complexity work; see <a href="complexity.html">Complexity</a>.</p>
+<h3>Lodge: <code>UpdateFrameInput</code> and <code>NavigateModal</code></h3>
+<div class="diagram"><pre class="mermaid">
+flowchart TD
+  UPD["IsometricSlice.Update → UpdateFrameWorld"] --&gt; TIK["TrackInputKind&lt;br/&gt;InputKind Pointer · Keyboard · Controller"]
+  TIK --&gt; TXT{"HandleClubNameInput&lt;br/&gt;HandleCircuitTextEntry"}
+  TXT --&gt;|"a letter board or field took it"| DONE["frame ends"]
+  TXT --&gt; UFI["UpdateFrameInput"]
+  UFI --&gt;|"Start"| MENU["UpdateFrameMenuButton&lt;br/&gt;OpenCircuitMenu · BackCircuitPage"]
+  UFI --&gt;|"Esc · East"| BK["UpdateFrameBack&lt;br/&gt;stop a walk · BackCircuitPage · OpenPause"]
+  UFI --&gt;|"no window open"| WLD["UpdateFrameWorldInput&lt;br/&gt;journal · map · Interact · walking"]
+  UFI --&gt;|"window open"| UFM["UpdateFrameModal&lt;br/&gt;LB · RB → CycleCircuitPage"]
+  UFM --&gt; NAVM["NavigateModal"]
+  NAVM --&gt;|"WaybookMenuActive"| NWB["NavigateWaybook&lt;br/&gt;UI Toolkit Focus"]
+  NAVM --&gt;|"otherwise"| NMM["NavigateModalMove → DirectionalButton&lt;br/&gt;MenuNavigationRows.Neighbor"]
+  NMM --&gt; FBT["FocusButton&lt;br/&gt;EventSystem.SetSelectedGameObject"]
+  FBT --&gt; TBM["TravellerButtonMotion paints focus"]
+</pre></div>
+<p class="caption">The lodge router in <code>IsometricSlice.cs</code> and <code>IsometricSlice.Hud.cs</code>. It is a second, separate router with the same overall shape. The whole of <code>IsometricSlice.Update</code>, including the lobby, encounter and startup-error branches, is on <a href="world.html#frame">world.html §03</a>.</p>
+<ul>
+  <li>Nothing is read on the frame a window opened or closed (<code>modalFrame</code>), or for .12 s after one closed or the app regained focus (<code>blockedUntil</code>).</li>
+  <li><code>NavigateModalMove</code> ignores small stick input and snaps the rest to one axis. It moves at once, repeats after .30 s, then every .13 s. Tab and Shift+Tab step through <code>modalButtons</code>. Submit (South, Enter or Space) invokes the selected button only if it is in that list.</li>
+  <li>After pointer use the selection is cleared. The next Submit first brings back a visible focus (<code>UpdateFrameModalRevealFocus</code>) instead of firing a choice the player cannot see.</li>
+  <li>In the world, arrows and WASD (or the stick and d-pad) walk the traveller. WASD stop being read while a letter board is open.</li>
+</ul>
+<h3>Pointer, touch and text entry</h3>
+<div class="scrollx"><table>
+<tr><th>Input</th><th>Hosted stack</th><th>Lodge stack</th></tr>
+<tr><td>Click or tap a control</td><td><code>EventSystem</code> → <code>Button.onClick</code>; the router switches to pointer mode and hides focus rings</td><td>The same; <code>UpdatePromptPointerSelection</code> clears the selection, except on a text field</td></tr>
+<tr><td>Card tap, hold, drag</td><td><code>ExpeditionCardGesture</code>: a tap clicks; a hold of <code>Settings.HoldToInspect</code> or a right click inspects; a drag (when <code>Settings.DragCards</code> allows) ends in <code>EndPointerDrag</code>, where <code>DragReleaseWinner</code> picks the drop target; a mostly sideways drag over the hand scrolls it instead</td><td>None</td></tr>
+<tr><td>Swipe over a settings slider</td><td><code>ExpeditionSettingsSlider</code> waits to see whether a touch is a sideways adjustment or a page scroll</td><td>None</td></tr>
+<tr><td>Small touch targets</td><td><code>ExpandTouchTargets</code> grows each portrait hit area toward <code>MenuSpace.ExpTouchTarget</code>, by at most 16 units</td><td>None</td></tr>
+<tr><td>Click or tap the ground</td><td>None</td><td><code>ReadPointer</code> → <code>GroundClick</code> → <code>WalkTo</code>, unless <code>PointerOverUi</code> hits UI; a tap counts only if it moved less than 20 pixels</td></tr>
+<tr><td>Title page click</td><td>None</td><td>World-space raycast from the world camera into the panel's collider → <code>entry.clicked</code></td></tr>
+<tr><td>Text fields</td><td><code>TMP_InputField</code> with <code>shouldActivateOnSelect = false</code>: focus never opens typing. Submit or a click starts it, and a controller Submit opens <code>BuildControllerKeyboard</code></td><td>The builder's search and rename letter board (<code>HandleCircuitTextEntry</code>) and the club name (<code>HandleClubNameInput</code>), read before any other input</td></tr>
+</table></div>
+<p>Player-facing behaviour is in <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/PLAYER_CONTROLS.md#mouse-and-touch">Mouse and touch</a> and <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/PLAYER_CONTROLS.md#text-entry-without-a-physical-keyboard">Text entry without a physical keyboard</a>.</p>
+</section>
+
+<section id="focus"><h2><span class="num">07</span>Focus: scope, rows, memory and the ring</h2>
+<p class="lead">Focus is uGUI selection: <code>EventSystem.currentSelectedGameObject</code>. The routers decide what may be focused, what is next in each direction, where focus starts and returns, and how it looks. The written title is the exception: its focus is UI Toolkit focus, read through the panel's <code>focusController</code>.</p>
+<h3>Scope and screen keys (hosted)</h3>
+<p><code>TopNavigationRoot</code> picks the last active child of the page whose name ends in "shield". During Play my turn it picks the "Turn help" strip instead. Controls outside that root are not in <code>focusOrder</code>. <code>NavigationScreenKey</code> names the current screen, and focus memory and first focus are keyed by that name:</p>
+<div class="scrollx"><table>
+<tr><th>Key</th><th>When</th></tr>
+<tr><td><code>keyboard.<i>field</i></code>, <code>inspection</code>, <code>display.confirm</code></td><td>The controller keyboard, a touch card inspection, a display trial</td></tr>
+<tr><td><code>world.cards</code>, <code>settings.<i>tab</i></code>, <code>turn.confirm</code>, <code>feedback</code>, <code>help</code></td><td>The card library, Settings on tab 0–3, the end-turn question, feedback, game rules</td></tr>
+<tr><td><code>move.help</code>, <code>move.help.preview</code>, <code>move.help.turn</code></td><td>Help me play and its two states</td></tr>
+<tr><td><code>pause</code>, <code>pause.more</code>, <code>leave.confirm</code>, <code>retirement.confirm</code></td><td>The pause and its questions</td></tr>
+<tr><td><code>network</code>, <code>decks</code>, <code>handoff</code>, <code>disconnected</code></td><td>Connection screens, deck choice, the pass-the-device screen, a lost connection</td></tr>
+<tr><td><code>battle</code>, <code>battle.result</code>, <code>home</code></td><td>The board, the result, Versus home or an empty session</td></tr>
+</table></div>
+<h3>Which control is next</h3>
+<div class="scrollx"><table>
+<tr><th>Screen</th><th>Neighbour rule</th><th>Code</th></tr>
+<tr><td>Settings</td><td>Explicit lists of tabs, rows and footer: Back above the tabs, Reset below the last row, one remembered row per tab</td><td><code>TrySettingsNeighbor</code>, <code>BuildSettingsNavigation</code> (<code>.SettingsNavigation</code>)</td></tr>
+<tr><td>Other hosted menus and every lodge window</td><td>Row topology</td><td><code>MenuNavigationRows</code></td></tr>
+<tr><td>Hosted battle</td><td>Spatial: the nearest control in the pressed direction, scored as forward distance plus three times sideways distance</td><td><code>NavigationNeighborSpatial</code></td></tr>
+<tr><td>Written title</td><td>One column, Up and Down only</td><td><code>MoveWaybookFocus</code></td></tr>
+</table></div>
+<p><code>MenuNavigationRows.Rebuild</code> measures each control's own rectangle (decoration is ignored), sorts top to bottom and then left to right, and groups controls into one row when their centres differ by less than 35% of the smaller height. The hosted router passes <code>IsHeaderBack</code> as the heading test, so there a window's Back always gets a row of its own at the top; the lodge passes no heading test. With a group function, as the deck builder passes through <code>BuilderNavigationGroup</code>, controls in different groups never share a row: Up and Down stay in the group, and Left or Right at its edge crosses to the nearest row of the next group. Disabled controls keep their row, and <code>Available</code> is checked when a move happens. A vertical move keeps the column the player came from (<code>preserveColumn</code>).</p>
+<p>The routers also write explicit <code>selectOnUp</code> / <code>selectOnDown</code> / <code>selectOnLeft</code> / <code>selectOnRight</code> links onto each control (<code>RefreshNavigationLinks</code>, <code>RefreshModalNavigationLinks</code>). Because Unity's navigation events are off, those links only record what the router computed. The router moves focus itself.</p>
+<h3>Where focus starts and returns</h3>
+<ul>
+  <li><b>Hosted.</b> <code>rememberedFocus[screen key]</code> stores a <code>SemanticPath</code>: the control's name path from the root, with a duplicate index for repeated names, and a "world-table:" prefix for controls on the 3D table. <code>RefreshNavigation</code> starts from the remembered path, then lets these rules change it, in this order:
+    <ul>
+      <li>the context rules: a window's Back is not restored after the screen changes, and the leave and retire questions start on their Cancel;</li>
+      <li>in battle, a legal destination after choosing a card (<code>FirstActionTarget</code>), or the source card again after cancelling;</li>
+      <li>a requested settings focus;</li>
+      <li>practice focus.</li>
+    </ul>
+    If nothing has been chosen by then, <code>InitialNavigationFocus</code> picks by screen key, and failing that the first control that is not Back.</li>
+  <li><b>Lodge.</b> A redraw of the same page keeps the selected button's name. A new page starts on the first control after the heading, then per-page rules override it by name (<code>DrawCircuitModalFocus</code>: builder, Your decks, episode, map, reward and replace, tasks). Going back restores the name saved in <code>CircuitPageState.Focus</code>.</li>
+  <li><b>Reveal before submit.</b> If scrolling has left the focused control outside its viewport, the first Submit scrolls it back into view and does nothing else (<code>ExpeditionFocusMotion.RevealBeforeSubmit</code>). The lodge and the title page have their own versions for returning from pointer use.</li>
+</ul>
+<h3>How focus looks</h3>
+<p>The two stacks paint focus with separate components that read the same roles. In the hosted stack, <code>RefreshNavigationMotion</code> adds an <code>ExpeditionFocusMotion</code> to every focusable control. It draws a "Focus surface" fill of <code>ControlActive</code> and an <code>ExpeditionFocusOutline</code> ring <code>MenuSpace.FocusRing</code> wide in the accent colour, or an ink ring on a light fill. Cards and board units get a two-tone frame instead, and units on the 3D table get corner brackets. With a keyboard or controller the emphasis follows the selection; with a pointer it follows hover instead (<code>ShowFocus</code>). It also scrolls a focused control into view (<code>Reveal</code>). In the lodge stack, <code>TravellerButtonMotion</code> eases the fill from the resting colour to <code>ControlActive</code>, widens its <code>DuelUiInsetBorder</code> from 1 to <code>FocusRing</code>, and shrinks the button slightly while pressed. The player-facing description is in <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/PLAYER_CONTROLS.md#mouse-and-touch">PLAYER_CONTROLS</a>.</p>
+</section>
+
+<section id="glyphs"><h2><span class="num">08</span>Controller glyphs and hints</h2>
+<p class="lead">Hints are presentation only. As the comment in <code>ExpeditionView.Glyphs.cs</code> says, actual bindings stay with the router, so changing a binding means changing the router and every hint that names it. One function picks the controller family, but each of the three hint surfaces turns that family into sprite names itself.</p>
+<p><code>ExpeditionView.ResolveControllerGlyphFamily(layout, product, manufacturer)</code> joins the three strings and searches them. "dualshock", "dualsense", "playstation" or "sony" gives <code>Sony</code>; "switch", "nintendo", "joycon" or "joy-con" gives <code>Nintendo</code>; anything else gives <code>Xbox</code>. <code>FaceGlyphLabel</code> gives the printed name of a face or shoulder button for a family, used when no sprite exists. Sprites load from <code>Resources/InputGlyphs/&lt;prefix&gt;&lt;control&gt;</code>, with the prefix <code>xbox_</code>, <code>sony_</code> or <code>switch_</code>, plus shared <code>dpad</code>, <code>key_enter</code>, <code>key_esc</code> and <code>key_updown</code>.</p>
+<div class="scrollx"><table>
+<tr><th>Hint surface</th><th>Owner</th><th>Shown when</th><th>When a sprite is missing</th></tr>
+<tr><td>"Navigation hint dock", a strip below the hosted composition</td><td><code>ExpeditionView.Glyphs</code>: <code>UpdateNavigationHints</code>, rebuilt only when its inputs change (a packed flags value, the screen key, the text colour or the text size)</td><td>Keyboard or controller, with hints chosen for the screen and the focused control</td><td><code>ExpeditionNavigationGlyph</code> draws vector marks for <code>pad_*</code> and <code>key_horizontal</code>; anything else gets a text keycap</td></tr>
+<tr><td>"Input hints", the lodge HUD strip</td><td><code>IsometricSlice.Hud</code>: <code>UpdatePromptHints</code></td><td>In the world with no window open, keyboard or controller</td><td>The label alone (<code>Glyph</code>)</td></tr>
+<tr><td>"Waybook paging hints" on a journal window</td><td><code>IsometricSlice.Waybook</code>: <code>RefreshWaybookHints</code></td><td>A window with more than one page, keyboard or controller</td><td>The printed shoulder name (LB, L1 or L)</td></tr>
+</table></div>
+<p>The family-to-prefix mapping is written three times, in <code>ExpeditionView.Glyphs</code>, <code>IsometricSlice.Hud</code> and <code>IsometricSlice.Waybook</code>. The comment at the top of <code>CircuitSliceChecks.MenuRules.cs</code> explains that the rehearsal therefore checks the resolver and the text labels, not what each surface shows. The family table players see is in <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/PLAYER_CONTROLS.md#keyboard-and-controller">Keyboard and controller</a>.</p>
+</section>
+
+<section id="layout"><h2><span class="num">09</span>Layout modes: portrait and short landscape</h2>
+<p class="lead">The hosted stack lays out on one of two fixed compositions and scales the whole composition to fit. The lodge stack lets a <code>CanvasScaler</code> scale it and sizes its journal from the space left. Each stack decides orientation and short landscape in its own way.</p>
+<div class="scrollx"><table>
+<tr><th>Concern</th><th>Hosted (<code>ExpeditionView.Layout</code>)</th><th>Lodge (<code>IsometricSlice.Hud</code>, <code>.CircuitUi</code>)</th></tr>
+<tr><td>Portrait test</td><td>Safe area taller than wide (<code>FitComposition</code>)</td><td><code>Screen.height &gt; Screen.width</code> (<code>BuildHud</code>)</td></tr>
+<tr><td>Design space</td><td><code>CompositionSize</code>: 1920×1080 or 1080×1920, scaled uniformly into the safe area</td><td>Canvas reference 1280×800 or 720×1280, inside a "Safe area" rect</td></tr>
+<tr><td>Reserved space</td><td>The hint dock: 64 units below a landscape composition, 112 below a portrait one. The composition and the dock are fitted together, so the dock never covers the board</td><td>The hint strip sits inside the safe area</td></tr>
+<tr><td>On a size or safe-area change</td><td><code>FitCompositionNoteChange</code> sets <code>layoutDirty</code> and cancels any drag; <code>Update</code> then calls <code>Render</code> unless the app is busy</td><td><code>UpdateFrameLayout</code> calls <code>BuildHud</code>, which redraws an open window too</td></tr>
+<tr><td>Portrait builders</td><td>Separate builders: <code>PortraitBattle</code>, <code>PortraitPanel</code>, <code>PButton</code>, <code>PortraitHandoff</code>, <code>PortraitBattleResult</code>, <code>PortraitFeedback</code>; many windows branch on <code>IsPortrait</code></td><td>Card pages and the reward take <code>JournalTallHeight</code> in portrait</td></tr>
+<tr><td>Short landscape</td><td><code>ShortSettings</code>: when the safe area's aspect exceeds <code>SettingsWideAspect</code>, Settings becomes the wide sheet and uses the <code>*Short</code> type sizes</td><td>When <code>uiWidth &gt; uiHeight * 1.5</code> and <code>uiHeight &lt; 720</code>, card pages and story invitations take <code>JournalShortHeight</code>; invitations also take the wide journal (<code>CompactCircuitInvitation</code>)</td></tr>
+<tr><td>Fitting the window</td><td>Fixed panel sizes per orientation</td><td><code>journalScale = min(1, (uiHeight − JournalScreenMarginY) / shellHeight)</code>; the width is capped by the screen</td></tr>
+<tr><td>Text size</td><td><code>ReadingScale</code> = <code>Theme.TextScale × Settings.TextScale</code>, clamped .8–1.38, applied in <code>Text()</code> and <code>ApplyThemeText</code></td><td><code>TravellerPreferenceText.Apply</code> with the player's text scale clamped .9–1.2; it keeps the authored sizes so repeated redraws do not compound</td></tr>
+</table></div>
+<p>The rendered-size floors that QA asserts (minimum pixel heights for text and controls) are listed in <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CIRCUIT_PRESENTATION.md#menu-roles">Menu roles</a>.</p>
+</section>
+
+<section id="settings"><h2><span class="num">10</span>Settings screens</h2>
+<p class="lead">There are two settings screens. The lodge's <code>CircuitPage.Controls</code> page (<code>DrawCircuitControls</code>) holds camera follow, reduced motion, zoom, a movement guide and a "Game settings" button. The full Settings screen is hosted only: <code>ExpeditionView.SettingsScreen</code>, with the tabs Sound, Screen, Reading and Controls. The lodge reaches it by starting a hosted session of kind <code>Settings</code>.</p>
+<ul>
+  <li><b>Rows.</b> <code>SettingToggle</code>, <code>SettingChoice</code> and <code>SettingSlider</code> build each row as a "Setting <i>title</i>" parent holding its title, help and value control. <code>SettingLabel</code> swaps in the words a player reads, while the object names stay fixed for navigation and saved focus. Left and Right change a choice through <code>ExpeditionSettingAdjustment</code>, or move a slider by one percent. A slider is an <code>ExpeditionSettingsSlider</code>, which separates touch adjustment from page scrolling. Trying a new window mode or resolution opens a trial with a countdown (<code>DisplayConfirmation</code>), and Reset asks once before it resets.</li>
+  <li><b>Navigation.</b> Settings does not use <code>MenuNavigationRows</code>. It has its own explicit lists (<a href="#focus">§07</a>) and its own shoulder handling: LB and RB change tab through <code>ChangeSettingsTab</code>, which can carry focus to the remembered row of the new tab.</li>
+  <li><b>Storage.</b> Rows edit <code>app.Settings</code> through <code>ExpeditionApp.ChangeSettings</code>, which applies the change at once and saves to disk after input settles. The format, the keys and the save timing are on <a href="saves.html#settings">saves.html §08</a>.</li>
+</ul>
+<p>From the battle pause, and from Versus home, Settings opens inside the session already running (<code>ExpeditionApp.OpenSettings</code>). From the title or the Controls page it is a separate hosted session:</p>
+<div class="diagram"><pre class="mermaid">
+sequenceDiagram
+  participant S as IsometricSlice
+  participant B as IsometricCombatBridge
+  participant A as ExpeditionApp
+  participant V as ExpeditionView
+  S-&gt;&gt;S: OpenTitleSettings → ShowWorldSettings
+  S-&gt;&gt;S: CaptureCircuitPage, CloseModal, hide the lodge canvas
+  S-&gt;&gt;B: Kind = Settings, Play
+  B-&gt;&gt;A: ConfigureSettingsSession sets SettingsOpen
+  A-&gt;&gt;V: Start adds the view and calls Initialize
+  V-&gt;&gt;V: Render → SettingsScreen
+  V-&gt;&gt;A: Back → CloseSettings
+  A-&gt;&gt;A: SaveSettings, then FinishSession
+  A--&gt;&gt;B: completed callback
+  B-&gt;&gt;B: Release → ReleaseSettings records ResultSettings
+  B--&gt;&gt;S: Play returns
+  S-&gt;&gt;S: ApplyWorldPreferences with ResultSettings
+  S-&gt;&gt;S: BuildHud, RestoreCircuitPage
+</pre></div>
+<p class="caption">Opening the full Settings from the title (<code>IsometricSlice.Settings.cs</code>, <code>IsometricCombatBridge.cs</code>, <code>ExpeditionApp.Settings.cs</code>). The lodge then restores the page, its history and the builder's undo list.</p>
+<p>What each setting does for the player is in <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/PLAYER_CONTROLS.md#settings">Settings</a>.</p>
+</section>
+
+<section id="motion"><h2><span class="num">11</span>Transitions, motion and reduced motion</h2>
+<p class="lead">No menu transition blocks input. A new window appears at full opacity and settles into place over a fraction of a second. Reduced Motion is <code>PlayerSettings.ReducedMotion</code>. The hosted stack reads it as <code>app.ReducedMotion</code>; the lodge copies it into <code>IsometricSlice.ReducedMotion</code> in <code>ApplyWorldPreferences</code> and passes it to the bridge.</p>
+<div class="scrollx"><table>
+<tr><th>Motion</th><th>Code</th><th>With Reduced Motion</th></tr>
+<tr><td>Hosted window entrance: the panel starts 7 units low (12 in portrait) and settles over .16 s when the screen changes</td><td><code>FinalizePresentationEntrance</code>, <code>TickPresentation</code> (<code>.Transitions</code>)</td><td>Not started</td></tr>
+<tr><td>Hosted scrim fade toward its target alpha</td><td><code>RefreshModalPresentation</code>, <code>TickPresentation</code></td><td>Jumps to the target</td></tr>
+<tr><td>Hosted focus ring easing in over .12 s</td><td><code>ExpeditionFocusMotion.UpdateIntensity</code></td><td>Instant</td></tr>
+<tr><td>Lodge window entrance (8 units down) and page turn (12 units sideways, slight flex) over .16 s</td><td><code>TravellerPanelMotion.Begin</code>, direction from <code>waybookTurn</code></td><td>Instant</td></tr>
+<tr><td>Lodge button easing and press shrink</td><td><code>TravellerButtonMotion.Paint</code></td><td>Instant, no shrink</td></tr>
+<tr><td>Title page hover and focus marks</td><td><code>WaybookPage.uss</code></td><td>The <code>.still</code> class</td></tr>
+<tr><td>Battle card travel, impacts, numbers, terrain blooms</td><td><code>AnimateCommand</code>, <code>AnimateEvents</code> (<code>.Motion</code>)</td><td>Travel skipped (<code>AnimateCommandSkipped</code>), effects shortened or smaller</td></tr>
+<tr><td>Screen shake</td><td><code>AnimateEventsShakeTargets</code></td><td>Off; it also needs <code>Settings.ScreenShake</code></td></tr>
+<tr><td>Lodge camera lead and follow smoothing</td><td><code>UpdateCameraLead</code>, <code>UpdateCamera</code></td><td>No lead, no smoothing</td></tr>
+</table></div>
+<p>The lodge's "Circuit shade" behind a journal window does not fade. The guide-level description of page motion is in <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CIRCUIT_WAYBOOK.md#motion-and-accessibility">Motion and accessibility</a>.</p>
+</section>
+
+<section id="duplication"><h2><span class="num">12</span>What is still duplicated, and the planned move</h2>
+<p class="lead">The two stacks grew separately and now share roles, rows and a glyph resolver. These jobs are still done twice or more. Each item was checked against <code>main</code>; the decisions about them belong to the roadmap and <a href="findings.html">Findings</a>.</p>
+<div class="scrollx"><table>
+<tr><th>Duplicated job</th><th>Where</th><th>Visible difference today</th></tr>
+<tr><td>Input routing</td><td><code>ExpeditionView.UpdateShellInput</code> and <code>IsometricSlice.UpdateFrameInput</code> / <code>NavigateModal</code></td><td>Separate device enums (<code>NavigationDevice</code>, <code>InputKind</code>), repeat timings (.32/.12 s and .30/.13 s) and dead zones</td></tr>
+<tr><td>Focus and press painting</td><td><code>ExpeditionFocusMotion</code> and <code>TravellerButtonMotion</code></td><td>The same roles, applied by different code</td></tr>
+<tr><td>Glyph family to sprite prefix</td><td><code>ExpeditionView.Glyphs</code>, <code>IsometricSlice.Hud</code>, <code>IsometricSlice.Waybook</code></td><td>The Waybook copy also keeps its own shoulder names</td></tr>
+<tr><td>Window entrance motion</td><td><code>FinalizePresentationEntrance</code> and <code>TravellerPanelMotion</code></td><td>Similar distances and the same .16 s duration</td></tr>
+<tr><td>Window shells and buttons</td><td><code>Modal</code>, <code>PortraitPanel</code>, <code>WorldPanel</code>, <code>ConnectionPanel</code>; <code>Button</code>, <code>PButton</code>, <code>PMenuButton</code>, <code>MenuActionButton</code></td><td>Windows built separately for each orientation</td></tr>
+<tr><td>Words and colours fixed after building</td><td><code>RewriteHostedMenuCopy</code>, <code>SkinWaybook</code></td><td>Button text and fills are replaced by name after the builder ran</td></tr>
+<tr><td>Global static colour state</td><td><code>DuelUi.MenuColour</code>, written by <code>Use</code> and <code>UseHighContrast</code> from both stacks</td><td>The lodge must re-apply its own High Contrast in <code>BuildHud</code> after a hosted session</td></tr>
+<tr><td>Unused code</td><td><code>DuelHoverLift</code> in <code>DuelUi.cs</code></td><td>It has no users on <code>main</code></td></tr>
+</table></div>
+<p>The roadmap's <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Release/ROADMAP.md#cleanup-milestone">cleanup milestone</a> tracks giving these jobs one owner (its steps G, shared menu rules, and H, hosted windows), and <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Release/ROADMAP.md#menu-ui-cleanup">Menu UI cleanup</a> tracks the remaining role stages. Check there for their status. The milestone's rule for this work: a shared rule gets one owner before either stack changes, and one stack is never made to match the other by writing a second copy.</p>
+<h3>The planned move to UI Toolkit</h3>
+<p>Today the title page is the only UI Toolkit surface. It uses a <code>UIDocument</code> with its own world-space <code>PanelSettings</code>, and every other menu is code-built uGUI through <code>DuelUi</code>. The direction, the proof work, the order of the slices and the rule for stopping are all in <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Release/ROADMAP.md#menus-on-ui-toolkit">Menus on UI Toolkit</a>. Update this page as each slice lands. Until then, treat everything above as the current structure.</p>
+</section>
+
+<div class="honest"><h4>Keep this page honest</h4><ul>
+  <li><code>Game/EmberGrove/Assets/Runtime/DuelUi.cs</code>: the factory members, the three role tables, <code>Use</code> / <code>UseHighContrast</code> / <code>Resolve</code>, <code>DuelHoverLift</code></li>
+  <li><code>Game/EmberGrove/Assets/Runtime/ExpeditionView.cs</code>: <code>Initialize</code>, <code>Update</code>, <code>Render</code>, <code>Modal</code></li>
+  <li><code>Game/EmberGrove/Assets/Runtime/ExpeditionView.Navigation.cs</code>: <code>UpdateShellInput*</code>, screen keys, focus memory, neighbours, the controller keyboard, <code>MenuNavigationRows</code></li>
+  <li><code>Game/EmberGrove/Assets/Runtime/ExpeditionView.Glyphs.cs</code>: the hint dock, <code>ResolveControllerGlyphFamily</code>, <code>FaceGlyphLabel</code>, <code>ExpeditionNavigationGlyph</code></li>
+  <li><code>Game/EmberGrove/Assets/Runtime/ExpeditionView.Layout.cs</code>, <code>ExpeditionView.PortraitJourney.cs</code>: compositions, the hint dock reserve, touch targets, portrait builders</li>
+  <li><code>Game/EmberGrove/Assets/Runtime/ExpeditionView.Transitions.cs</code>, <code>ExpeditionView.Shell.cs</code>, <code>ExpeditionView.WorldMenus.cs</code>, <code>ExpeditionView.World.cs</code>, <code>ExpeditionView.Connection.cs</code>: shields, the single scrim, entrance, notices, <code>HeaderBack</code>, roles, <code>SkinWaybook</code>, <code>RewriteHostedMenuCopy</code>, window shells</li>
+  <li><code>Game/EmberGrove/Assets/Runtime/ExpeditionView.Settings.cs</code>, <code>ExpeditionView.SettingsNavigation.cs</code>, <code>ExpeditionApp.Settings.cs</code>, <code>ExpeditionApp.Session.cs</code>: the Settings screen and the Settings session</li>
+  <li><code>Game/EmberGrove/Assets/Runtime/ExpeditionView.Input.cs</code>, <code>ExpeditionView.Motion.cs</code>, <code>ExpeditionView.Media.cs</code>, <code>ExpeditionTheme.cs</code>: gestures, battle motion, theme application</li>
+  <li><code>Game/EmberGrove/Assets/Runtime/ExpeditionFocusMotion.cs</code>, <code>Game/EmberGrove/Assets/Runtime/Exploration/TravellerUiMotion.cs</code>: <code>HostedMenuRole</code> and both focus painters</li>
+  <li><code>Game/EmberGrove/Assets/Runtime/Exploration/IsometricSlice.cs</code>, <code>IsometricSlice.Hud.cs</code>: the lodge router, <code>TrackInputKind</code>, the HUD, <code>NavigateModal</code>, canvas set-up</li>
+  <li><code>Game/EmberGrove/Assets/Runtime/Exploration/IsometricSlice.CircuitUi.cs</code>, <code>IsometricSlice.Circuit.cs</code>, <code>IsometricSlice.Waybook.cs</code>, <code>IsometricSlice.Title.cs</code>: the journal pipeline, page history, art slots, paging hints, title entries</li>
+  <li><code>Game/EmberGrove/Assets/Runtime/Exploration/IsometricSlice.WaybookMenu.cs</code>, <code>Game/EmberGrove/Assets/Resources/UI/WaybookPage.uxml</code>, <code>WaybookPage.uss</code>, <code>WaybookPanel.asset</code>: the written title</li>
+  <li><code>Game/EmberGrove/Assets/Runtime/Exploration/IsometricSlice.Settings.cs</code>, <code>IsometricSlice.Preferences.cs</code>, <code>IsometricCombatBridge.cs</code>: the hand-off and the Settings session</li>
+  <li><code>Toolkit/Packages/com.catsplat.cardforge/Runtime/Content/ContentPackFiles.cs</code>: <code>MenuPaletteDefinition.MenuRoles</code>, <code>WaybookPresentationDefinition.ArtRoles</code></li>
+</ul></div>
+</main>
+<footer>Bloomfire Wiki · page source <code>Docs/Wiki/ui.html</code>, built by <code>Tools/Documentation/structure_wiki.py</code> · Found a mistake? Fix it in the same commit as the code that made it one.</footer>
+</body>
+</html>

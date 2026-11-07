@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hosted Sessions — Bloomfire Wiki</title>
+<link rel="stylesheet" href="wiki.css">
+<script src="mermaid.min.js" defer></script>
+<script src="wiki.js" defer></script>
+</head>
+<body>
+<nav class="wiki">
+  <a class="home" href="index.html">🔥 Bloomfire Wiki</a>
+  <div class="grp"><span class="grp-t">Start here</span>
+    <a href="codebase-tour.html">Codebase Tour</a>
+    <a href="glossary.html">Glossary</a>
+  </div>
+  <div class="grp"><span class="grp-t">Game systems</span>
+    <a href="rules.html">Rules Engine</a>
+    <a href="world.html">World &amp; Journal</a>
+    <a class="on" href="sessions.html">Hosted Sessions</a>
+    <a href="ui.html">UI &amp; Menus</a>
+    <a href="networking.html">Networking</a>
+    <a href="content.html">Content &amp; Media</a>
+    <a href="saves.html">Saves &amp; Settings</a>
+  </div>
+  <div class="grp"><span class="grp-t">Code health</span>
+    <a href="diagrams.html">Diagrams</a>
+    <a href="complexity.html">Complexity</a>
+    <a href="findings.html">Findings</a>
+  </div>
+  <div class="grp"><span class="grp-t">Ship &amp; maintain</span>
+    <a href="qa.html">QA &amp; Rehearsals</a>
+    <a href="builds.html">Builds &amp; Tools</a>
+    <a href="maintaining.html">Maintaining</a>
+  </div>
+</nav>
+<header class="page"><h1>How a table <span class="flame">session</span> runs</h1><p class="tag">How the Circuit world hands a duel, a practice, a lesson, the Versus menu or the Settings screen to a throwaway <code>ExpeditionApp</code>, and how the result comes back and gets saved.</p></header>
+<main>
+  <div class="tldr"><h4>In 60 seconds</h4><ul>
+    <li><b>Every table is a throwaway app.</b> <code>IsometricCombatBridge.Play</code> builds an inactive <code>Hosted session</code> GameObject, adds an <code>ExpeditionApp</code>, configures it for one <code>HostedSessionKind</code>, then activates it. <code>Start</code> loads the content pack, builds the match and adds <code>ExpeditionView</code>. <a href="#kinds">§02</a> <a href="#start">§03</a></li>
+    <li><b>One command path.</b> Local player moves and rival moves both end in <code>ResolveLocal</code> → <code>CombatRules.Resolve</code> → <code>Present</code>, which runs <code>AnimateCommand</code>, <code>Render</code> and <code>AnimateEvents</code>. The rival chooses with <code>CombatAi.Choose</code>. Practice uses a scripted partner instead. <a href="#turns">§04</a></li>
+    <li><b>A duel result is committed twice, on purpose.</b> The world applies <code>CircuitRules.ResolveDuel</code> as soon as the match is over, before the player leaves the result screen, then again after <code>Play</code> returns. The duel's <code>ReceiptId</code> turns the second call into a no-op. <a href="#result">§05</a></li>
+    <li><b>The screen is decided, not stored.</b> No enum says which screen is showing. <code>ExpeditionView.Render</code> works it out each time from <code>Kind</code>, <code>State</code> and booleans spread across seven <code>ExpeditionApp</code> files and the view. <a href="#screens">§06</a></li>
+    <li><b>A session borrows the world and gives it back.</b> It draws on the world's table through <code>WorldTableContext</code>. The bridge snapshots quality, frame rate, vsync, render pipeline, volume, cursor and <code>EventSystem</code> before the session and restores them afterwards. <a href="#table">§08</a> <a href="#globals">§09</a></li>
+  </ul></div>
+
+  <div class="prereq"><h4>Before you start</h4><p>Read the <a href="codebase-tour.html">Codebase Tour</a> for where the game and the toolkit sit, and <a href="rules.html">Rules Engine</a> for <code>CombatRules</code>, <code>CombatCommand</code> and <code>CombatState</code>. This page starts where the world (<a href="world.html">World &amp; Journal</a>) decides to play a table. It ends where the result is saved (<a href="saves.html">Saves &amp; Settings</a>). Network play inside Versus is on <a href="networking.html">Networking</a>, and the view's drawing and input routing are on <a href="ui.html">UI &amp; Menus</a>.</p></div>
+
+  <section id="anatomy"><h2><span class="num">01</span>Where the pieces live</h2>
+    <p class="lead">All session code is game code in <code>Game/EmberGrove/Assets/Runtime</code>. The game has no asmdef, so it compiles into Assembly-CSharp. The bridge sits with the world in <code>Exploration/</code> (namespace <code>EmberGrove.Exploration</code>). The session itself is in namespace <code>EmberGrove.Expedition</code>, a name left over from the retired standalone mode (<a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CODE_ARCHITECTURE_GUIDE.md#product-names">CODE_ARCHITECTURE_GUIDE · Product names</a>). The rules it calls (<code>CombatRules</code>, <code>CombatAi</code>, <code>LessonRules</code>, <code>CircuitRules</code>) live in the CardForge toolkit.</p>
+    <div class="scrollx"><table>
+      <tr><th>Type</th><th>File(s)</th><th>What it does</th></tr>
+      <tr><td><code>IsometricCombatBridge</code></td><td><code>Exploration/IsometricCombatBridge.cs</code></td><td>A MonoBehaviour the world adds to its own GameObject the first time it needs one. It hosts one session at a time through the <code>Play</code> coroutine. Its public fields are the inputs (<code>Kind</code>, <code>PlayerDeck</code>, <code>EncounterSeed</code>, <code>ContentRoot</code>, the three <code>Opening*</code> bonuses, <code>OpponentName</code>/<code>OpponentDescription</code>, <code>Table</code>, <code>Lesson</code>, <code>PracticeContentJson</code>, <code>LobbySession</code>). <code>ReducedMotion</code> is public too: launchers set it, but nothing reads it. Its read-only properties are the results (<code>Outcome</code>, <code>Error</code>, <code>ResultSettings</code>, <code>PracticeCompleted</code>, <code>ReceiptId</code>).</td></tr>
+      <tr><td><code>ExpeditionApp</code></td><td><code>ExpeditionApp.cs</code>, eight <code>ExpeditionApp.*.cs</code> partials and <code>WorldTableContext.cs</code> (10 files)</td><td>Coordinates the session. The main file has <code>Start</code>, <code>Update</code>, the <code>Select*</code> methods, <code>Submit</code>/<code>ResolveLocal</code>/<code>Present</code> and the rival loop. <code>.Session</code> has the kinds, the encounter, deck, friendly-episode and settings <code>Configure*</code> methods, <code>PrepareTable</code> and <code>FinishSession</code>. The other <code>Configure*</code> methods sit in the partial they configure. The rest are <code>.Practice</code>, <code>.Lessons</code>, <code>.WorldMenu</code> (Versus), <code>.Settings</code>, <code>.Network</code>, <code>.Queries</code> (legal-action cache, move help) and <code>.Media</code>.</td></tr>
+      <tr><td><code>ExpeditionView</code></td><td>21 <code>ExpeditionView*.cs</code> files, plus parts in <code>ExpeditionTheme.cs</code> and <code>ExpeditionApp.Session.cs</code> (23 files)</td><td>Draws every session screen and routes input. See <a href="ui.html">UI &amp; Menus</a>.</td></tr>
+      <tr><td><code>HostedSessionKind</code></td><td><code>ExpeditionApp.Session.cs</code></td><td>The enum <code>{ CircuitDuel, FriendlyGame, Practice, Lesson, Versus, Settings }</code>.</td></tr>
+      <tr><td><code>FairMatchSetup</code></td><td><code>ExpeditionApp.Session.cs</code></td><td>An internal static class. It checks the solo opening choice (<code>ValidateOpeningChoice</code>) and builds the starting <code>CombatState</code> (<code>CreateFairMatch</code>).</td></tr>
+      <tr><td><code>WorldTableContext</code></td><td><code>WorldTableContext.cs</code></td><td>The presentation references a host passes in: camera, anchor, size, location id and the living-table prefab. It also holds the table geometry and <code>Frame</code>. Per its own comment, no rules, deck or network state lives here.</td></tr>
+      <tr><td><code>WorldTablePresentation</code></td><td><code>WorldTablePresentation.cs</code></td><td>The living table: a prefab MonoBehaviour that shows creatures and terrain on the world's table.</td></tr>
+      <tr><td><code>PracticeNarration</code></td><td><code>PracticeNarration.cs</code></td><td>Optional recorded voice for practice and lesson instructions.</td></tr>
+      <tr><td>Launchers in <code>IsometricSlice</code></td><td><code>.Circuit</code>, <code>.Onboarding</code>, <code>.Lessons</code>, <code>.Versus</code>, <code>.Settings</code>, <code>.Table</code>, <code>.Progress</code></td><td>These start each kind, own the table lease and commit the result. The bridge is the private field <code>combat</code> in <code>IsometricSlice.Progress.cs</code>.</td></tr>
+    </table></div>
+    <p>The class diagrams for these types are generated on <a href="diagrams.html">Diagrams</a>. The <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CODE_ARCHITECTURE_GUIDE.md#source-map">Source map</a> lists <code>ExpeditionApp*.cs</code> as the player coordinator and <code>ExpeditionView*.cs</code> as the player presentation.</p>
+  </section>
+
+  <section id="kinds"><h2><span class="num">02</span>Six kinds, one bridge</h2>
+    <p class="lead">The kind decides which <code>Configure*</code> calls the bridge makes before the session starts. Each launcher sets the bridge's public <code>Kind</code> field before calling <code>Play</code>. <code>Begin</code> turns that field into configure calls, and those calls set the app's read-only <code>Kind</code> property. The <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CODE_ARCHITECTURE_GUIDE.md#product-names">architecture guide</a> owns what a kind is. It is set before the session starts and never changes. <code>LocalDuel</code> and the network session are what is played inside Versus, and they are not kinds.</p>
+    <div class="scrollx"><table>
+      <tr><th>Kind</th><th>Started by</th><th>Bridge configure calls (after <code>ConfigureWorldTable</code>)</th><th>What <code>Start</code> builds</th><th>Normal way out</th></tr>
+      <tr><td><code>CircuitDuel</code></td><td><code>PlayCircuitDuel()</code> after <code>CircuitRules.BeginDuel</code>. <code>ConfigureCircuitMatch</code> fills the opening bonuses from the run's solo perk.</td><td><code>ConfigureEncounter(id, Complete)</code>, then <code>ConfigureDeck(deck, seed, root, momentum, shield, scout)</code></td><td><code>PrepareTable</code> → <code>FairMatchSetup.CreateFairMatch</code></td><td><code>ContinueAfterBattle</code> → <code>FinishSession(BattleOutcome)</code></td></tr>
+      <tr><td><code>FriendlyGame</code></td><td><code>PlayCircuitDuel(episodeId)</code> after <code>CircuitRules.BeginEpisodeDuel</code></td><td>The same calls, then <code>ConfigureFriendlyEpisode(OpponentName, OpponentDescription)</code></td><td>Same as a duel. <code>EnemyName</code> and the result title come from the episode.</td><td>Same as a duel</td></tr>
+      <tr><td><code>Practice</code></td><td><code>PlayCircuitPractice()</code> in <code>IsometricSlice.Onboarding.cs</code></td><td><code>ConfigureEncounter</code> (first non-champion opponent) and <code>ConfigureDeck</code> (run deck, fixed seed), then <code>ConfigurePracticeTutorial(PracticeContentJson)</code>. The bridge also adds <code>PracticeNarration</code>.</td><td><code>PrepareTable</code>, then <code>PreparePracticeTutorial</code> replaces <code>State</code> with a one-card-per-side match</td><td><code>FinishPracticeTutorial</code> or <code>SkipPracticeTutorial</code></td></tr>
+      <tr><td><code>Lesson</code></td><td><code>PlayCircuitPractice(lesson)</code>, called from <code>IsometricSlice.Lessons.cs</code></td><td>As Practice, but <code>ConfigureAuthoredLesson(Lesson)</code></td><td><code>PrepareTable</code>, then <code>PrepareAuthoredLesson</code> replaces <code>State</code> with <code>LessonRules.Prepare</code></td><td>As Practice</td></tr>
+      <tr><td><code>Versus</code></td><td><code>ShowWorldVersus()</code> from the title, or <code>PlayLobbyMatch()</code> from the trusted table lobby</td><td><code>ConfigureWorldMenuSession(ContentRoot, Complete)</code>. For the lobby, the poll loop later calls <code>AttachLobbyMatch(LobbySession)</code>.</td><td><code>PrepareTable</code> returns at once. <code>State</code> stays null until a local duel or network match starts.</td><td><code>CloseWorldMenu</code> → <code>FinishSession(Interrupted)</code></td></tr>
+      <tr><td><code>Settings</code></td><td><code>ShowWorldSettings()</code>, through <code>OpenTitleSettings</code></td><td><code>ConfigureSettingsSession(ContentRoot, Complete)</code>, which also sets <code>SettingsOpen</code></td><td><code>PrepareTable</code> returns at once. There is no <code>State</code>.</td><td><code>CloseSettings</code> → <code>FinishSession(Interrupted)</code></td></tr>
+    </table></div>
+    <ul>
+      <li>Every <code>Configure*</code> method throws once <code>LoadedPack</code> or <code>View</code> exists, so they only work on the inactive host before <code>Start</code>. <code>ConfigureFriendlyEpisode</code> also requires <code>Kind</code> to be <code>CircuitDuel</code> already, which is why it comes after <code>ConfigureEncounter</code>.</li>
+      <li>Derived properties read the kind: <code>IsCircuitMatch</code> (CircuitDuel or FriendlyGame), <code>IsFriendlyEpisode</code>, <code>IsPracticeTutorial</code> (Practice or Lesson), <code>IsWorldMenuSession</code> (Versus) and <code>IsSettingsSession</code>. <code>IsAuthoredLesson</code> means <code>AuthoredLesson != null</code>.</li>
+      <li>Each launcher calls <code>ApplyWorldPreferences(combat.ResultSettings)</code> after <code>Play</code> (<a href="#globals">§09</a>). Duels and friendly games then commit through <code>ResolveDuel</code> (<a href="#result">§05</a>). Practice and lessons never ask for a duel receipt. <code>PlayCircuitPracticeRecord</code> sets <code>practiceCompleted</code> or adds to <code>completedLessonIds</code>, then the launcher calls <code>SaveCircuit</code>. Settings calls <code>SaveCircuit</code> and restores the journal page it was opened from. <code>ShowWorldVersus</code> writes no run save, and its closing comment says so.</li>
+    </ul>
+  </section>
+
+  <section id="start"><h2><span class="num">03</span>Opening a session</h2>
+    <p class="lead">A launcher fills in the bridge and yields on <code>Play</code>. <code>Play</code> builds the host while it is inactive, so the configure calls finish before <code>Awake</code> and <code>Start</code> run. It then polls each frame until the session ends.</p>
+    <ol class="steps">
+      <li><b>Launcher.</b> It sets <code>inEncounter</code> and fills the bridge fields. Every launcher except the lobby match (<code>PlayLobbyMatch</code>) also closes the journal, shows the "Shuffling decks…" cover (<code>ShowEncounterLoading</code>, which adds a Cancel button only while a Circuit duel is pending) and takes the table lease (<code>PrepareWorldTablePresentation</code>). Most launchers then move the camera (<code>BeginWorldTableSessionView</code>, <a href="#table">§08</a>).</li>
+      <li><b><code>Play(encounterId, completed, receiptId)</code>.</b> It throws if a session is already <code>Active</code>. It resets <code>Error</code>, <code>ResultSettings</code> and <code>PracticeCompleted</code>, sets <code>Outcome</code> to <code>Interrupted</code>, stores <code>ReceiptId</code> and snapshots global state into a <code>RuntimePreferences</code> (<a href="#globals">§09</a>).</li>
+      <li><b><code>Begin</code>.</b> It creates <code>new GameObject("Hosted session")</code>, deactivates it and parents it to the bridge. Then it calls <code>AddComponent&lt;ExpeditionApp&gt;()</code>, subscribes <code>KeepWorldPipeline</code> to <code>SettingsChanged</code> and calls <code>ConfigureWorldTable(Table)</code>. It makes the configure calls for the kind (<a href="#kinds">§02</a>), adds <code>PracticeNarration</code> for Practice and Lesson, clears the <code>EventSystem</code> selection and finally calls <code>host.SetActive(true)</code>. An exception here sets <code>Error</code> and ends the session at once.</li>
+      <li><b><code>Awake</code> → <code>InitializeSettings</code>.</b> It reads the saved <code>PlayerSettings</code>, applies the saved display, then calls <code>ApplySettingsRuntime</code>. That sets the quality level, frame rate, vsync and listener volume for the whole process.</li>
+      <li><b><code>Start</code> (a coroutine).</b> It calls <code>ContentPackFiles.Load(sessionContentRoot ?? ContentPackFiles.DefaultRoot())</code>, which loads the pack again even though the world loaded it at boot. It sets <code>Content</code> and <code>Catalog = Content.CreateCatalog()</code>, adds a <code>GameAudioDirector</code>, calls <code>PrepareTable</code> and <code>InitializeMedia</code> and makes sure a <code>PlaytestSessionService</code> exists. Last, it adds <code>ExpeditionView</code> and calls <code>Initialize(this)</code> and <code>ApplyExternalTheme</code>. Load or parse errors go into <code>FatalError</code> and do not throw.</li>
+      <li><b>Poll loop.</b> Each frame, <code>PollSession</code> ends the session if <code>Session</code> is gone or <code>FatalError</code> is set. While <code>Session.View</code> is still null, it also ends the session after 120 s of real time, or on Escape or the gamepad's east button. For the lobby, <code>LobbyMatchReady</code> attaches the borrowed network session once the view exists. On the world side, <code>IsometricSlice.UpdateFrameEncounter</code> hides the world canvas once <code>combat.Session.View</code> exists.</li>
+    </ol>
+    <h3><code>PrepareTable</code>, step by step</h3>
+    <p>It returns at once for Settings, for Versus, or if <code>FatalError</code> is set. Otherwise:</p>
+    <ol>
+      <li>It finds the encounter with <code>Content.Encounter(sessionEncounter)</code> and throws if it is unknown.</li>
+      <li>It picks a deck: the chosen preset or <code>Content.StarterDeck</code>, replaced by the bridge's deck when one was configured. <code>PrepareTableSessionDeck</code> checks that deck with <code>CombatRules.LegalMatchDeck</code>.</li>
+      <li><code>BeginEncounter</code> resets selection, audio and timers, starts the playtest record (not in practice), and also builds a <code>CombatState</code> with the encounter's <code>EnemyLife</code>.</li>
+      <li>The next line replaces that state with <code>FairMatchSetup.CreateFairMatch(...)</code>, using <code>Content.MatchRules</code> and the configured opening bonus. A code comment states the intent: every table kind uses the same life, cards and resource rules as a default PvP match.</li>
+      <li><code>PreparePracticeTutorial</code> runs last. For Practice and Lesson it replaces <code>State</code> once more.</li>
+    </ol>
+    <p>Any exception becomes <code>FatalError = "The encounter could not be prepared. …"</code>. <code>CombatRules.NewMatch</code> and the other combat rules are on <a href="rules.html">Rules Engine</a>. The fair-setup suite is described in the <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Tools/CircuitFieldSetupChecks/README.md">CircuitFieldSetupChecks README</a>.</p>
+  </section>
+
+  <section id="turns"><h2><span class="num">04</span>The turn loop</h2>
+    <p class="lead">Each move goes through one guarded entry point and one presentation coroutine. The <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CODE_ARCHITECTURE_GUIDE.md#one-accepted-command">One accepted command</a> section of the architecture guide owns the contract: the screen guards stop accidental input, and the reducer enforces the rules.</p>
+    <div class="diagram"><pre class="mermaid">
+sequenceDiagram
+  participant V as ExpeditionView
+  participant A as ExpeditionApp
+  participant R as CombatRules
+  participant Ai as CombatAi
+  participant T as WorldTablePresentation
+  V-&gt;&gt;A: SelectUnit / SelectSlot / SelectHero / EndTurn
+  A-&gt;&gt;A: Submit checks CanAct, Viewer, PracticeAllows
+  A-&gt;&gt;R: ResolveLocal calls Resolve(State, command, Catalog)
+  R--&gt;&gt;A: CombatResolution (new State and Events) or a RuleError
+  A-&gt;&gt;A: Present coroutine sets Busy
+  A-&gt;&gt;V: AnimateCommand(before, command)
+  V-&gt;&gt;T: AnimateCommand (lunge on the living table)
+  A-&gt;&gt;A: State = resolution.State, Sound
+  A-&gt;&gt;V: Render
+  A-&gt;&gt;V: AnimateEvents(before, events)
+  V-&gt;&gt;T: AnimateEvents, then Reconcile
+  A-&gt;&gt;A: PresentFinish clears Busy, PracticeResolved, Render
+  Note over A,Ai: Update, when it is the rival's turn
+  A-&gt;&gt;Ai: Choose(State, Catalog) and DescribeIntent
+  A-&gt;&gt;A: wait for nextAi and HoldAutomaticAdvance
+  A-&gt;&gt;R: ResolveLocal(planned), then the same Present path
+</pre></div>
+    <p class="caption">One local move, from input to settled board. The rival skips <code>Submit</code> and calls <code>ResolveLocal</code> directly. A networked session sends the command with <code>network.Submit</code> instead (<a href="networking.html">Networking</a>).</p>
+    <ul>
+      <li><b><code>Submit</code></b> drops the command unless <code>CanAct</code> is true, <code>command.Player == Viewer</code> and <code>PracticeAllows(command)</code>. <code>CanAct</code> needs an unfinished <code>State</code>, no open menu, no lesson feedback waiting, no end-turn confirmation open (<code>View.IsWorldReading</code>), no card being inspected, and the turn owned by this viewer (<a href="#screens">§06</a>).</li>
+      <li><b><code>ResolveLocal</code></b> calls <code>CombatRules.Resolve</code> and records the action with <code>Playtest</code> (not in practice). If the rules reject the command, it shows the error with <code>Notify</code> and pushes the rival's next try back.</li>
+      <li><b><code>Present</code></b> sets <code>Busy</code> and keeps the old state on screen while <code>View.AnimateCommand</code> runs. It then publishes <code>resolution.State</code>, plays sounds, calls <code>Render</code> and waits for <code>View.AnimateEvents</code>. <code>PresentFinish</code> clears <code>Busy</code>, plays the outcome cue if the match is over, sets <code>Handoff</code> after a local-duel end turn and advances practice (<code>PracticeResolved</code>).</li>
+      <li><b>The rival</b> runs from <code>Update</code>. <code>UpdateRivalWaits</code> holds it while there is no state, the match is over, it is a local or network duel, it is player 0's turn, a screen is open (<code>UpdateRivalScreenOpen</code>), lesson feedback is waiting, or the end-turn confirmation is open or a card is being inspected (<code>CanActViewIdle</code>). <code>UpdatePlanRivalCommand</code> picks with <code>CombatAi.Choose</code>, or <code>PracticeOpponentCommand</code> in practice, and sets <code>Intent</code>. <code>UpdateResolveRivalCommand</code> plays it once <code>nextAi</code> has passed. In practice it also waits while <code>PracticeNarration.HoldAutomaticAdvance()</code> returns true.</li>
+    </ul>
+  </section>
+
+  <section id="result"><h2><span class="num">05</span>Result, FinishSession and the receipt</h2>
+    <p class="lead">A session ends when <code>FinishSession(outcome)</code> calls the bridge's <code>Complete</code>. For Circuit duels, the world has usually committed the result before that, as soon as the match was over. After <code>Play</code> returns it commits again with the same receipt, and the rules ignore the repeat.</p>
+    <div class="diagram"><pre class="mermaid">
+sequenceDiagram
+  autonumber
+  participant S as IsometricSlice
+  participant C as CircuitRules
+  participant B as IsometricCombatBridge
+  participant A as ExpeditionApp
+  participant V as ExpeditionView
+  participant P as CircuitPersistence
+  S-&gt;&gt;C: BeginDuel(definition, circuit)
+  C--&gt;&gt;S: PendingDuel with a ReceiptId
+  S-&gt;&gt;P: ApplyCircuit saves the pending duel
+  S-&gt;&gt;B: Play(EncounterId, outcome callback, ReceiptId)
+  B-&gt;&gt;A: AddComponent on the inactive Hosted session
+  B-&gt;&gt;A: ConfigureWorldTable, ConfigureEncounter, ConfigureDeck
+  B-&gt;&gt;A: SetActive(true) runs Awake and Start
+  A-&gt;&gt;A: ContentPackFiles.Load, PrepareTable, CreateFairMatch
+  A-&gt;&gt;V: AddComponent, Initialize(app)
+  Note over A,V: turn loop until State.IsOver
+  S-&gt;&gt;C: CommitFinishedCircuitDuel calls ResolveDuel(ReceiptId, BattleOutcome)
+  S-&gt;&gt;P: SaveCircuit, CaptureCircuitSave, Save
+  V-&gt;&gt;V: Render shows BattleResult
+  V-&gt;&gt;A: ContinueAfterBattle (RETURN TO WORLD)
+  A-&gt;&gt;B: FinishSession calls Complete(outcome)
+  B-&gt;&gt;A: Release, ReleasePresentation, Destroy(host)
+  B--&gt;&gt;S: completed(Outcome), one frame later
+  S-&gt;&gt;C: ResolveDuel(same ReceiptId) returns an unchanged copy
+  S-&gt;&gt;P: SaveCircuit again
+</pre></div>
+    <p class="caption">A Circuit duel from start to saved result. Steps 10–11 run from <code>IsometricSlice.UpdateFrameEncounter</code> on the first frame <code>State.IsOver</code> is true. <code>Present</code> publishes the final state before its last animation, so this can happen before the result panel appears. Steps 17–18 come from <code>PlayCircuitDuel</code> resuming after <code>yield return combat.Play(...)</code>.</p>
+
+    <h3>How the player leaves, and which outcome that gives</h3>
+    <div class="scrollx"><table>
+      <tr><th>Player does</th><th>Code path</th><th><code>CircuitDuelOutcome</code></th></tr>
+      <tr><td>Finishes the match and presses RETURN TO WORLD (Back does the same)</td><td><code>ContinueAfterBattle</code> → <code>FinishSession(BattleOutcome)</code></td><td><code>BattleOutcome</code> maps <code>State.Winner</code> 0 / 1 / 2 to Won / Lost / Drawn</td></tr>
+      <tr><td>Leaves an unfinished match from the pause</td><td><code>MainMenu</code> → <code>FinishSession(BattleOutcome)</code></td><td>Interrupted (the match is not over)</td></tr>
+      <tr><td>Retires from the pause (Circuit matches only)</td><td><code>Concede</code> → <code>FinishSession(Abandoned)</code></td><td>Abandoned</td></tr>
+      <tr><td>Cancels loading, or loading fails or times out</td><td><code>Cancel</code> or <code>PollSession</code> resolves the bridge directly</td><td>Interrupted (failures also set <code>Error</code>)</td></tr>
+      <tr><td>Finishes or skips a practice</td><td><code>FinishPracticeTutorial</code> / <code>SkipPracticeTutorial</code></td><td>Won / Won if <code>PracticeWon</code>, otherwise Interrupted</td></tr>
+    </table></div>
+    <p>What each outcome does to the run is owned by the Circuit package: <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Toolkit/Packages/com.catsplat.cardforge/Runtime/Circuit/README.md#outcomes-and-receipts">Circuit README · Outcomes and receipts</a>.</p>
+
+    <h3>Teardown order</h3>
+    <ol class="steps">
+      <li><b><code>FinishSession</code></b> runs once (<code>sessionFinished</code>). Outside practice, it records an abandoned match with <code>Playtest</code> if the match is unfinished. It disables the app and the view first, so the same press cannot submit twice. Then it stops audio and playtest and invokes the stored callback once.</li>
+      <li><b><code>Complete</code></b> on the bridge stores <code>Outcome</code> and sets <code>resolved</code>. The poll loop exits, and its <code>finally</code> runs <code>Release</code>.</li>
+      <li><b><code>Release</code></b> takes the settings result (<code>ReleaseSettings</code>: unsubscribe, revert an unconfirmed display trial, <code>FlushSettings</code>, set <code>ResultSettings</code>). For Practice and Lesson it copies <code>PracticeWon</code> into <code>PracticeCompleted</code>. If <code>State.IsOver</code>, it replaces <code>Outcome</code> with <code>Session.BattleOutcome</code>, so the rules state wins over the callback. It then calls <code>Session.ReleasePresentation()</code>, clears a selection inside the host, deactivates and destroys the host and restores the global snapshot.</li>
+      <li><b>One frame later</b>, <code>Play</code> restores the snapshot again, clears <code>Active</code> and invokes <code>completed(Outcome)</code>. The code comment explains the wait: the battle canvas, audio and focus targets must be gone first, so the world cannot consume the same confirming button press.</li>
+    </ol>
+
+    <h3>Why committing twice is safe</h3>
+    <p><code>CommitFinishedCircuitDuel</code> runs every frame during an encounter (<code>UpdateFrameEncounter</code>). It also runs from <code>SaveProgress</code> and <code>SaveBeforeQuit</code>. It applies <code>ResolveDuel</code> only when <code>PendingDuel</code> exists, <code>combat.ReceiptId</code> matches it, and the outcome (<code>Session.BattleOutcome</code> once the match is over, otherwise <code>combat.Outcome</code>) is not Interrupted. So a result is recorded as soon as it exists, and quitting before Continue cannot lose it. When <code>Play</code> returns, <code>PlayCircuitDuel</code> calls <code>ResolveDuel</code> with the same receipt. <code>ResolveDuelApplied</code> finds the receipt in <code>Run.AppliedReceipts</code> (or in an episode record) and returns an unchanged copy, so nothing is granted twice. When the rules call succeeds, <code>ApplyCircuit</code> calls <code>SaveCircuit</code>, which writes through <code>CaptureCircuitSave</code> and <code>circuitPersistence.Save</code>.</p>
+    <div class="note">Two related paths: a friendly game commits with <code>requireSaved</code>. If that save fails, <code>ApplyCircuit</code> keeps the previous state, <code>EpisodeSavePending</code> stays true and <code>RetryEpisodeSave</code> offers the same <code>ResolveDuel</code> again. And when a save is restored with a <code>PendingDuel</code> (the process quit mid-duel), <code>RestoreCircuit</code> resolves it as Interrupted, so the player comes back to the challenge without a made-up result. See <a href="saves.html">Saves &amp; Settings</a>.</div>
+  </section>
+
+  <section id="screens"><h2><span class="num">06</span>How the screen is decided</h2>
+    <p class="lead"><code>ExpeditionApp</code> has no screen enum. Every <code>ExpeditionView.Render</code> rebuilds the page and chooses what to draw from <code>FatalError</code>, <code>Kind</code>, <code>State</code> and a set of booleans. The order of the checks below is the real state machine.</p>
+    <div class="scrollx"><table>
+      <tr><th>Step</th><th>Check (in <code>ExpeditionView.cs</code>)</th><th>Draws</th></tr>
+      <tr><td>1</td><td><code>FatalError</code> not empty</td><td><code>Fatal()</code> and nothing else</td></tr>
+      <tr><td>2</td><td><code>RenderScreen</code>: <code>Handoff</code></td><td><code>Handoff()</code> (PASS THE SCREEN)</td></tr>
+      <tr><td></td><td>else <code>State != null</code></td><td><code>Battle()</code>, then <code>PracticePresentation()</code> if <code>IsPracticeTutorial</code>, otherwise <code>BattleResult()</code> if <code>State.IsOver</code> (skipped while <code>Busy</code>)</td></tr>
+      <tr><td></td><td>else <code>IsWorldMenuSession</code> and no focused window</td><td><code>WorldVersusHome()</code></td></tr>
+      <tr><td>3</td><td><code>RenderWindow</code>: no focused window</td><td><code>BuildConnectionScreens()</code>: deck choice if <code>DeckMenuOpen</code>, network menu if <code>NetworkMenuOpen</code>, "Connection interrupted" if <code>Networked</code>, there is a <code>State</code> and <code>!NetworkConnected</code></td></tr>
+      <tr><td></td><td>else the first of <code>WorldCardLibraryOpen</code>, <code>SettingsOpen</code>, <code>confirmTurn</code>, <code>FeedbackOpen</code>, <code>HelpOpen</code>, <code>MoveHelpOpen</code>, otherwise <code>Paused</code></td><td>Card library (drawn by a later pass), <code>SettingsScreen</code>, <code>EndTurnConfirmation</code>, <code>Feedback</code>, <code>Help</code>, <code>MoveHelp</code>, <code>Pause</code></td></tr>
+    </table></div>
+    <p>A "focused window" is <code>RenderFocusedWindow()</code>: <code>WorldCardLibraryOpen || SettingsOpen || confirmTurn || FeedbackOpen || HelpOpen || Paused || MoveHelpOpen</code>. <code>Pause()</code> branches again on view fields: <code>PracticePause</code> for practice, then <code>leaveQuestion</code>, then <code>confirmConcede</code> (Circuit matches), then <code>pauseMore</code>, then the break window. A Settings session has <code>SettingsOpen</code> set and no <code>State</code>, so it draws only the settings window.</p>
+    <div class="diagram"><pre class="mermaid">
+stateDiagram-v2
+  state "Loading (View is null)" as Loading
+  state "Fatal panel" as Fatal
+  state "Settings window only" as SettingsOnly
+  state "Versus home" as VersusHome
+  state "Battle board" as Board
+  state "Pass the screen" as Handoff
+  state "Battle result" as Result
+  state "Practice coach" as Coach
+  state "Lesson feedback, Next" as Feedback
+  state "Practice celebration" as Celebration
+  state "Window over the board" as Window
+  [*] --&gt; Loading
+  Loading --&gt; Fatal : FatalError set
+  Loading --&gt; SettingsOnly : Kind Settings
+  Loading --&gt; VersusHome : Kind Versus, State null
+  Loading --&gt; Board : Kind CircuitDuel or FriendlyGame
+  Loading --&gt; Coach : Kind Practice or Lesson
+  VersusHome --&gt; Handoff : NewLocalDuel
+  VersusHome --&gt; Board : network snapshot sets State
+  Board --&gt; Handoff : LocalDuel and EndTurn
+  Handoff --&gt; Board : ReadyHandoff
+  Board --&gt; Result : State.IsOver, not Busy
+  Board --&gt; Window : Paused, HelpOpen, SettingsOpen and others
+  Window --&gt; Board : Resume or ResumeMatch
+  Coach --&gt; Feedback : AuthoredLessonAwaitingContinue
+  Feedback --&gt; Coach : ContinueAuthoredLesson
+  Coach --&gt; Celebration : PracticeTutorialCompleted
+  Result --&gt; VersusHome : Versus, ReturnToWorldMenu
+  Result --&gt; [*] : ContinueAfterBattle, FinishSession(BattleOutcome)
+  Window --&gt; [*] : Circuit match, MainMenu or Concede, FinishSession
+  Coach --&gt; [*] : SkipPracticeTutorial
+  Celebration --&gt; [*] : FinishPracticeTutorial, FinishSession(Won)
+  SettingsOnly --&gt; [*] : CloseSettings, FinishSession(Interrupted)
+  VersusHome --&gt; [*] : CloseWorldMenu, FinishSession(Interrupted)
+  Fatal --&gt; [*] : bridge PollSession ends it
+</pre></div>
+    <p class="caption">The screen states of one <code>ExpeditionApp</code>, named here for reading; none of these names exist in code. Each label is the flag, <code>Kind</code> or method that actually moves between them. The coach is drawn over the battle board and can open the practice pause too. <code>Result → Versus home</code> is a local or LAN/relay match. A lobby match (<code>borrowedNetwork</code>) closes the whole session instead.</p>
+    <h3>Where the flags live, and who reads them</h3>
+    <p>The flags are spread over <code>ExpeditionApp.cs</code> (<code>FatalError</code>, <code>Handoff</code>, <code>Busy</code>, <code>Paused</code>, <code>HelpOpen</code>, <code>FeedbackOpen</code>), <code>.Settings</code> (<code>SettingsOpen</code>), <code>.Network</code> (<code>NetworkMenuOpen</code>, <code>DeckMenuOpen</code>, <code>Networked</code>, <code>ConnectionLost</code>), <code>.Queries</code> (<code>MoveHelpOpen</code>), <code>.WorldMenu</code> (<code>WorldCardLibraryOpen</code>), <code>.Practice</code> (<code>PracticeTutorialCompleted</code>) and <code>.Lessons</code> (<code>AuthoredLessonAwaitingContinue</code>). The view adds <code>confirmTurn</code> (<code>ExpeditionView.Shell.cs</code>) and <code>confirmConcede</code>, <code>pauseMore</code> and <code>leaveQuestion</code> (<code>ExpeditionView.Journey.cs</code>). Several helpers each list their own subset of these flags:</p>
+    <div class="scrollx"><table>
+      <tr><th>Flag</th><th><code>CanAct</code></th><th><code>UpdateRivalScreenOpen</code></th><th><code>CanContinueAuthoredLesson</code></th><th><code>RenderFocusedWindow</code></th><th><code>HandleWorldMenuBack</code></th><th><code>WorldVersusHomeCovered</code></th></tr>
+      <tr><td><code>Busy</code></td><td>✓</td><td>✓</td><td>✓</td><td></td><td>✓</td><td></td></tr>
+      <tr><td><code>Paused</code></td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td></td></tr>
+      <tr><td><code>SettingsOpen</code></td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td></tr>
+      <tr><td><code>HelpOpen</code></td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td></td></tr>
+      <tr><td><code>FeedbackOpen</code></td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td></td></tr>
+      <tr><td><code>Handoff</code></td><td>✓</td><td>✓</td><td>✓</td><td></td><td>✓</td><td></td></tr>
+      <tr><td><code>NetworkMenuOpen</code></td><td>✓</td><td></td><td>✓</td><td></td><td>✓</td><td>✓</td></tr>
+      <tr><td><code>DeckMenuOpen</code></td><td>✓</td><td></td><td>✓</td><td></td><td>✓</td><td>✓</td></tr>
+      <tr><td><code>WorldCardLibraryOpen</code></td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>closes it first</td><td>✓</td></tr>
+      <tr><td><code>MoveHelpOpen</code></td><td>✓ (except while an assisted move is submitting)</td><td>✓</td><td>✓</td><td>✓</td><td></td><td></td></tr>
+      <tr><td><code>confirmTurn</code> (view)</td><td>✓ (as <code>View.IsWorldReading</code>)</td><td></td><td>✓ (as <code>View.IsWorldReading</code>)</td><td>✓</td><td></td><td></td></tr>
+    </table></div>
+    <p>The table is a reading of <code>main</code>, not a spec. Some gaps are harmless. For example, the rival never runs in Versus, so <code>UpdateRivalScreenOpen</code> has no need to check the Versus menus. <code>Back</code> handles <code>MoveHelpOpen</code> before it calls <code>HandleWorldMenuBack</code>. Even so, a new window has to be added by hand to every list that should know about it. The small helper names, such as <code>CanActMenusClosed</code> and <code>UpdateRivalScreenOpen</code>, were split out of longer conditions by the complexity work (<a href="complexity.html">Complexity</a>).</p>
+  </section>
+
+  <section id="practice"><h2><span class="num">07</span>Practice, lessons and narration</h2>
+    <p class="lead">Practice and Lesson are ordinary hosted sessions. They use a different starting <code>State</code>, a command filter and a scripted partner. Every move still goes through <code>CombatRules.Resolve</code>. The player-facing behaviour and the content files are owned by <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CIRCUIT_FIRST_STEPS.md#playing-the-lesson">CIRCUIT_FIRST_STEPS</a> and <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CIRCUIT_LESSONS.md#how-a-practice-works">CIRCUIT_LESSONS</a>. This section shows where that behaviour lives in the session.</p>
+    <div class="grid c2">
+      <div class="card accent-green"><h4>Basic practice (<code>ExpeditionApp.Practice.cs</code>)</h4>
+        <p><code>ConfigurePracticeTutorial(json)</code> parses <code>PracticeTutorialContent</code>, the text from <code>Circuit/practice.json</code> that the world loaded at boot. <code>PreparePracticeTutorial</code> picks two simple units: the card ids named in that text if they qualify, otherwise the cheapest suitable catalogue cards. It copies <code>Content.MatchRules</code> with no opening hand and no empty-draw damage, and calls <code>CombatRules.NewMatch</code> with one card per side. The opposing heart total equals the player card's attack. Progress is the nine-value <code>PracticeTutorialStep</code> enum. <code>PracticeAllows</code> and <code>PracticeCanSelect</code> block every other move, and <code>PracticeOpponentCommand</code> scripts the partner.</p></div>
+      <div class="card accent-cyan"><h4>Authored lesson (<code>ExpeditionApp.Lessons.cs</code>)</h4>
+        <p><code>ConfigureAuthoredLesson</code> rejects a lesson without a scenario (<code>LessonRules.HasScenario</code>) and keeps its own JSON copy of the definition. <code>PrepareAuthoredLesson</code> runs <code>LessonRules.ValidateLesson</code>, then <code>LessonRules.Prepare</code> for the state and the alias bindings. Each step's expected command comes from <code>LessonRules.Command</code>, and <code>AuthoredAllows</code> compares with <code>LessonRules.Matches</code>. After a matching move, <code>AuthoredResolved</code> shows the step's <code>AfterPrompt</code>. <code>AuthoredLessonAwaitingContinue</code> then blocks both the player and the rival until <code>ContinueAuthoredLesson</code>.</p></div>
+    </div>
+    <ul>
+      <li><b>One instruction string.</b> <code>PracticeInstruction</code> is the text both the view and the narrator read. It comes from the lesson step, the practice step or the waiting line.</li>
+      <li><b>Again, Skip, Finish.</b> <code>RestartPracticeTutorial</code> stops coroutines, resets the screen and builds the practice again. It remembers an earlier win in <code>practiceWonEarlier</code>, so <code>PracticeWon</code> survives a replay. <code>SkipPracticeTutorial</code> finishes as Won if the practice was ever won, otherwise as Interrupted. <code>FinishPracticeTutorial</code> finishes as Won. All three reset <code>PracticeNarration</code>.</li>
+      <li><b><code>PracticeNarration</code></b> is a sibling component on the host, added only for Practice and Lesson. Its <code>Start</code> loads <code>StreamingAssets/Circuit/Voice/lines.json</code>. When <code>PracticeInstruction</code> changes and the board has settled, it plays the WAV whose <code>Text</code> matches the instruction exactly. <code>HoldAutomaticAdvance</code> is what makes the rival wait for the line. Every load has a timeout (<code>LoadTimeout</code>), and mute or zero volume never holds the lesson. The content rules are in <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CIRCUIT_FIRST_STEPS.md#spoken-guide">Spoken guide</a> and <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CIRCUIT_LESSONS.md#voice-coverage-and-limits">Voice, coverage and limits</a>.</li>
+      <li><b>What practice changes outside the session.</b> Only presentation flags in the save, and never a receipt, deck or run. <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CIRCUIT_FIRST_STEPS.md#practice-and-the-real-adventure">Practice and the real adventure</a> owns that promise. The lesson guide's <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CIRCUIT_LESSONS.md#integration-and-teaching-architecture">Integration and teaching architecture</a> covers how the lesson library reaches the session.</li>
+    </ul>
+    <div class="note warn">Practice still goes through <code>PrepareTable</code> first. The launcher passes the first non-champion opponent's encounter and the run's active deck, and <code>PrepareTableSessionDeck</code> checks that deck with <code>LegalMatchDeck</code>. An unplayable run deck can therefore stop a practice that never uses it.</div>
+  </section>
+
+  <section id="table"><h2><span class="num">08</span>The world table</h2>
+    <p class="lead">A session can be drawn on the 3D table in the world, not only on a flat screen. The world lends the session a <code>WorldTableContext</code>. The view puts a world-space card canvas on the table and, if the venue has one, instantiates a <code>WorldTablePresentation</code> for creatures and terrain.</p>
+    <ol class="steps">
+      <li><b>Lease.</b> <code>IsometricSlice.PrepareWorldTablePresentation(landmarkId)</code> returns the active context, or finds a table surface (the given landmark, else the nearest one). It saves the camera and builds <code>new WorldTableContext(WorldCamera, anchor, size, landmarkId, visuals.LivingTablePrefab(landmarkId))</code>, then seats the traveller and the opponent (<code>StageWorldTableCharacters</code>) and hides the table props. Versus lobby matches build their context with <code>LobbyContext</code> instead.</li>
+      <li><b>Camera in.</b> <code>BeginWorldTableSessionView</code> calls <code>context.Frame(...)</code> for the final camera pose and eases the camera there. With reduced motion it jumps.</li>
+      <li><b>Hand-over.</b> The bridge calls <code>ConfigureWorldTable(Table)</code> for every kind. <code>UsesWorldPresentation</code> is true when the context is <code>Valid</code>.</li>
+      <li><b>Cards on the table.</b> In each <code>Render</code>, <code>ExpeditionView.PrepareWorldTable</code> creates or updates the world-space canvas <code>Physical card table</code>, sized <code>WorldTableContext.Width</code> × <code>Height</code>. It is hidden during <code>Handoff</code>. <code>Battle()</code> switches to <code>WorldTableBattle()</code>.</li>
+      <li><b>Living table.</b> <code>RefreshLivingTable</code> instantiates <code>context.PresentationPrefab</code> as <code>Living table projections</code> and calls <code>Configure(context)</code>. While not <code>Busy</code>, it calls <code>Reconcile(State, viewer, reducedMotion)</code>.</li>
+      <li><b>Animation.</b> <code>ExpeditionView.AnimateCommand</code> and <code>AnimateEvents</code> call the living table's versions first. <code>WorldTablePresentation</code> sets a <code>pending</code> flag so <code>Reconcile</code> keeps the old board until the events finish. Its class comment sums it up: snapshots reconcile resting pieces, and resolved events alone play reactions. <code>CancelPresentation</code> stops any running animation and reconciles to a given state. The view calls it on handoff, and <code>RestartPracticeTutorial</code> calls it on practice restart.</li>
+      <li><b>Camera out.</b> <code>EndWorldTableSessionView</code> eases back and calls <code>ReleaseWorldTablePresentation</code>. That restores the characters, traveller and camera, shows the props again and clears <code>combat.Table</code>.</li>
+    </ol>
+    <p>The prefab comes from the authored venue bound to the landmark (<code>IsometricSectorVisuals.LivingTablePrefab</code>). Authored rooms and venues are on <a href="world.html">World &amp; Journal</a>.</p>
+  </section>
+
+  <section id="globals"><h2><span class="num">09</span>Global state around a session</h2>
+    <p class="lead">A session changes process-wide Unity state. <code>Awake</code> re-applies the saved preferences. <code>ExpeditionView.Initialize</code> makes the cursor visible and unlocked, and adds an <code>EventSystem</code> named <code>Expedition input</code> if none exists. The bridge therefore snapshots that state first and restores it afterwards.</p>
+    <div class="scrollx"><table>
+      <tr><th>Captured by <code>RuntimePreferences</code> (in <code>IsometricCombatBridge.cs</code>)</th><th>Restored as</th></tr>
+      <tr><td><code>QualitySettings.GetQualityLevel()</code></td><td><code>SetQualityLevel(quality, true)</code> if it changed</td></tr>
+      <tr><td><code>QualitySettings.renderPipeline</code></td><td><code>RestorePipeline()</code></td></tr>
+      <tr><td><code>QualitySettings.vSyncCount</code>, <code>Application.targetFrameRate</code></td><td>Assigned back</td></tr>
+      <tr><td><code>AudioListener.volume</code></td><td>Assigned back</td></tr>
+      <tr><td><code>Cursor.visible</code>, <code>Cursor.lockState</code></td><td>Assigned back</td></tr>
+      <tr><td><code>EventSystem.current</code>, its <code>sendNavigationEvents</code> and selection</td><td>Navigation flag restored. The old selection is restored if it is still active, otherwise cleared.</td></tr>
+    </table></div>
+    <ul>
+      <li><b>When.</b> The snapshot is taken at the start of <code>Play</code>. It is restored at the end of <code>Release</code> and again one frame later, just before the callback (<a href="#result">§05</a>).</li>
+      <li><b>During the session.</b> <code>ApplyRuntimePreferences</code> can change the quality level, which can swap the render pipeline. On every <code>SettingsChanged</code>, the bridge's <code>KeepWorldPipeline</code> puts the world's pipeline back.</li>
+      <li><b>Settings the player changed.</b> <code>ReleaseSettings</code> flushes them to <code>PlayerPrefs</code> and hands them out as <code>ResultSettings</code>: the session's normalized settings, or <code>ExpeditionApp.ReadPreferences()</code> if the host is already inactive. Each launcher then calls <code>ApplyWorldPreferences(combat.ResultSettings)</code>. That re-applies the preferences on top of the restored snapshot and keeps the world's pipeline. So a change made in Settings survives the restore. Preference storage is on <a href="saves.html">Saves &amp; Settings</a>.</li>
+    </ul>
+  </section>
+
+  <section id="fix"><h2><span class="num">10</span>What to weigh when fixing</h2>
+    <p class="lead">These are the structural points in this area that a fix would have to deal with. Each is checked against <code>main</code>. <a href="findings.html">Findings</a> ranks them against the rest of the codebase.</p>
+    <div class="grid c2">
+      <div class="card accent-red"><h4>A full app per screen</h4><p>Settings and the Versus menu get the same complete <code>ExpeditionApp</code> as a duel: a fresh <code>ContentPackFiles.Load</code>, a <code>GameAudioDirector</code>, media, a playtest service, saved preferences re-applied in <code>Awake</code>, and the whole snapshot and restore. Menu plans are tracked in the roadmap's <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Release/ROADMAP.md#menus-on-ui-toolkit">Menus on UI Toolkit</a>.</p></div>
+      <div class="card accent-gold"><h4>Screen state is implicit</h4><p>The only statement of which screen is showing is the order of checks in <code>Render</code>, <code>RenderScreen</code> and <code>RenderWindow</code>. The six helpers in the <a href="#screens">§06</a> table, and others such as <code>MoveHelpAvailableMenusClosed</code>, keep overlapping flag lists. <code>ResetScreen</code> clears most flags by hand. An explicit screen state would replace those lists.</p></div>
+      <div class="card accent-gold"><h4><code>PrepareTable</code> builds states it throws away</h4><p><code>BeginEncounter</code> builds a state that <code>CreateFairMatch</code> replaces on the next line. Practice and Lesson replace that state again. As a result, practice depends on an encounter id and a legal run deck it never plays (<a href="#practice">§07</a>).</p></div>
+      <div class="card accent-cyan"><h4>One result, two commit paths</h4><p>The receipt makes it safe, but committing is split between <code>CommitFinishedCircuitDuel</code> (per frame and on save or quit) and <code>PlayCircuitDuel</code> after <code>Play</code>. Practice, Versus and Settings pass <code>_ =&gt; { }</code> as the callback and read the bridge's properties instead.</p></div>
+      <div class="card accent-violet"><h4>Code in files named for other types</h4><p><code>ExpeditionView.ReleaseSessionSprites</code> and <code>FairMatchSetup</code> sit in <code>ExpeditionApp.Session.cs</code>. <code>ExpeditionApp.ConfigureWorldTable</code> sits in <code>WorldTableContext.cs</code>. <code>Tools/CircuitFieldSetupChecks/Run-Checks.ps1</code> cuts <code>FairMatchSetup</code> out of <code>ExpeditionApp.Session.cs</code> by searching for the text <code>internal static class FairMatchSetup</code>, so moving or renaming it fails that suite.</p></div>
+      <div class="card accent-red"><h4>The session reaches back into the world</h4><p><code>ExpeditionApp.EnterTableLobby</code> finds the world with <code>FindAnyObjectByType&lt;IsometricSlice&gt;()</code> and calls <code>OpenTableLobby</code>. Two values must also agree: the bridge's public <code>Kind</code> field and the app's <code>Kind</code> property. They agree today only because <code>Begin</code> derives one from the other.</p></div>
+    </div>
+  </section>
+
+  <div class="honest"><h4>Keep this page honest</h4><ul>
+    <li><code>Game/EmberGrove/Assets/Runtime/Exploration/IsometricCombatBridge.cs</code> — <code>Play</code>, <code>Begin</code>, <code>PollSession</code>, <code>Complete</code>, <code>Release</code>, <code>ReleaseSettings</code>, <code>KeepWorldPipeline</code>, <code>RuntimePreferences</code></li>
+    <li><code>Game/EmberGrove/Assets/Runtime/ExpeditionApp.Session.cs</code> — <code>HostedSessionKind</code>, the encounter, deck, friendly-episode and settings <code>Configure*</code> methods, <code>PrepareTable</code>, <code>FinishSession</code>, <code>ReleasePresentation</code>, <code>FairMatchSetup</code></li>
+    <li><code>Game/EmberGrove/Assets/Runtime/ExpeditionApp.cs</code> — <code>Start</code>, <code>Update</code>, the rival loop, <code>Submit</code>, <code>ResolveLocal</code>, <code>Present</code>, <code>ContinueAfterBattle</code>, <code>Concede</code>, <code>MainMenu</code>, <code>CanAct</code> and its helpers</li>
+    <li><code>Game/EmberGrove/Assets/Runtime/ExpeditionApp.Practice.cs</code>, <code>ExpeditionApp.Lessons.cs</code>, <code>ExpeditionApp.WorldMenu.cs</code>, <code>ExpeditionApp.Settings.cs</code> — practice and lesson flow, Versus open and close, <code>InitializeSettings</code>, <code>CloseSettings</code>, <code>ApplyRuntimePreferences</code></li>
+    <li><code>Game/EmberGrove/Assets/Runtime/ExpeditionView.cs</code> — <code>Render</code>, <code>RenderFocusedWindow</code>, <code>RenderScreen</code>, <code>RenderWindow</code>; <code>ExpeditionView.Journey.cs</code> — <code>BattleResult</code>, <code>Pause</code>; <code>ExpeditionView.Connection.cs</code> — <code>BuildConnectionScreens</code></li>
+    <li><code>Game/EmberGrove/Assets/Runtime/ExpeditionView.Motion.cs</code>, <code>ExpeditionView.WorldTable.cs</code>, <code>WorldTableContext.cs</code>, <code>WorldTablePresentation.cs</code> — the world table and living-table animation</li>
+    <li><code>Game/EmberGrove/Assets/Runtime/PracticeNarration.cs</code> — voice loading, exact-text matching, <code>HoldAutomaticAdvance</code></li>
+    <li><code>Game/EmberGrove/Assets/Runtime/Exploration/IsometricSlice.Circuit.cs</code> — <code>PlayCircuitDuel</code>, <code>CommitFinishedCircuitDuel</code>, <code>ApplyCircuit</code>, <code>SaveCircuit</code>, the restore-time Interrupted resolve; <code>IsometricSlice.cs</code> — <code>UpdateFrameEncounter</code>; <code>IsometricSlice.Progress.cs</code> — <code>SaveProgress</code>, <code>SaveBeforeQuit</code></li>
+    <li><code>Game/EmberGrove/Assets/Runtime/Exploration/IsometricSlice.Onboarding.cs</code>, <code>.Versus.cs</code>, <code>.Settings.cs</code>, <code>.Table.cs</code>, <code>.Learning.cs</code> — the other launchers, <code>ConfigureCircuitMatch</code> and the table lease</li>
+    <li><code>Toolkit/Packages/com.catsplat.cardforge/Runtime/Circuit/CircuitRules.cs</code> — <code>BeginDuel</code>, <code>ResolveDuel</code>, <code>ResolveDuelApplied</code></li>
+    <li><code>Tools/CircuitFieldSetupChecks/Run-Checks.ps1</code> — the text search that extracts <code>FairMatchSetup</code></li>
+  </ul></div>
+</main>
+<footer>Bloomfire Wiki · page source <code>Docs/Wiki/sessions.html</code>, built by <code>Tools/Documentation/structure_wiki.py</code> · Found a mistake? Fix it in the same commit as the code that made it one.</footer>
+</body>
+</html>

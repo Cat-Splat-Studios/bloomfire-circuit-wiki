@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Builds &amp; Tools — Bloomfire Wiki</title>
+<link rel="stylesheet" href="wiki.css">
+<script src="mermaid.min.js" defer></script>
+<script src="wiki.js" defer></script>
+</head>
+<body>
+<nav class="wiki">
+  <a class="home" href="index.html">🔥 Bloomfire Wiki</a>
+  <div class="grp"><span class="grp-t">Start here</span>
+    <a href="codebase-tour.html">Codebase Tour</a>
+    <a href="glossary.html">Glossary</a>
+  </div>
+  <div class="grp"><span class="grp-t">Game systems</span>
+    <a href="rules.html">Rules Engine</a>
+    <a href="world.html">World &amp; Journal</a>
+    <a href="sessions.html">Hosted Sessions</a>
+    <a href="ui.html">UI &amp; Menus</a>
+    <a href="networking.html">Networking</a>
+    <a href="content.html">Content &amp; Media</a>
+    <a href="saves.html">Saves &amp; Settings</a>
+  </div>
+  <div class="grp"><span class="grp-t">Code health</span>
+    <a href="diagrams.html">Diagrams</a>
+    <a href="complexity.html">Complexity</a>
+    <a href="findings.html">Findings</a>
+  </div>
+  <div class="grp"><span class="grp-t">Ship &amp; maintain</span>
+    <a href="qa.html">QA &amp; Rehearsals</a>
+    <a class="on" href="builds.html">Builds &amp; Tools</a>
+    <a href="maintaining.html">Maintaining</a>
+  </div>
+</nav>
+<header class="page"><h1>How a build is <span class="flame">made</span></h1><p class="tag">The Unity build owner <code>IsometricSliceBuild</code>, the defines it sets, the identity files it writes and the PowerShell scripts that turn players into checked packages. Also the other tools in <code>Tools/</code>, and which file owns each version number.</p></header>
+<main>
+
+<div class="tldr"><h4>In 60 seconds</h4><ul>
+  <li><b>One build owner.</b> Every player build goes through one private method, <code>IsometricSliceBuild.Build(rehearsal, target)</code>, in <code>Assets/Editor</code>. The menu items and the batch <code>-executeMethod</code> entries are thin wrappers around it (<a href="#entries">§02</a>, <a href="#build">§03</a>).</li>
+  <li><b>QA is a define, not a scene.</b> A rehearsal build is the same scene and content with <code>CIRCUIT_QA</code> added through <code>extraScriptingDefines</code>. <code>-expedition-network-qa</code> also adds <code>EMBERGROVE_QA</code>. The project-wide defines contain neither (<a href="#defines">§04</a>).</li>
+  <li><b>Every build leaves an identity.</b> <code>build-report.txt</code> and <code>build-info.json</code> sit beside the player. The JSON records the version, build GUID and the hash of <code>Assembly-CSharp.dll</code>, which the rehearsal report and the packager must match (<a href="#identity">§05</a>).</li>
+  <li><b>A candidate is proved before it is packaged.</b> <code>Tools/Package-Isometric.ps1</code> snapshots the source, then in a second run requires fresh shipping and QA builds and a passing rehearsal of that exact QA build, runs <code>Validate-CircuitPlayer.ps1</code> on both, and only then writes the ZIP and its sidecars (<a href="#candidate">§06</a>).</li>
+  <li><b>The editor owns the product version.</b> <code>bundleVersion</code> in <code>ProjectSettings.asset</code> (Player Settings › Version) is the product version. A candidate passes its own label, and the build puts the old value back afterwards (<a href="#versions">§10</a>).</li>
+</ul></div>
+
+<div class="prereq"><h4>Before you start</h4><p>This page explains structure. The step-by-step procedures, the command lines and the current evidence are in <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/MAINTAINING.md#verify-and-build-the-game">MAINTAINING § Verify and build the game</a> and the sections after it. What the rehearsal does once it is built is on <a href="qa.html">QA &amp; Rehearsals</a>.</p></div>
+
+<section id="anatomy"><h2><span class="num">01</span>Where the pieces live</h2>
+  <p class="lead">One Unity editor class builds players. PowerShell scripts in <code>Tools/</code> drive it in batch mode, then inspect and package what it wrote. Players, packages, evidence and reports go to the ignored <code>Builds/</code> and <code>Temp/</code> folders at the repository root.</p>
+  <div class="scrollx"><table>
+    <tr><th>Piece</th><th>File</th><th>Role</th></tr>
+    <tr><td>Build owner</td><td><a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Game/EmberGrove/Assets/Editor/IsometricSliceBuild.cs"><code>Game/EmberGrove/Assets/Editor/IsometricSliceBuild.cs</code></a></td><td><code>public static class EmberGrove.Editor.IsometricSliceBuild</code>. It holds the build entries, the scene and room authoring commands, content staging, the nested <code>PrivateRelayQaBuildGuard</code> and <code>BuildPreferences</code>, and (as a separate class in the same file) <code>AndroidNetworkQaLinker</code>. It is not partial.</td></tr>
+    <tr><td>Candidate packager</td><td><a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Tools/Package-Isometric.ps1"><code>Tools/Package-Isometric.ps1</code></a></td><td><code>-PrepareReviewEvidence</code>, then <code>-ReviewCandidate</code></td></tr>
+    <tr><td>Assembly contract</td><td><a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Tools/Validate-CircuitPlayer.ps1"><code>Tools/Validate-CircuitPlayer.ps1</code></a></td><td>Reads a built <code>Assembly-CSharp.dll</code> with <code>Unity.Cecil</code></td></tr>
+    <tr><td>Private relay pair</td><td><a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Tools/Build-PrivateNetworkPair.ps1"><code>Tools/Build-PrivateNetworkPair.ps1</code></a></td><td>Eight batch-editor stages for the private Windows and Android QA players</td></tr>
+    <tr><td>Toolkit package</td><td><a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Tools/Package-Toolkit.ps1"><code>Tools/Package-Toolkit.ps1</code></a></td><td>The CardForge ZIP, checked by an isolated consumer</td></tr>
+    <tr><td>Relay companion</td><td><a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Tools/ExpeditionRelay/Publish-Relay.ps1"><code>Tools/ExpeditionRelay/Publish-Relay.ps1</code></a>, <code>Package-Relay.ps1</code></td><td>The Windows relay app, or the relay's container source</td></tr>
+    <tr><td>Studio handoff</td><td><a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Tools/ContentStudio/Publish-Studio.ps1"><code>Tools/ContentStudio/Publish-Studio.ps1</code></a></td><td>The Content Studio app plus handbook, as a ZIP</td></tr>
+    <tr><td>Versions</td><td><code>Game/EmberGrove/ProjectSettings/ProjectSettings.asset</code>, <code>ProjectVersion.txt</code></td><td><code>bundleVersion</code> and the Unity editor version (<a href="#versions">§10</a>)</td></tr>
+  </table></div>
+  <p>Where finished output should be kept, and what may be deleted, is decided by <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/MAINTAINING.md#local-output-retention">MAINTAINING § Local output retention</a>.</p>
+</section>
+
+<section id="entries"><h2><span class="num">02</span><code>IsometricSliceBuild</code> entry points</h2>
+  <p class="lead">Four menu items build players, and one menu item runs the Android preflight. The other Android and private-relay steps exist only as batch entries, called with <code>-batchmode -quit -projectPath … -executeMethod EmberGrove.Editor.IsometricSliceBuild.&lt;Method&gt;</code>.</p>
+  <div class="scrollx"><table>
+    <tr><th>Method</th><th>Menu (<span class="kbd">Bloomfire Circuit ▸ …</span>)</th><th>Does</th></tr>
+    <tr><td><code>CircuitWindows</code></td><td>Build Windows</td><td><code>Build(false)</code>: Windows x64 shipping player, no QA define</td></tr>
+    <tr><td><code>CircuitRehearsal</code></td><td>Build Windows rehearsal</td><td><code>Build(true)</code>: the same player with <code>CIRCUIT_QA</code></td></tr>
+    <tr><td><code>CircuitMac</code></td><td>Build macOS (Intel)</td><td><code>Build(false, StandaloneOSX)</code></td></tr>
+    <tr><td><code>CircuitMacRehearsal</code></td><td>Build macOS rehearsal (Intel)</td><td><code>Build(true, StandaloneOSX)</code></td></tr>
+    <tr><td><code>CircuitAndroidPreflight</code></td><td>Check Android development prerequisites</td><td>Read-only. Checks the editor's Android tools, the saved scene and the content identity, and logs <code>ANDROID PREFLIGHT PASS</code>.</td></tr>
+    <tr><td><code>CircuitAndroidCaptureBuildState</code></td><td>—</td><td>Copies <code>ProjectSettings.asset</code>, <code>GraphicsSettings.asset</code> and <code>QualitySettings.asset</code>, plus the Android defines and the original target, into a fresh <code>-circuit-build-state</code> folder under <code>Temp</code>.</td></tr>
+    <tr><td><code>CircuitAndroidPreparationChecks</code></td><td>—</td><td>Rejects bad ABI, graphics API and MSAA values. Calls <code>ExpeditionHarness.CheckAndroidNetworkLaunch</code>. Applies temporary overrides, fails on purpose, and proves that <code>BuildPreferences</code> restores them.</td></tr>
+    <tr><td><code>CircuitPrivateRelayQaPreparationChecks</code></td><td>—</td><td>Runs the private-relay guard against fixture inputs and expects every invalid combination to be refused.</td></tr>
+    <tr><td><code>CircuitAndroidDevelopment</code></td><td>—</td><td><code>Build(false, Android)</code>: development APK with no QA define</td></tr>
+    <tr><td><code>CircuitAndroidRehearsal</code></td><td>—</td><td>Refuses to run without <code>-expedition-network-qa</code>, then calls <code>Build(true, Android)</code></td></tr>
+    <tr><td><code>CircuitAndroidRestoreBuildState</code></td><td>—</td><td>Run with the <i>original</i> <code>-buildTarget</code>. Verifies the backup hashes and that nothing else changed, then writes the three settings files and the Android defines back.</td></tr>
+  </table></div>
+  <p>The same class also owns authoring commands that are not builds: <span class="kbd">Create circuit journey</span> (<code>CreateCircuitScene</code>), <span class="kbd">Stage content for editor</span> (<code>StageCircuitContent</code>), <span class="kbd">Create lodge waybook</span> and the <span class="kbd">Rooms ▸ …</span> commands (<code>ExtractSelectedRooms</code>, <code>UseSelectedRooms</code>, <code>CreateAlternateTableRoom</code>, <code>CreateReusableDistrict</code>). The arguments each Android step takes are listed in <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/MAINTAINING.md#android-development-build">MAINTAINING § Android development build</a>.</p>
+</section>
+
+<section id="build"><h2><span class="num">03</span>Inside <code>Build()</code></h2>
+  <p class="lead">Every player build runs the same steps: validate, stage content, snapshot the editor's settings, override them for the build, build, write the identity, and restore the settings in a <code>finally</code>.</p>
+  <div class="diagram"><pre class="mermaid">flowchart TD
+  entry["menu item or -executeMethod"] --&gt; build["Build(rehearsal, target)"]
+  build --&gt; relay["PrivateRelayQaRequest: null unless a private pair asked for it"]
+  relay --&gt; isAndroid{"Android target?"}
+  isAndroid --&gt;|yes| droid["ValidateAndroidPrerequisites, version code, ABI, AndroidContentIdentity"]
+  isAndroid --&gt;|no| out
+  droid --&gt; out["BuildOutput: default folder, or a fresh -circuit-build-output"]
+  out --&gt; scene["ValidateBuildScene(CircuitJourney.unity)"]
+  scene --&gt; stage["StageSector, StageEncounterContent, StageCircuit"]
+  stage --&gt; snap["new BuildPreferences(target)"]
+  snap --&gt; set["set product, company, bundleVersion, backend, render pipeline"]
+  set --&gt; inst["PrivateRelayQaScope.Install, private pair only"]
+  inst --&gt; player["BuildPipeline.BuildPlayer with extraScriptingDefines"]
+  player --&gt; files[("build-report.txt and build-info.json")]
+  files --&gt; fin["finally: dispose the private scope, previous.Restore()"]</pre></div>
+  <p class="caption">The order of <code>Build()</code>. A failure at any step throws. Once <code>BuildPreferences</code> has taken its snapshot, the <code>finally</code> restores the editor's player settings and the exact bytes of the three settings files.</p>
+  <ul>
+    <li><b>Staging.</b> Content moves from the repository into the ignored <code>Assets/StreamingAssets</code>. <code>StageSector</code> validates and copies <code>Content/Exploration/sector.json</code>. <code>StageEncounterContent</code> validates the default pack and copies <code>Content/EmberGroveDefault</code> into <code>StreamingAssets/Content</code>. <code>StageCircuit</code> validates <code>lessons.json</code> and copies the Circuit sidecars and voice files. How the game reads them back is on <a href="content.html">Content &amp; Media</a>.</li>
+    <li><b>Overrides.</b> The build sets the product name to "Bloomfire Circuit", or "Bloomfire Circuit QA" for an Android rehearsal. It also sets the company "Cat Splat Studios", the version, the window defaults (3840×2160 fullscreen on the Mac, a 1600×900 window on Windows), Mono for desktop and IL2CPP ARM64 for Android, low managed stripping, and the Circuit world render pipeline. <code>BuildPreferences</code> captured all of these first. It also keeps the raw bytes of the three settings files, because <code>BuildPlayer</code> writes overrides to disk.</li>
+    <li><b>Build options.</b> LZ4HC compression and a detailed build report always. Android adds <code>Development</code>. Android and private builds add <code>CleanBuildCache</code>, so a cached scene override cannot leak into a later baseline.</li>
+    <li><b>Output.</b> With no candidate arguments, a desktop build goes to <code>Builds/CircuitJourney</code>, <code>CircuitJourneyQA</code>, <code>CircuitJourneyMac</code> or <code>CircuitJourneyMacQA</code>, under the stem <code>BloomfireCircuit</code>. Android always needs both <code>-circuit-build-output</code> and <code>-circuit-build-version</code>. A candidate output must be a new or empty folder under <code>Builds</code> or <code>Temp</code> that does not pass through a linked directory.</li>
+  </ul>
+</section>
+
+<section id="defines"><h2><span class="num">04</span>Compile-time defines</h2>
+  <p class="lead">The QA defines never appear in <code>ProjectSettings.asset</code>; its Standalone defines are <code>SENTIS_ANALYTICS_ENABLED;APP_UI_EDITOR_ONLY</code>, and its Android defines are empty. <code>Build()</code> passes them per build through <code>BuildPlayerOptions.extraScriptingDefines</code>, so an editor session and every ordinary build compile without them.</p>
+  <div class="scrollx"><table>
+    <tr><th>Define</th><th>Set by</th><th>Turns on</th></tr>
+    <tr><td><code>CIRCUIT_QA</code></td><td><code>Build(true, …)</code>: <code>CircuitRehearsal</code>, <code>CircuitMacRehearsal</code>, <code>CircuitAndroidRehearsal</code></td><td>The ten <code>CircuitSliceChecks</code> files and the <code>CIRCUIT_QA</code> blocks in the game code (<a href="qa.html#seams">qa.html §10</a>)</td></tr>
+    <tr><td><code>EMBERGROVE_QA</code></td><td><code>Build(true, …)</code> when <code>-expedition-network-qa</code> is on the editor's command line; always together with <code>CIRCUIT_QA</code></td><td><code>ExpeditionHarness</code> and its hooks in <code>ExpeditionApp.Network.cs</code> and <code>IsometricSlice.Versus.cs</code>. <code>ExpeditionHarness.cs</code> raises <code>#error</code> if it is set without <code>CIRCUIT_QA</code>.</td></tr>
+    <tr><td><code>EMBERGROVE_PRIVATE_RELAY_QA</code></td><td><code>Build()</code> for an authorised private-relay request, with both QA defines</td><td>The generated <code>PrivateRelayQaSettings</code> type and the private-relay blocks in <code>ExpeditionApp.Network.cs</code>. The build guard refuses a build if this define is in the project-wide settings (<a href="#private">§09</a>).</td></tr>
+    <tr><td><code>CIRCUIT_PERSISTENCE_PORTABLE</code></td><td><code>Tools/CircuitPersistenceChecks/CircuitPersistenceChecks.csproj</code></td><td><code>CircuitPersistenceVerification.cs</code> outside Unity</td></tr>
+    <tr><td><code>CARDFORGE_HEADLESS</code></td><td><code>Tools/ExpeditionRelay/ExpeditionRelay.csproj</code>, <code>Tools/ContentStudio/ContentStudio.csproj</code></td><td>Leaves out the Unity file loaders in <code>ContentPackFiles.cs</code> and <code>ExpeditionContent.cs</code></td></tr>
+    <tr><td><code>STUDIO_DESKTOP</code></td><td><code>ContentStudio.csproj</code> with <code>-p:StudioDesktop=true</code></td><td>The WinForms and WebView2 host, <code>DesktopHost.cs</code></td></tr>
+    <tr><td><code>BASELINE_CORE</code></td><td><code>Tools/ExpeditionPerformance/ExpeditionPerformance.csproj</code> with <code>-p:BaselineCore=true</code></td><td>The historical-core comparison build of the benchmark</td></tr>
+  </table></div>
+  <p>Unity's own <code>UNITY_EDITOR</code> also turns on the rehearsal and harness code, because their guards read <code>UNITY_EDITOR || …</code>; that is why the rehearsals run in Play Mode. The private-relay blocks are the exception: they require <code>!UNITY_EDITOR</code>. <code>UNITY_ANDROID</code> is compiled correctly only when Android is the active target before the build starts, which is why <code>Build()</code> refuses an Android build from another active target.</p>
+</section>
+
+<section id="identity"><h2><span class="num">05</span><code>build-info.json</code> and its sidecars</h2>
+  <p class="lead">After <code>BuildPlayer</code> returns, <code>Build()</code> writes two files beside the player, whether the build passed or failed. Both scripts identify a build by the GUID and hashes in these files.</p>
+  <div class="grid c2">
+    <div class="card accent-ember"><h4><code>build-report.txt</code></h4><p>One line: the result, total size, errors, warnings and time. <code>Package-Isometric.ps1</code> accepts only a report that starts with <code>Succeeded:</code> and contains <code>, 0 errors,</code>.</p></div>
+    <div class="card accent-gold"><h4><code>build-info.json</code> (<code>BuildIdentity</code>, schema 1)</h4><p><b>What was built:</b> <code>Version</code>, <code>Rehearsal</code>, <code>Scene</code>, <code>Platform</code>, <code>Architecture</code>, <code>Development</code>, <code>ApplicationId</code>, <code>UnityVersion</code>, <code>Backend</code>, graphics APIs and MSAA. <b>Proof:</b> <code>BuildGuid</code>, <code>Result</code>, <code>Errors</code>, <code>Warnings</code>, <code>StartedUtc</code> and <code>CompletedUtc</code>, <code>AssemblySha256</code> (desktop) or <code>ArtifactSha256</code> (Android APK). <b>Android content identity:</b> <code>ContentSha256</code>, <code>Fingerprint</code>, <code>ContentVersion</code>, <code>Protocol</code>, <code>RulesVersion</code> and <code>NetworkRulesVersion</code>, plus the version code and API levels.</p></div>
+  </div>
+  <p>Three pieces depend on them. The rehearsal writes its own <code>BuildGuid</code>, <code>AssemblySha256</code> and <code>Version</code> into <code>verification.txt</code> for comparison (<a href="qa.html#report">qa.html §06</a>). <code>Validate-CircuitPlayer.ps1</code> refuses to run when <code>Platform</code> or <code>Architecture</code> differ from what was asked; a Mac player needs <code>build-info.json</code> to exist at all. <code>Package-Isometric.ps1</code> ties the three together, as the next section shows.</p>
+  <p>The packager adds more files at each stage:</p>
+  <div class="scrollx"><table>
+    <tr><th>Where</th><th>File</th><th>Written by</th></tr>
+    <tr><td>Evidence directory</td><td><code>source-snapshot.json</code></td><td><code>-PrepareReviewEvidence</code>: the SHA-256 of every non-ignored file under <code>Game/EmberGrove</code>, <code>Toolkit/Packages</code> and <code>Content</code>, plus the packager and validator scripts (uncommitted edits included), with the <code>HEAD</code> revision</td></tr>
+    <tr><td>Evidence directory</td><td><code>candidate-evidence.json</code>, <code>production-assembly-validation.json</code>, <code>rehearsal-assembly-validation.json</code></td><td><code>-ReviewCandidate</code>, only after every check passed</td></tr>
+    <tr><td>Inside the ZIP</td><td><code>START_GAME.cmd</code> or <code>START_GAME.command</code>, <code>START_HERE.txt</code>, <code>CREDITS.txt</code>, <code>CANDIDATE.json</code>, <code>Licenses/</code>, <code>Provenance/</code>, <code>MANIFEST.sha256</code></td><td><code>-ReviewCandidate</code>; the manifest covers every other file in the payload</td></tr>
+    <tr><td>Beside the ZIP</td><td><code>&lt;zip&gt;.sha256</code>, <code>&lt;zip&gt;.manifest.sha256</code>, <code>&lt;zip&gt;.validation.json</code></td><td><code>-ReviewCandidate</code>, after reading the ZIP back and re-hashing every entry</td></tr>
+  </table></div>
+</section>
+
+<section id="candidate"><h2><span class="num">06</span>The candidate pipeline</h2>
+  <p class="lead">An internal preview candidate is one platform's shipping player, packaged only after a QA build from the same source passed a rehearsal. <code>Package-Isometric.ps1</code> runs in two separate invocations, before and after the builds. The second one refuses anything stale, mismatched or changed.</p>
+  <div class="diagram"><pre class="mermaid">flowchart TD
+  prep["Package-Isometric.ps1 -PrepareReviewEvidence"] --&gt; snap[("source-snapshot.json")]
+  prep -.-&gt; checks["Run-Checks.ps1, run by the maintainer, not read by the packager"]
+  snap --&gt;|started after the snapshot| qa["CircuitRehearsal build, CIRCUIT_QA"]
+  snap --&gt;|started after the snapshot| ship["CircuitWindows build, no QA define"]
+  qa --&gt; qainfo[("QA build-info.json and build-report.txt")]
+  ship --&gt; shipinfo[("shipping build-info.json and build-report.txt")]
+  qa --&gt; run["QA player -batchmode -circuit-verify dir"]
+  run --&gt; ver[("verification.txt and captures")]
+  snap &amp; qainfo &amp; shipinfo &amp; ver --&gt; review["Package-Isometric.ps1 -ReviewCandidate"]
+  review --&gt; gate{"source unchanged, builds fresh, hashes and identities match?"}
+  gate --&gt;|no| stop["throw, no ZIP or evidence written"]
+  gate --&gt;|yes| val["Validate-CircuitPlayer.ps1 on the shipping and the QA player"]
+  val --&gt; content["StreamingAssets equals canonical Content in both players and the payload"]
+  content --&gt; zip[("ZIP and its three sidecars")]
+  content --&gt; evid[("candidate-evidence.json and both assembly reports")]</pre></div>
+  <p class="caption">The Windows candidate. The Mac candidate is the same sequence run on the Mac, using <code>CircuitMacRehearsal</code> and <code>CircuitMac</code> and passing <code>-Platform macOS -Architecture x86_64</code> to both packager steps.</p>
+  <p>What <code>-ReviewCandidate</code> checks before it writes the archive or any evidence, in order:</p>
+  <ol class="steps">
+    <li><b>Same source.</b> The current file hashes must equal <code>source-snapshot.json</code>. They are checked again after the ZIP is built, so an edit during packaging also fails.</li>
+    <li><b>Fresh, separate builds.</b> Both players must have a successful <code>build-info.json</code> that started after the snapshot. They must disagree on <code>Rehearsal</code> and agree on <code>Version</code>, and each <code>AssemblySha256</code> must equal the hash of the DLL now on disk. The shipping build folder must not end in <code>QA</code>.</li>
+    <li><b>The rehearsal ran this QA build.</b> <code>verification.txt</code> must start with <code>PASS Bloomfire circuit rehearsal</code> and be written after the QA build finished. Its <code>BuildGuid</code>, <code>AssemblySha256</code> and <code>Version</code> lines must equal the QA <code>build-info.json</code>.</li>
+    <li><b>The assembly contract.</b> <code>Validate-CircuitPlayer.ps1</code> runs against both players (<a href="#validate">§07</a>).</li>
+    <li><b>Exact content.</b> Every file under each player's <code>StreamingAssets</code>, and under the payload copy, must hash-match the canonical <code>Content/</code> set, with nothing extra and nothing missing.</li>
+  </ol>
+  <p>The commands, the batch method table and the Mac launch flags are owned by <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/MAINTAINING.md#internal-preview-candidate">MAINTAINING § Internal preview candidate</a>. Which candidates exist and what they were cleared for is in the <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Release/ROADMAP.md">roadmap</a>.</p>
+</section>
+
+<section id="validate"><h2><span class="num">07</span>The assembly contract</h2>
+  <p class="lead"><code>Tools/Validate-CircuitPlayer.ps1</code> is the one place that says what a built <code>Assembly-CSharp.dll</code> must and must not contain. It loads <code>Unity.Cecil.dll</code> from the editor that <code>ProjectVersion.txt</code> names, or from <code>-CecilPath</code>, and reads the player DLL without running it.</p>
+  <div class="scrollx"><table>
+    <tr><th>Check</th><th>Shipping player</th><th>Rehearsal player (<code>-Rehearsal</code>)</th></tr>
+    <tr><td>Required types: <code>TravellerWaybookFrame</code>, <code>PracticeNarration</code>, <code>ExpeditionApp</code>, <code>WorldTableContext</code>, <code>WorldTablePresentation</code>, <code>CardArtworkCache</code></td><td>Present</td><td>Present</td></tr>
+    <tr><td><code>ExpeditionApp.ConfigureAuthoredLesson</code></td><td>Exactly one</td><td>Exactly one</td></tr>
+    <tr><td>Types named <code>CircuitSliceChecks</code> or <code>ExpeditionHarness</code></td><td>None</td><td><code>CircuitSliceChecks</code> present</td></tr>
+    <tr><td>A <code>RehearsalOwnsFocus</code> field</td><td>None</td><td>—</td></tr>
+    <tr><td>Members matching <code>TestingAllCards</code> or <code>TestingSave</code></td><td>None</td><td>At least one</td></tr>
+    <tr><td><code>ldstr</code> of <code>-circuit-all-cards</code>, <code>testing-all-cards</code> or <code>Bloomfire.Testing.AllCards</code></td><td>None</td><td>—</td></tr>
+  </table></div>
+  <p>It writes a JSON report (by default <code>Temp/CircuitPlayerValidation/production-assembly-validation.json</code>) and throws on a fail. <code>Build-PrivateNetworkPair.ps1</code> calls it for each Windows player it builds. Desktop Mono validation does not cover the Android IL2CPP player; MAINTAINING lists what to inspect in an APK instead.</p>
+</section>
+
+<section id="android"><h2><span class="num">08</span>Android builds</h2>
+  <p class="lead">Android uses the same <code>Build()</code>, with more checks before and a strict rule around the active platform. Switching Unity to Android rewrites settings and defines, so the original state is captured first and restored by a separate editor run.</p>
+  <ol class="steps">
+    <li><b>Capture</b> with <code>CircuitAndroidCaptureBuildState</code> while the original target is active.</li>
+    <li><b>Check</b> with <code>CircuitAndroidPreparationChecks</code>. For a private pair, also run <code>CircuitPrivateRelayQaPreparationChecks</code>.</li>
+    <li><b>Build</b> with <code>-buildTarget Android</code>, using <code>CircuitAndroidDevelopment</code> or <code>CircuitAndroidRehearsal</code>. Both need an explicit <code>-circuit-build-output</code>, version label and <code>-circuit-android-version-code</code>, and <code>-circuit-android-abi arm64</code> is required. <code>-circuit-android-graphics-api gles3</code> and <code>-circuit-android-msaa 1</code> are optional, and MSAA is allowed only with GLES3. The content identity (<code>AndroidContentIdentity</code>) is computed before staging and compared with the staged combat file after it. The version label must satisfy the pack manifest's <code>MinimumGameVersion</code>; only the Android build path checks this.</li>
+    <li><b>Restore</b> with <code>CircuitAndroidRestoreBuildState</code> and the recorded original <code>-buildTarget</code>, after success <i>or</i> failure.</li>
+  </ol>
+  <p>Only an Android rehearsal sets <code>AndroidNetworkQaBuild</code>. During that build <code>AndroidNetworkQaLinker</code> (an <code>IUnityLinkerProcessor</code>) writes a <code>link.xml</code> preserving all of <code>Assembly-CSharp</code>, because IL2CPP stripping would otherwise remove the private members the harness reaches by reflection. An ordinary Android build registers nothing. The reasons for the GLES3 and MSAA options, and the APK inspection list, are in <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/MAINTAINING.md#android-development-build">MAINTAINING § Android development build</a>.</p>
+</section>
+
+<section id="private"><h2><span class="num">09</span>The private relay pair and its guard</h2>
+  <p class="lead">The private QA players carry a tester access key for one hosted relay, so the code around them is built to keep that key out of command lines, logs, source control and every other build. Two pieces do this: an orchestration script that alone may supply the key, and a build guard that runs for every Unity build.</p>
+  <div class="diagram"><pre class="mermaid">flowchart TD
+  pre["preconditions: Windows, STA, the pinned Unity editor, unexpired window, a network-qa version label, no generated residue, no editor or game process running, one workflow at a time"] --&gt; s1
+  s1["01 CircuitAndroidCaptureBuildState"] --&gt; s2["02 CircuitAndroidPreparationChecks"]
+  s2 --&gt; s3["03 CircuitPrivateRelayQaPreparationChecks"]
+  s3 --&gt; s4["04 CircuitWindows: ordinary control build"]
+  s4 --&gt; key["masked dialog: Request-ExistingKey, then Confirm-ExistingAccess"]
+  key --&gt; s5["05 CircuitRehearsal: private Windows-QA"]
+  s5 --&gt; s6["06 CircuitAndroidRehearsal: private Android-QA"]
+  s6 --&gt; s7["07 CircuitWindows: control after private"]
+  s7 --&gt; fin["finally: Remove-OwnedInjection, 08 CircuitAndroidRestoreBuildState, Sanitize-OwnedLogs"]
+  fin --&gt; pres[("build-preservation.json")]</pre></div>
+  <p class="caption"><code>Tools/Build-PrivateNetworkPair.ps1</code>. Every stage is a separate batch editor (<code>Run-Unity</code>) with its own log under the evidence folder. After stages 04, 05 and 07, <code>Assert-PrivateAssembly</code> reads the Windows player with Cecil. The pass needs all eight stages to pass and every source hash to be unchanged.</p>
+  <ul>
+    <li><b>Key path.</b> The key comes only from the masked <b>Bloomfire private QA builds</b> dialog. Only the two private stages receive it, through the environment variable <code>BLOOMFIRE_PRIVATE_QA_RELAY_KEY</code>, together with a fresh <code>-expedition-private-relay-owner</code> GUID. <code>PrivateRelayQaRequest</code> validates it, then clears the variable in the editor process so compiler children do not inherit it. <code>PrivateRelayQaScope.Install</code> writes the ignored <code>Assets/Tests/Runtime/PrivateRelayQaSettings.generated.cs</code> and its <code>.meta</code> just before <code>BuildPlayer</code>; <code>Dispose</code> deletes exactly those bytes. An <code>-expedition-private-relay-adopt</code> form reuses generated bytes that are already in place, without the variable.</li>
+    <li><b>Guard.</b> <code>PrivateRelayQaBuildGuard</code> is an <code>IPreprocessBuildWithReport</code> with <code>callbackOrder</code> <code>int.MinValue</code>, so it runs before any build, including the generic Unity Build menu. It fails the build in four cases. The first is <code>EMBERGROVE_PRIVATE_RELAY_QA</code> sitting in the project-wide defines. The second is an unauthorised build that sees a private flag, the key variable or the generated file. The third is an authorised build that lacks the generated file, still sees the key variable, or repeats or omits a required flag. The fourth is an authorised build whose platform, output path, <code>bundleVersion</code> or generated bytes differ from the scope it was given.</li>
+    <li><b>Assembly checks.</b> <code>Assert-PrivateAssembly</code> requires that the private player has <code>ExpeditionApp.PrivateRelayQaActive</code> and the ordinary controls do not. An ordinary player must not contain the <code>PrivateRelayQaSettings</code> type. Once the key is known, the check also requires the key literal to appear in the private player and in neither control.</li>
+    <li><b>Expiry.</b> Each private build has a fixed expiry. The same endpoint and expiry are written three times: as constants in <code>IsometricSliceBuild.cs</code> (<code>PrivateRelayQaEndpoint</code>, <code>PrivateRelayQaExpiry</code>), in <code>ExpeditionApp.Network.cs</code>, and as variables in <code>Build-PrivateNetworkPair.ps1</code>. A new test window means editing all three.</li>
+  </ul>
+  <p><code>-CheckPreflight</code> runs only the script's fixture tests of its relay access preflight, in memory and over loopback. It uses no key, no external service and no Unity, and it is the <code>RelayPreflight</code> check suite. The owner-facing procedure and the record of each private pair are in <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/MAINTAINING.md#android-development-build">MAINTAINING § Android development build</a>; the two-device test is in <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/NETWORKING.md#private-qa-two-device-test">NETWORKING § Private QA two-device test</a>.</p>
+</section>
+
+<section id="versions"><h2><span class="num">10</span>Who owns each version</h2>
+  <p class="lead">Each product has one file that owns its version. Builds and packages read that version rather than declaring their own. The few places that hard-code a copy are listed after the table.</p>
+  <div class="scrollx"><table>
+    <tr><th>Version</th><th>Owner</th><th>Read by</th></tr>
+    <tr><td>Game product version</td><td><code>bundleVersion</code> in <code>Game/EmberGrove/ProjectSettings/ProjectSettings.asset</code> (Player Settings › Version)</td><td><code>BuildOutput</code>. A candidate passes its own label with <code>-circuit-build-version</code> (1–64 letters, digits, <code>.</code>, <code>_</code> or <code>-</code>), which <code>Build()</code> writes into <code>bundleVersion</code> for the build. <code>BuildPreferences.Restore</code> puts the editor's value back. The version used is recorded as <code>Version</code> in <code>build-info.json</code> and copied into <code>CANDIDATE.json</code>.</td></tr>
+    <tr><td>Android version code</td><td>The explicit <code>-circuit-android-version-code</code> of each build</td><td><code>ConfigureAndroid</code>. The project's <code>AndroidBundleVersionCode</code> is restored afterwards, and <code>Build-PrivateNetworkPair.ps1</code> requires <code>-AndroidVersionCode</code>.</td></tr>
+    <tr><td>Pack compatibility</td><td><code>MinimumGameVersion</code> in <code>Content/EmberGroveDefault/manifest.json</code></td><td><code>ValidateAndroidContentVersion</code> (Android only)</td></tr>
+    <tr><td>Rules and protocol</td><td><code>CombatRules.Version</code>, <code>ExpeditionProtocol.Version</code> and <code>RulesVersion</code></td><td>Recorded in Android <code>build-info.json</code>, and part of the network fingerprint (<a href="networking.html">Networking</a>)</td></tr>
+    <tr><td>CardForge toolkit</td><td><code>version</code> in <code>Toolkit/Packages/com.catsplat.cardforge/package.json</code></td><td><code>Package-Toolkit.ps1</code>, which names the archive <code>CardForge-Toolkit-&lt;major.minor&gt;.zip</code></td></tr>
+    <tr><td>Relay companion</td><td><code>&lt;Version&gt;</code> in <code>Tools/ExpeditionRelay/Launcher/EmberGroveRelay.csproj</code></td><td><code>Publish-Relay.ps1</code>, which writes it into <code>BUILD_INFO.txt</code></td></tr>
+    <tr><td>Unity editor</td><td><code>Game/EmberGrove/ProjectSettings/ProjectVersion.txt</code></td><td><code>Validate-CircuitPlayer.ps1</code>, to find <code>Unity.Cecil.dll</code></td></tr>
+  </table></div>
+  <div class="note warn"><b>Hard-coded copies.</b> <code>Publish-Relay.ps1</code> and <code>Package-Relay.ps1</code> default their output paths to <code>Builds/CardGameRelay-0.8.2</code> and <code>Builds/CardGame-Relay-0.8.2.zip</code>, which repeat the companion's version. <code>Build-PrivateNetworkPair.ps1</code> accepts only labels matching <code>^0\.8\.2-network-qa\.[0-9]+$</code>, and it hard-codes the editor path <code>Unity/Hub/Editor/6000.5.5f1</code> instead of reading <code>ProjectVersion.txt</code>. These copies must be edited by hand when the owning version changes.</div>
+</section>
+
+<section id="tools"><h2><span class="num">11</span>The other tools</h2>
+  <p class="lead">Everything else in <code>Tools/</code> is either a check suite (<a href="qa.html#suites">qa.html §02</a>) or one of the authoring and delivery tools below. Each tool's README owns its commands; <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Tools/README.md#find-the-right-tool">Tools/README § Find the right tool</a> maps tasks to entry points.</p>
+  <div class="grid c2">
+    <div class="card accent-cyan"><h4>ExpeditionRelay and its launcher</h4><p><code>ExpeditionRelay.csproj</code> is an ASP.NET Core web project (with <code>CARDFORGE_HEADLESS</code>). It compiles the toolkit's core, progression, authority and contracts and adds <code>RelayApplication</code>, <code>RelayRuntime</code> and <code>TrustedMatchApplication</code>. <code>Launcher/EmberGroveRelay.csproj</code> wraps it in a WinForms app, <code>EmberGroveRelay.exe</code>. <code>Publish-Relay.ps1</code> publishes that app self-contained, single-file and untrimmed for <code>win-x64</code>, or with <code>-Target ContainerSource</code> copies the relay source with <code>Dockerfile</code> and <code>render.yaml</code> and writes <code>source-manifest.json</code>, uploading nothing. <code>Package-Relay.ps1</code> zips the published folder with a manifest, and <code>Test-Launcher.ps1</code> is the <code>RelayLauncher</code> suite. <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Tools/ExpeditionRelay/README.md#portable-windows-build">Relay README</a></p></div>
+    <div class="card accent-violet"><h4>ContentStudio</h4><p>One <code>ContentStudio.csproj</code> compiles the toolkit's functional, core, progression, circuit and content sources, using <code>UnityBoundary.cs</code> in place of <code>UnityEngine</code>. By default it is a local web service, <code>EmberGrove.ContentStudio</code>, that the <code>Studio</code> suite tests. With <code>-p:StudioDesktop=true</code> it becomes a WebView2 desktop app (<code>DesktopHost.cs</code>). <code>Start-Studio.ps1</code> runs it. <code>Publish-Studio.ps1</code> publishes the desktop app with a sample pack, notices and an offline <code>handbook.html</code> from <code>export_wiki.py --handbook-only</code>, then zips it. <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Tools/ContentStudio/README.md#start">Studio README</a></p></div>
+    <div class="card accent-gold"><h4>CircuitStudio</h4><p>Plain HTML and JavaScript. <code>index.html</code> with <code>dialogue-model.js</code> simulates dialogue branches, and <code>lessons.html</code> with <code>lessons.js</code> edits lessons. <code>check.cjs</code> and <code>lessons-check.cjs</code> are the <code>DialogueModel</code> and <code>LessonModel</code> suites. <code>Start-CardWorkshop.ps1</code> builds Content Studio from current sources and opens it in a browser on the canonical pack. Unity's <span class="kbd">CardForge ▸ Current Card Workshop</span> window (<code>CurrentCardWorkshop.cs</code>) and <code>Open-CardWorkshop.cmd</code> launch it.</p></div>
+    <div class="card accent-green"><h4>Score and Audio</h4><p><code>Tools/Score</code> is an offline music renderer: <code>fetch_samples.py</code> downloads pinned samples into <code>Temp</code>, <code>render_score.py</code> and <code>render_circuit.py</code> compose and render the cues and save each arrangement as a <code>*-score.json</code>, and <code>verify_score.py</code> is the <code>Audio</code> suite. <code>Tools/Audio/author_palette.py</code> synthesises the sound effects. <code>Build-PracticeGuide.ps1</code> makes offline narration placeholders with Kokoro or Windows speech. None of these run in the game. <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Tools/Score/README.md#rebuild">Score README</a></p></div>
+    <div class="card accent-ember"><h4>Documentation</h4><p><code>export_wiki.py</code> writes the offline content and code reference and the portable handbook into <code>Builds/Documentation</code>. <code>check_wiki.cjs</code> is the <code>Docs</code> suite, which checks that already-exported output. This wiki is built separately by <code>Tools/Documentation/structure_wiki.py</code> from the pages in <code>Docs/Wiki</code>. <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Tools/Documentation/README.md">Documentation README</a></p></div>
+    <div class="card accent-red"><h4>Package-Toolkit</h4><p><code>Package-Toolkit.ps1</code> first regenerates the tracked <code>Documentation~/API_INDEX.md</code> from the public declarations under <code>Runtime</code>, so running it can change a committed file. It then stages only the allowed package folders and file types, zips them with a manifest, extracts the ZIP into an isolated consumer and runs <code>Validation~/Run-Validation.ps1</code> there. Finally it writes <code>Builds/CardForge-Toolkit-&lt;major.minor&gt;.zip</code> and a <code>-validation.json</code>, which also compares the recorded <code>Validation~/unity-import.json</code> hashes.</p></div>
+  </div>
+</section>
+
+<section id="guides"><h2><span class="num">12</span>Guides that own the procedures</h2>
+  <p class="lead">Run builds from these guides. This page will not tell you which arguments to pass for the next candidate.</p>
+  <div class="grid c2">
+    <a class="card accent-ember" href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/MAINTAINING.md#verify-and-build-the-game"><h4>MAINTAINING § Verify and build the game</h4><p>Checks, staging, the rehearsal build and run, the normal build and validation.</p></a>
+    <a class="card accent-gold" href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/MAINTAINING.md#android-development-build"><h4>MAINTAINING § Android development build</h4><p>The capture, check, build and restore table, the emulator options and the private pair.</p></a>
+    <a class="card accent-cyan" href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/MAINTAINING.md#internal-preview-candidate"><h4>MAINTAINING § Internal preview candidate</h4><p>Commands for both packager steps and the four builds, saves and preferences, and the Mac pilot.</p></a>
+    <a class="card accent-violet" href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/MAINTAINING.md#publish-cardforge-and-its-handbook"><h4>MAINTAINING § Publish CardForge and its handbook</h4><p>Publishing Content Studio and regenerating the offline references.</p></a>
+    <a class="card accent-green" href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Tools/README.md"><h4>Tools/README.md</h4><p>Check suites, prerequisites and the task-to-tool map.</p></a>
+    <a class="card accent-red" href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CODE_ARCHITECTURE_GUIDE.md#product-names"><h4>CODE_ARCHITECTURE_GUIDE § Product names</h4><p>Why the build says "Bloomfire Circuit" while the project says "Ember &amp; Grove", and which identifiers are frozen.</p></a>
+  </div>
+</section>
+
+<div class="honest"><h4>Keep this page honest</h4><ul>
+  <li><code>Game/EmberGrove/Assets/Editor/IsometricSliceBuild.cs</code>: the entry points, <code>Build()</code>, <code>BuildOutput</code>, <code>BuildIdentity</code>, <code>BuildPreferences</code>, staging, the Android state capture and restore, <code>PrivateRelayQaBuildGuard</code>, <code>PrivateRelayQaScope</code> and <code>AndroidNetworkQaLinker</code></li>
+  <li><code>Game/EmberGrove/ProjectSettings/ProjectSettings.asset</code> and <code>ProjectVersion.txt</code>: <code>bundleVersion</code>, the project-wide defines and the editor version</li>
+  <li><code>Tools/Package-Isometric.ps1</code>: both modes, the review checks and every file it writes</li>
+  <li><code>Tools/Validate-CircuitPlayer.ps1</code>: the shipping and rehearsal contracts</li>
+  <li><code>Tools/Build-PrivateNetworkPair.ps1</code>: preconditions, the eight stages, <code>Assert-PrivateAssembly</code> and the hard-coded label, editor path, endpoint and expiry</li>
+  <li><code>Tools/Package-Toolkit.ps1</code>, <code>Tools/ExpeditionRelay/Publish-Relay.ps1</code>, <code>Package-Relay.ps1</code>, <code>Tools/ContentStudio/Publish-Studio.ps1</code>: outputs and version sources</li>
+  <li><code>Tools/ExpeditionRelay/ExpeditionRelay.csproj</code>, <code>Launcher/EmberGroveRelay.csproj</code>, <code>Tools/ContentStudio/ContentStudio.csproj</code>, <code>Tools/ExpeditionPerformance/ExpeditionPerformance.csproj</code>: the non-Unity defines</li>
+  <li><code>Tools/CircuitStudio/Start-CardWorkshop.ps1</code>, <code>Tools/Score/*.py</code>, <code>Tools/Audio/*</code>, <code>Tools/Documentation/*</code>: the tool summaries in §11</li>
+</ul></div>
+</main>
+<footer>Bloomfire Wiki · page source <code>Docs/Wiki/builds.html</code>, built by <code>Tools/Documentation/structure_wiki.py</code> · Found a mistake? Fix it in the same commit as the code that made it one.</footer>
+</body>
+</html>
