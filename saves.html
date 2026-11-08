@@ -56,7 +56,8 @@
     <div class="scrollx"><table>
       <tr><th>File</th><th>What it owns</th></tr>
       <tr><td><code>Game/EmberGrove/Assets/Runtime/Exploration/CircuitPersistence.cs</code></td><td><code>CircuitSave</code> (the wrapper) and <code>CircuitPersistence</code> (<code>Restore</code>, <code>Save</code>, <code>WriteBlockReason</code>, <code>HasRejectedSaves</code>, <code>DecksRepaired</code>). Uses only <code>System.*</code> and <code>CardForge.Circuit</code>; JSON is passed in as a string and a deserializer delegate.</td></tr>
-      <tr><td><code>Game/EmberGrove/Assets/Runtime/Exploration/IsometricSlice.Circuit.cs</code></td><td>Paths (<code>CircuitStorageRoot</code>, <code>CircuitPath</code>, <code>PreviousCircuitPath</code>), <code>RestoreCircuit</code>, <code>SaveCircuit</code>, <code>SaveCircuitWrite</code>, <code>CaptureCircuitSave</code>, <code>ApplyCircuit</code></td></tr>
+      <tr><td><code>Game/EmberGrove/Assets/Runtime/Exploration/IsometricSlice.Circuit.cs</code></td><td>Paths (<code>CircuitStorageRoot</code>, <code>CircuitPath</code>, <code>PreviousCircuitPath</code>), <code>RestoreCircuit</code> and <code>RestoreCircuitSavedProgress</code>, <code>SaveCircuit</code> and its gates, <code>SaveCircuitWrite</code>, <code>CaptureCircuitSave</code>, <code>ApplyCircuit</code> and every notice</td></tr>
+      <tr><td><code>Game/EmberGrove/Assets/Runtime/Exploration/CircuitProgress.cs</code></td><td><code>CircuitProgress</code>, the adventure's one owner: <code>State</code>, <code>Definition</code> and <code>Store</code>; <code>Apply</code> (swap, one save, rollback), <code>Restore</code> and its notice, <code>EnsureRun</code>, <code>Write</code> and <code>TryResolveFinishedDuel</code>. It is free of Unity too: the slice passes in its JSON codec and warning log.</td></tr>
       <tr><td><code>Toolkit/…/Runtime/Circuit/CircuitRules.cs</code>, <code>CircuitValidation.cs</code></td><td>The partial class <code>CircuitRules</code>: <code>CurrentProfileVersion</code>, <code>CurrentRunVersion</code>, <code>CurrentWorldLayoutVersion</code>, <code>HasNewerRoomRevision</code>, <code>DecksRepaired</code>, and <code>Recover</code> (in <code>CircuitValidation.cs</code>)</td></tr>
       <tr><td><code>Game/EmberGrove/Assets/Runtime/PlayerSettings.cs</code></td><td><code>PlayerSettings</code> and <code>PlayerSettingsRules.Normalize</code></td></tr>
       <tr><td><code>Game/EmberGrove/Assets/Runtime/ExpeditionApp.Settings.cs</code></td><td><code>PreferenceKey</code>, <code>ReadPreferences</code>, <code>SavePreferences</code>, <code>ApplyRuntimePreferences</code>, the save debounce and the display trial</td></tr>
@@ -83,14 +84,23 @@
     <p class="lead"><code>CircuitSave</code> is a serializable class around the toolkit's <code>CircuitState</code>. Its own <code>Version</code> is separate from the profile and run versions nested inside the state; all of them are checked on restore.</p>
     <div class="scrollx"><table>
       <tr><th>Field</th><th>Meaning</th></tr>
-      <tr><td><code>Version</code></td><td>The wrapper version. <code>CaptureCircuitSave</code> writes 5; <code>RecoverCandidate</code> accepts 1–5. It has no default, so a file without one reads as 0 and is rejected.</td></tr>
+      <tr><td><code>Version</code></td><td>The wrapper version. <code>CaptureCircuitSave</code> writes <code>CircuitSave.CurrentVersion</code> (5), and <code>RecoverCandidate</code> accepts 1 up to it. It has no default, so a file without one reads as 0 and is rejected.</td></tr>
       <tr><td><code>State</code></td><td>The complete <code>CircuitState</code> (profile and run)</td></tr>
       <tr><td><code>HasWorldPosition</code>, <code>WorldX</code>, <code>WorldZ</code>, <code>FocusStage</code></td><td>Where the traveller stood, relative to the district at <code>FocusStage</code>. Used only when <code>Version &gt;= 2</code>, a run exists and the numbers are finite.</td></tr>
       <tr><td><code>Zoom</code>, <code>FollowCamera</code>, <code>ReducedMotion</code></td><td>Camera and motion choices. <code>Zoom</code> is clamped to 0.7–1.5 on restore.</td></tr>
       <tr><td><code>WelcomeSeen</code>, <code>PracticeCompleted</code>, <code>OpeningBeatId</code>, <code>CompletedLessonIds</code>, <code>ReadLessonIds</code></td><td>Onboarding and lesson progress that lives outside <code>CircuitState</code></td></tr>
       <tr><td><code>ClubNickname</code>, <code>ClubBadgeId</code></td><td>Local presentation only; never used as a review or session identity</td></tr>
     </table></div>
-    <p><b>A save is "from a newer game"</b> (<code>SavedByNewerVersion</code>) when the wrapper version is above 5, or the profile, run or world-layout version is above <code>CircuitRules.CurrentProfileVersion</code>, <code>CurrentRunVersion</code> or <code>CurrentWorldLayoutVersion</code>, or <code>CircuitRules.HasNewerRoomRevision</code> is true for the run. Older nested versions are upgraded in memory by <code>CircuitRules.Recover</code>; reading never rewrites the file, and the next ordinary save keeps the old bytes as <code>.previous</code>. The per-version behaviour is owned by the guides linked under <i>Before you start</i>.</p>
+    <p><b>A save is "from a newer game"</b> (<code>SavedByNewerVersion</code>) when the wrapper version is above <code>CircuitSave.CurrentVersion</code>, or the profile, run or world-layout version is above <code>CircuitRules.CurrentProfileVersion</code>, <code>CurrentRunVersion</code> or <code>CurrentWorldLayoutVersion</code>, or <code>CircuitRules.HasNewerRoomRevision</code> is true for the run. Older nested versions are upgraded in memory by <code>CircuitRules.Recover</code>; reading never rewrites the file, and the next ordinary save keeps the old bytes as <code>.previous</code>. The per-version behaviour is owned by the guides linked under <i>Before you start</i>.</p>
+    <h3 id="adding-a-saved-field">Adding a saved field</h3>
+    <p>A field of the adventure itself belongs in <code>CircuitState</code>. It is saved whole, so it needs none of these steps; its versions and recovery belong to the toolkit (<i>Before you start</i>). A field outside it, such as a world, onboarding, lesson or preference value, takes five:</p>
+    <ol class="steps">
+      <li><b>Declare it.</b> Add the field to <code>CircuitSave</code> with a default that is right for an older file, which does not have it.</li>
+      <li><b>Capture it.</b> One line in <code>CaptureCircuitSave</code>.</li>
+      <li><b>Restore it.</b> One line in <code>RestoreCircuitSavedProgress</code>, or a clamp beside the zoom and position ones in <code>RestoreCircuitSaved</code>.</li>
+      <li><b>Check the file.</b> A round-trip scenario in <code>CircuitPersistenceVerification</code>'s <code>WrapperScenarios</code>, as <code>OpeningCheckpoint</code> does; <code>ReleasedWrapper</code> shows how to read an older file without the field.</li>
+      <li><b>Check the rehearsal.</b> When <code>RestoreCircuit</code> sets a slice field from it, add that field to <code>CircuitSliceChecks.KeepRestoredFields</code>, and add the saved field to the <code>CheckLifecycleRestoreSame*</code> comparisons in <code>CircuitSliceChecks.Saves.cs</code>.</li>
+    </ol>
   </section>
 
   <section id="files"><h2><span class="num">04</span>File names and folders</h2>
@@ -131,7 +141,7 @@ stateDiagram-v2
   Read --&gt; Next: a save is already restored
   Read --&gt; Recover: nothing restored yet
   Read --&gt; Rejected: empty or malformed, nothing restored yet
-  Recover --&gt; Restored: version 1 to 5, collection present, CircuitRules.Recover ok
+  Recover --&gt; Restored: version 1 to CurrentVersion, collection present, CircuitRules.Recover ok
   Recover --&gt; Rejected: any check fails
   Blocked --&gt; Next
   Rejected --&gt; Next
@@ -143,43 +153,49 @@ stateDiagram-v2
   end note
 </pre></div>
     <p class="caption">One pass of <code>CircuitPersistence.Restore</code>. "Rejected" covers <code>IOException</code>, <code>InvalidDataException</code>, <code>UnauthorizedAccessException</code>, <code>ArgumentException</code> (Unity's malformed JSON) and <code>FormatException</code>. If the rejected file is the primary, <code>preservePrevious</code> is set so the next save does not rotate it over the good backup.</p>
-    <p>Then <code>IsometricSlice.RestoreCircuit</code> finishes the job:</p>
+    <p>Then <code>IsometricSlice.RestoreCircuit</code>, which opens the store as <code>progress.Store</code>, finishes the job in this order:</p>
     <ol class="steps">
-      <li><b>Use what was restored.</b> <code>RestoreCircuitSaved</code> copies the state and the wrapper fields, and sets a notice: restored from a <code>.previous</code> or after a rejection ("restored from an earlier save"), decks repaired, nothing readable ("could not be read… original files will be kept"), or the <code>WriteBlockReason</code> text, which wins.</li>
-      <li><b>Fill gaps.</b> No profile → <code>CircuitRules.NewProfile</code>. No run → <code>RestoreCircuitStartRun</code> (the first playable saved deck, else the initial starter).</li>
-      <li><b>Close an interrupted match.</b> A saved <code>Run.PendingDuel</code> is resolved as <code>CircuitDuelOutcome.Interrupted</code>: the player is back at the challenge and no result is invented.</li>
+      <li><b>Use what was restored.</b> <code>CircuitProgress.Restore</code> makes the restored state <code>State</code> and returns the notice: restored from a <code>.previous</code> or after a rejection ("restored from an earlier save"), decks repaired, nothing readable ("could not be read… original files will be kept"), or the <code>WriteBlockReason</code> text, which wins. <code>RestoreCircuitSaved</code> then copies the wrapper fields while <code>State</code> is still the saved one, and shows the notice.</li>
+      <li><b>Fill gaps.</b> <code>CircuitProgress.EnsureRun</code>: no profile → <code>CircuitRules.NewProfile</code>; no run → the first playable saved deck, else the initial starter.</li>
+      <li><b>Close an interrupted match.</b> Also in <code>EnsureRun</code>, a saved <code>Run.PendingDuel</code> is resolved as <code>CircuitDuelOutcome.Interrupted</code>: the player is back at the challenge and no result is invented.</li>
       <li><b>QA only.</b> <code>RestoreCircuitTesting</code> tops up the testing save with every card and records <code>TestingSaveSummary</code> for the Settings screen.</li>
     </ol>
     <div class="note">The save is read only after the content pack has loaded and a <code>CircuitDefinition</code> exists, because <code>Recover</code> needs the definition. A pack that fails to load leaves the save untouched (<a href="content.html#pipeline">content.html §02</a>).</div>
   </section>
 
   <section id="save"><h2><span class="num">06</span>Saving: tmp, Replace, .previous</h2>
-    <p class="lead">Most saves start in <code>ApplyCircuit</code>, which swaps in a new <code>CircuitState</code> from a <code>CircuitRules</code> call and then calls <code>SaveCircuit</code>. With <code>requireSaved: true</code> a failed write puts the previous state back so the player can retry.</p>
+    <p class="lead">Most saves start in <code>ApplyCircuit</code>: <code>CircuitProgress.Apply</code> swaps in a new <code>CircuitState</code> from a <code>CircuitRules</code> call and then calls <code>SaveCircuit</code> once. With <code>requireSaved: true</code> a failed write puts the previous state back so the player can retry.</p>
     <div class="diagram"><pre class="mermaid">
 sequenceDiagram
   participant S as IsometricSlice
   participant R as CircuitRules
+  participant C as CircuitProgress
   participant P as CircuitPersistence
   participant D as Save folder
   S-&gt;&gt;R: e.g. CommitEvent(...)
   R--&gt;&gt;S: Result&lt;CircuitState&gt;
   S-&gt;&gt;S: ApplyCircuit(result, requireSaved: true)
+  S-&gt;&gt;C: Apply(result.Value, save, requireSaved)
+  C-&gt;&gt;C: State = the new state, then the task advance
+  C-&gt;&gt;S: save(), once
   S-&gt;&gt;S: SaveCircuit checks lobby, suppression, testing folder and Ready
-  S-&gt;&gt;S: CaptureCircuitSave() writes Version 5
-  S-&gt;&gt;P: Save(JsonUtility.ToJson(save, true))
+  S-&gt;&gt;S: CaptureCircuitSave() writes CircuitSave.CurrentVersion
+  S-&gt;&gt;C: Write(save, restoreAtArrival)
+  C-&gt;&gt;P: Save(toJson(save)), with the slice's JsonUtility codec
   alt WriteBlockReason is set
-    P--&gt;&gt;S: throw IOException
+    P--&gt;&gt;C: throw IOException
   else ordinary save
     P-&gt;&gt;D: File.Copy each rejected file to .corrupt-UTC-guid
     P-&gt;&gt;D: write v2.json.tmp, Flush(true)
     P-&gt;&gt;D: File.Replace(tmp, v2.json, v2.json.previous)
     Note over P,D: File.Move when v2.json is new, and no backup on the first save after a rejected primary
-    P--&gt;&gt;S: return
+    P--&gt;&gt;C: return
   end
-  S-&gt;&gt;S: on IOException or UnauthorizedAccessException set circuitNotice
-  S-&gt;&gt;S: requireSaved and failed, so restore the previous state
+  C--&gt;&gt;S: null, or the failure text on IOException or UnauthorizedAccessException
+  S--&gt;&gt;C: a failure sets circuitNotice, and save() returns false
+  C-&gt;&gt;C: requireSaved and failed, so the previous State comes back
 </pre></div>
-    <p class="caption">One save from a player choice. <code>SaveCircuitWrite</code> catches only I/O and access errors; anything else propagates.</p>
+    <p class="caption">One save from a player choice. <code>CircuitProgress.Write</code> catches only I/O and access errors; anything else propagates.</p>
     <h3>When the game saves</h3>
     <div class="scrollx"><table>
       <tr><th>Trigger</th><th>Code</th></tr>
@@ -195,12 +211,12 @@ sequenceDiagram
   </section>
 
   <section id="portable"><h2><span class="num">07</span>Testing the save code: the portable build</h2>
-    <p class="lead">Because <code>CircuitPersistence</code> has no Unity dependency, the same source file is compiled into a plain .NET program and exercised with real temporary files.</p>
+    <p class="lead">Because <code>CircuitPersistence</code> and <code>CircuitProgress</code> have no Unity dependency, the same source files are compiled into a plain .NET program and exercised with real temporary files.</p>
     <div class="grid c2">
-      <div class="card accent-green"><h4>Portable runner</h4><p><code>Tools/CircuitPersistenceChecks/CircuitPersistenceChecks.csproj</code> compiles <code>Result.cs</code>, the toolkit's <code>Core</code> and <code>Circuit</code> folders, <code>CircuitPersistence.cs</code> and <code>CircuitPersistenceVerification.cs</code> with <code>CIRCUIT_PERSISTENCE_PORTABLE</code>. <code>Program.cs</code> supplies a <code>System.Text.Json</code> <code>SaveCodec</code> that turns <code>JsonException</code> into <code>ArgumentException</code>, as Unity does. Run it as the <code>Persistence</code> suite of <code>Tools/Run-Checks.ps1</code>.</p></div>
+      <div class="card accent-green"><h4>Portable runner</h4><p><code>Tools/CircuitPersistenceChecks/CircuitPersistenceChecks.csproj</code> compiles <code>Result.cs</code>, the toolkit's <code>Core</code> and <code>Circuit</code> folders, <code>CircuitPersistence.cs</code>, <code>CircuitProgress.cs</code> and <code>CircuitPersistenceVerification.cs</code> with <code>CIRCUIT_PERSISTENCE_PORTABLE</code>. <code>Program.cs</code> supplies a <code>System.Text.Json</code> <code>SaveCodec</code> that turns <code>JsonException</code> into <code>ArgumentException</code>, as Unity does. Run it as the <code>Persistence</code> suite of <code>Tools/Run-Checks.ps1</code>.</p></div>
       <div class="card accent-violet"><h4>Unity runner</h4><p><code>CircuitPersistenceVerification.RunBatch</code> runs the same <code>RunScenarios</code> list with <code>JsonUtility</code> in a batch-mode editor, writing its report and fixtures under <code>Temp/ReleaseReview</code>. A few scenarios run in only one runner (<code>if (native)</code>).</p></div>
     </div>
-    <p>The whole verification file is wrapped in <code>#if UNITY_EDITOR || CIRCUIT_PERSISTENCE_PORTABLE</code>, so no player compiles it. Lifecycle behaviour around real process exits (unload, quit during a battle, quit on a result, resume) is rehearsed separately by <code>CircuitSliceChecks.Saves</code> with <code>-circuit-lifecycle</code>; see <a href="qa.html">QA &amp; Rehearsals</a>. What the scenarios cover and how to run them is in the <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Tools/CircuitPersistenceChecks/README.md">Circuit save recovery checks README</a>.</p>
+    <p><code>RunScenarios</code> ends with <code>ProgressScenarios</code>, which runs <code>CircuitProgress</code> itself over the production store in both runners. The whole verification file is wrapped in <code>#if UNITY_EDITOR || CIRCUIT_PERSISTENCE_PORTABLE</code>, so no player compiles it. Lifecycle behaviour around real process exits (unload, quit during a battle, quit on a result, resume) is rehearsed separately by <code>CircuitSliceChecks.Saves</code> with <code>-circuit-lifecycle</code>; see <a href="qa.html">QA &amp; Rehearsals</a>. What the scenarios cover and how to run them is in the <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Tools/CircuitPersistenceChecks/README.md">Circuit save recovery checks README</a>.</p>
   </section>
 
   <section id="settings"><h2><span class="num">08</span>Player settings</h2>
@@ -254,7 +270,8 @@ sequenceDiagram
 
   <div class="honest"><h4>Keep this page honest</h4><ul>
     <li><code>Game/EmberGrove/Assets/Runtime/Exploration/CircuitPersistence.cs</code> — <code>CircuitSave</code> fields, candidate order, <code>SavedByNewerVersion</code>, rejection, <code>.corrupt-</code> copies, <code>.tmp</code> and <code>File.Replace</code></li>
-    <li><code>Game/EmberGrove/Assets/Runtime/Exploration/IsometricSlice.Circuit.cs</code> — storage root, file names, <code>RestoreCircuit</code>, <code>SaveCircuit</code>, <code>CaptureCircuitSave</code>, <code>ApplyCircuit</code>, <code>PlayCircuitDuel</code></li>
+    <li><code>Game/EmberGrove/Assets/Runtime/Exploration/IsometricSlice.Circuit.cs</code> — storage root, file names, <code>RestoreCircuit</code>, <code>RestoreCircuitSavedProgress</code>, <code>SaveCircuit</code>, <code>CaptureCircuitSave</code>, <code>ApplyCircuit</code>, <code>PlayCircuitDuel</code></li>
+    <li><code>Game/EmberGrove/Assets/Runtime/Exploration/CircuitProgress.cs</code> — <code>Restore</code> and its notice, <code>EnsureRun</code>, <code>Apply</code> and its rollback, <code>Write</code> and its catch</li>
     <li><code>Game/EmberGrove/Assets/Runtime/Exploration/IsometricSlice.cs</code>, <code>IsometricSlice.Progress.cs</code> — pause, quit and destroy saves</li>
     <li><code>Toolkit/Packages/com.catsplat.cardforge/Runtime/Circuit/CircuitRules.cs</code> — current version constants and <code>HasNewerRoomRevision</code>; <code>CircuitValidation.cs</code> — <code>Recover</code></li>
     <li><code>Game/EmberGrove/Assets/Runtime/PlayerSettings.cs</code>, <code>ExpeditionApp.Settings.cs</code>, <code>Exploration/IsometricSlice.Preferences.cs</code> — settings fields, keys, QA suffix, debounce and display trial</li>

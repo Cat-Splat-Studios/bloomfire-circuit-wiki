@@ -64,7 +64,7 @@
         <tr><td><a href="#f11">F11</a></td><td>Code in files named for other types</td><td><span class="badge low">low</span></td><td>Coupling</td><td>S</td></tr>
         <tr><td><a href="#f12">F12</a></td><td>Process-wide static state</td><td><span class="badge low">low</span></td><td>Coupling</td><td>S–M</td></tr>
         <tr><td><a href="#f13">F13</a></td><td>Two menu stacks, with the glyph mapping written three times</td><td><span class="badge medium">medium</span></td><td>Duplication</td><td>S–M</td></tr>
-        <tr><td><a href="#f14">F14</a></td><td>The Circuit sidecars are read by hand, and their types declared twice</td><td><span class="badge medium">medium</span></td><td>Duplication</td><td>S–L</td></tr>
+        <tr><td><a href="#f14">F14</a></td><td>The Circuit sidecars bypass the content pack, and parts of them are kept twice</td><td><span class="badge medium">medium</span></td><td>Duplication</td><td>S–L</td></tr>
         <tr><td><a href="#f15">F15</a></td><td>Two progression models, with their own result types</td><td><span class="badge medium">medium</span></td><td>Duplication</td><td>S–L</td></tr>
         <tr><td><a href="#f16">F16</a></td><td>Two tutorial engines and two voice catalogues</td><td><span class="badge low">low</span></td><td>Duplication</td><td>S–M</td></tr>
         <tr><td><a href="#f17">F17</a></td><td>The same content is parsed by two JSON libraries</td><td><span class="badge low">low</span></td><td>Duplication</td><td>S–M</td></tr>
@@ -149,6 +149,7 @@ flowchart LR
         <tr><td>Freeze it. Add no new partial files or fields, and build new features in new classes.</td><td>S</td><td>Stops the growth. Removes nothing.</td></tr>
       </tbody>
     </table></div>
+    <p class="dim"><b>Progress on the second option.</b> Step 1 has landed as <code>CircuitProgress</code>, a plain class that the portable <code>Persistence</code> suite also runs. It owns the adventure's state, definition and save store, applying a change with its save and rollback, the restore fallbacks, the write and the finished-duel rule. <code>CaptureCircuitSave</code> and the save gates stay on the slice on purpose: most of a save's fields belong to other topics, and the traveller's position comes from live transforms. Step 2 moved the sidecar reads into <code>CircuitContentLoader</code> and the definition rules into <code>CircuitDefinitionBuilder</code> (<a href="#f14">F14</a>). What comes next is in the roadmap's <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Release/ROADMAP.md#next-actions">next actions</a>. The evidence above is from before these steps.</p>
     <p><b>Roadmap.</b> <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Release/ROADMAP.md#menus-on-ui-toolkit">Menus on UI Toolkit</a>, its slices for lodge lists, the deck builder and the map, tasks, dialogue and onboarding.</p>
 
     <h3 id="f02">F02 · <code>ExpeditionView</code> draws the board and every hosted window <span class="badge medium">medium</span></h3>
@@ -320,7 +321,7 @@ flowchart LR
     EA["ExpeditionApp"]
     EV["ExpeditionView"]
     SESS["ExpeditionApp.Session.cs"]
-    GPURE["CircuitPersistence.cs, CircuitWorldLayout.cs"]
+    GPURE["CircuitPersistence.cs, CircuitProgress.cs, CircuitWorldLayout.cs, CircuitDefinitionBuilder.cs"]
     CSC["CircuitSliceChecks, QA only"]
     EH["ExpeditionHarness, QA only"]
   end
@@ -329,7 +330,7 @@ flowchart LR
   end
   subgraph TOOLS["Tools, .NET projects"]
     FS["CircuitFieldSetupChecks Run-Checks.ps1"]
-    PT["CircuitPersistenceChecks, CircuitWorldChecks"]
+    PT["CircuitPersistenceChecks, CircuitWorldChecks, CircuitContentChecks"]
     NT["ExpeditionNetworkChecks, WorldFactChecks"]
   end
   AUTH["ExpeditionAuthority, toolkit"]
@@ -486,8 +487,8 @@ flowchart LR
     </table></div>
     <p><b>Roadmap.</b> Step G of the <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Release/ROADMAP.md#cleanup-milestone">cleanup milestone</a>, the hint strip in <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Release/ROADMAP.md#menu-ui-cleanup">Menu UI cleanup</a>, and <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Release/ROADMAP.md#menus-on-ui-toolkit">Menus on UI Toolkit</a>. The shared rules themselves are owned by <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Guides/CIRCUIT_PRESENTATION.md#menu-roles">Menu roles</a>.</p>
 
-    <h3 id="f14">F14 · The Circuit sidecars are read by hand, and their types declared twice <span class="badge medium">medium</span></h3>
-    <p class="dim"><b>Why this priority:</b> the rules that turn content into the Circuit live in a MonoBehaviour, so no fast check sees the definition the game actually builds.</p>
+    <h3 id="f14">F14 · The Circuit sidecars bypass the content pack, and parts of them are kept twice <span class="badge medium">medium</span></h3>
+    <p class="dim"><b>Why this priority:</b> the sidecars are the one part of the Circuit's content a pack cannot replace, and the starter decks, the packager's sidecar names and the opening limits each have two owners.</p>
     <p><b>Evidence.</b></p>
     <ul>
       <li><code>IsometricSlice.LoadCircuit</code> reads <code>Circuit/card-guide.json</code>, <code>locations.json</code>, <code>journey.json</code>, <code>practice.json</code> and <code>lessons.json</code> from StreamingAssets through <code>CircuitText</code>. That is outside the content pack, so <code>-content-pack</code> and a <code>ContentOverride</code> do not reach them. The manifest's <code>CircuitPackDefinition</code> holds only <code>DialogueFile</code>.</li>
@@ -496,7 +497,7 @@ flowchart LR
       <li>The portable suites (<code>CircuitChecks</code>, <code>CircuitWorldChecks</code>) build synthetic definitions and repeat the tier rule as <code>1 + i / 20</code>. The live definition is checked only inside the rehearsal; <code>PureTournamentFixture</code> runs pure rules on <code>slice.circuitDefinition</code>.</li>
       <li>The sidecar names are listed again in <code>IsometricSliceBuild</code> and <code>Tools/Package-Isometric.ps1</code>, and the starter decks exist in both <code>card-guide.json</code> and <code>expedition-content.json</code>. Both are open owner decisions.</li>
     </ul>
-    <p><b>Why it matters.</b> Content Studio, the tools and the relay cannot build the definition the game plays. A field added to the guide must be added to two DTO sets, and Circuit rule tests run against fixtures rather than the shipped content.</p>
+    <p><b>Why it matters.</b> Only the game and the <code>Content</code> suite can build the definition the game plays; Content Studio and the relay cannot. A value kept in two places can drift apart without a check noticing.</p>
     <div class="scrollx"><table>
       <thead><tr><th>Option</th><th>Size</th><th>Trade-offs</th></tr></thead>
       <tbody>
@@ -506,6 +507,7 @@ flowchart LR
       </tbody>
     </table></div>
     <p><b>Roadmap.</b> The starter-deck copies and the staged-sidecar list are both in <a href="https://github.com/Cat-Splat-Studios/CardGame/blob/main/Docs/Release/ROADMAP.md#open-owner-decisions">Open owner decisions</a>.</p>
+    <p class="dim"><b>Progress.</b> The first option is done with a game-side home, the owner's choice on 2026-11-07, so Bloomfire's own rules stay with the game and the toolkit stays game-neutral. <code>Game/…/Runtime/Exploration/CircuitDefinitionBuilder.cs</code> holds the sidecar types, their checks (the presentation check stays on the slice, because it needs Unity's colour parser) and the rules that build the <code>CircuitDefinition</code>, with no Unity types. The <code>Content</code> suite compiles it by path, builds the shipped definition, and checks that each rule rejects what it should. <code>CircuitContentLoader</code> reads the five sidecars and owns their names, which the editor build stages; the tool's copies of the guide types are gone. Still open: the sidecars stay outside the pack, so <code>-content-pack</code> does not reach them (the third option); <code>Tools/Package-Isometric.ps1</code> keeps its own copy of the names; <code>ExpeditionPerformance</code> reads the starters through <code>JsonElement</code>; the starter decks exist twice; and the journey check restates the opening limits of <code>FairMatchSetup.ValidateOpeningChoice</code>, which the builder cannot call while that class is cut from a game file (<a href="#f20">F20</a>). The evidence above is from before this change.</p>
 
     <h3 id="f15">F15 · Two progression models, with their own result types <span class="badge medium">medium</span></h3>
     <p class="dim"><b>Why this priority:</b> the retired model is loaded and validated on every pack load, and the one thing the game still takes from it, a boss-music rule, never marks a Circuit champion.</p>
@@ -613,7 +615,7 @@ flowchart LR
     <p class="dim"><b>Why this priority:</b> the fast suites skip the assembly rules Unity enforces, and one suite depends on how a source file is laid out.</p>
     <p><b>Evidence.</b></p>
     <ul>
-      <li>The .NET check projects and the relay under <code>Tools/</code> use <code>&lt;Compile Include&gt;</code> to compile toolkit sources by path, usually several assemblies' folders into one assembly. Only the relay launcher references a project instead. <code>CircuitPersistenceChecks</code> also compiles <code>Game/EmberGrove/Assets/Runtime/Exploration/CircuitPersistence.cs</code> and <code>Game/EmberGrove/Assets/Tests/CircuitPersistenceVerification.cs</code>, and <code>CircuitWorldChecks</code> compiles <code>CircuitWorldLayout.cs</code>.</li>
+      <li>The .NET check projects and the relay under <code>Tools/</code> use <code>&lt;Compile Include&gt;</code> to compile toolkit sources by path, usually several assemblies' folders into one assembly. Only the relay launcher references a project instead. <code>CircuitPersistenceChecks</code> also compiles <code>Game/EmberGrove/Assets/Runtime/Exploration/CircuitPersistence.cs</code>, <code>Game/EmberGrove/Assets/Runtime/Exploration/CircuitProgress.cs</code> and <code>Game/EmberGrove/Assets/Tests/CircuitPersistenceVerification.cs</code>, <code>CircuitWorldChecks</code> compiles <code>CircuitWorldLayout.cs</code>, and <code>CircuitContentChecks</code> compiles <code>CircuitDefinitionBuilder.cs</code>.</li>
       <li><code>Tools/CircuitFieldSetupChecks/Run-Checks.ps1</code> finds <code>internal static class FairMatchSetup</code> inside <code>ExpeditionApp.Session.cs</code>, counts <code>{</code> and <code>}</code> to find its end, and writes it to <code>Temp/CircuitFieldSetupChecks/ActualSetup.cs</code> for the project to compile. A brace inside a string or comment in that class would cut it in the wrong place.</li>
       <li>Three UnityEngine stand-ins provide <code>TextAsset</code>, <code>Resources</code> and a <code>JsonUtility</code> mapped to <code>System.Text.Json</code>: <code>Tools/ContentStudio/UnityBoundary.cs</code>, <code>Tools/ExpeditionPerformance/UnityBoundaryStub.cs</code>, and a third that <code>Tools/Expedition/check_progression.py</code> writes when it runs.</li>
     </ul>
@@ -635,14 +637,14 @@ flowchart LR
       <li>10 partial files in <code>Assets/Tests/Runtime</code>; its size is in the table in <a href="#architecture">§03</a>. The editor-and-test complexity batch (PRs #33 and #34) split its long methods: it had 234 methods at <code>2b99fd4</code>, before that batch, and about three times as many at <code>ca8d41e</code>.</li>
       <li><code>Install</code> starts the run, and <code>Rehearse</code> runs every stage of the main sequence in a fixed order in one player process. A few switches choose a different run, such as <code>-circuit-world-only</code>, <code>-circuit-palettes</code> and the save-lifecycle phases, but no switch reruns one stage of the main sequence.</li>
       <li><code>Check</code> throws on the first false condition, so a run reports one failure. The player writes its report and quits with 0 or 1.</li>
-      <li>Some stages need no scene but run in the player anyway. For example, <code>PureTournamentFixture</code> runs pure <code>CircuitRules</code> transitions on the live definition, which only the world can build (<a href="#f14">F14</a>).</li>
+      <li>Some stages need no scene but run in the player anyway. For example, <code>PureTournamentFixture</code> runs pure <code>CircuitRules</code> transitions on the live definition, which before <a href="#f14">F14</a> only the world could build; the <code>Content</code> suite now builds it too.</li>
     </ul>
     <p><b>Why it matters.</b> The feedback loop is long: a fix whose next failure sits in a later stage needs another full build and run. Since <a href="#f08">F08</a>, a rename fails to compile instead of failing in this run.</p>
     <div class="scrollx"><table>
       <thead><tr><th>Option</th><th>Size</th><th>Trade-offs</th></tr></thead>
       <tbody>
         <tr><td>Add a stage filter argument beside the existing switches, so one failing stage can be rerun alone.</td><td>S–M</td><td>Shorter reruns. Stages that depend on state left by earlier stages cannot run alone.</td></tr>
-        <tr><td>Move the checks that need no scene into the portable suites, after <a href="#f14">F14</a> makes the real definition available there.</td><td>M</td><td>Seconds instead of minutes for rule checks. Some checks use Unity types and need stand-ins (<a href="#f20">F20</a>).</td></tr>
+        <tr><td>Move the checks that need no scene into the portable suites, now that <a href="#f14">F14</a> has made the real definition available there (the <code>Content</code> suite builds it).</td><td>M</td><td>Seconds instead of minutes for rule checks. Some checks use Unity types and need stand-ins (<a href="#f20">F20</a>).</td></tr>
         <tr><td>Split by subject into separate rehearsal classes that share one small runner.</td><td>M–L</td><td>Each subject can run alone. Cleanup step I gave the shared helpers one owner in <code>CircuitSliceChecks.cs</code>, and that owner must stay single.</td></tr>
       </tbody>
     </table></div>
@@ -653,7 +655,7 @@ flowchart LR
     <p><b>Evidence.</b> One static class in <code>Assets/Editor/IsometricSliceBuild.cs</code>, with 7 nested types and 12 <code>Bloomfire Circuit</code> menu items; its size is in the table in <a href="#architecture">§03</a>. The file also holds <code>AndroidNetworkQaLinker</code>. Its jobs are:</p>
     <ul>
       <li>scene and prefab authoring: <code>CreateCircuitScene</code>, <code>CreateLodgeWaybook</code>, the room-set and district tools;</li>
-      <li>content staging: <code>StageCircuitContent</code> and the sidecar list;</li>
+      <li>content staging: <code>StageCircuitContent</code>, which stages <code>CircuitContentLoader.SidecarFiles</code>;</li>
       <li>Windows and macOS builds and rehearsal builds;</li>
       <li>the Android preflight, build-state capture and restore, and MSAA processing;</li>
       <li>the private relay QA scope and its checks.</li>

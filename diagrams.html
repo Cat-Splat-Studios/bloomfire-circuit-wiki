@@ -53,7 +53,7 @@
 <tr><td><code>EmberGrove.Expedition.Progression</code></td><td><code>Toolkit/Packages/com.catsplat.cardforge/Runtime/Progression</code></td><td><code>EmberGrove.Expedition</code></td><td>all platforms</td><td>no</td><td class="num">5</td><td class="num">46</td></tr>
 <tr><td><code>CardForge.Samples</code></td><td><code>Toolkit/Packages/com.catsplat.cardforge/Samples~/MinimalTactics</code></td><td><code>CardForge.Functional</code>, <code>EmberGrove.Expedition</code>, <code>EmberGrove.Expedition.Progression</code>, <code>EmberGrove.Expedition.Networking</code></td><td>package sample, compiled only after a project imports it</td><td>no</td><td class="num">3</td><td class="num">3</td></tr>
 <tr><td><code>CardForge.Samples.Editor</code></td><td><code>Toolkit/Packages/com.catsplat.cardforge/Samples~/MinimalTactics/Editor</code></td><td><code>CardForge.Samples</code>, <code>CardForge.Linker.Editor</code></td><td>package sample, compiled only after a project imports it</td><td>yes</td><td class="num">1</td><td class="num">1</td></tr>
-<tr><td><code>Assembly-CSharp</code> (no .asmdef)</td><td><code>Game/EmberGrove/Assets</code></td><td><code>CardForge.Circuit</code>, <code>CardForge.Content</code>, <code>CardForge.Exploration</code>, <code>CardForge.Functional</code>, <code>EmberGrove.Expedition</code>, <code>EmberGrove.Expedition.Networking</code>, <code>EmberGrove.Expedition.Progression</code></td><td>game scripts outside Editor folders</td><td>yes</td><td class="num">87</td><td class="num">133</td></tr>
+<tr><td><code>Assembly-CSharp</code> (no .asmdef)</td><td><code>Game/EmberGrove/Assets</code></td><td><code>CardForge.Circuit</code>, <code>CardForge.Content</code>, <code>CardForge.Exploration</code>, <code>CardForge.Functional</code>, <code>EmberGrove.Expedition</code>, <code>EmberGrove.Expedition.Networking</code>, <code>EmberGrove.Expedition.Progression</code></td><td>game scripts outside Editor folders</td><td>yes</td><td class="num">90</td><td class="num">136</td></tr>
 <tr><td><code>Assembly-CSharp-Editor</code> (no .asmdef)</td><td><code>Game/EmberGrove/Assets</code></td><td><code>Assembly-CSharp</code>, <code>CardForge.Circuit</code>, <code>CardForge.Content</code>, <code>CardForge.Exploration</code>, <code>CardForge.Functional</code>, <code>CardForge.Linker.Editor</code>, <code>EmberGrove.Expedition</code>, <code>EmberGrove.Expedition.Networking</code>, <code>EmberGrove.Expedition.Progression</code></td><td>game scripts in Editor folders, Editor only</td><td>yes</td><td class="num">3</td><td class="num">11</td></tr>
 </table></div>
 
@@ -130,9 +130,9 @@ flowchart LR
 <div class="scrollx"><table>
 <tr><th>Project</th><th>SDK</th><th>Defines</th><th>Compiles from outside its folder</th><th>Own C# files</th><th>Project references</th></tr>
 <tr><td><code>Tools/CircuitChecks/CircuitChecks.csproj</code></td><td>Microsoft.NET.Sdk</td><td>—</td><td><code>Runtime/Functional/Result.cs</code><br><code>Runtime/Core/*.cs</code><br><code>Runtime/Circuit/*.cs</code></td><td>1</td><td>—</td></tr>
-<tr><td><code>Tools/CircuitContentChecks/CircuitContentChecks.csproj</code></td><td>Microsoft.NET.Sdk</td><td>—</td><td><code>Runtime/Functional/*.cs</code><br><code>Runtime/Core/*.cs</code><br><code>Runtime/Progression/*.cs</code><br><code>Runtime/Content/ExpeditionContent.cs</code><br><code>Runtime/Content/WorldContent.cs</code><br><code>Tools/ContentStudio/UnityBoundary.cs</code></td><td>1</td><td>—</td></tr>
+<tr><td><code>Tools/CircuitContentChecks/CircuitContentChecks.csproj</code></td><td>Microsoft.NET.Sdk</td><td>—</td><td><code>Runtime/Functional/*.cs</code><br><code>Runtime/Core/*.cs</code><br><code>Runtime/Progression/*.cs</code><br><code>Runtime/Content/ExpeditionContent.cs</code><br><code>Runtime/Content/WorldContent.cs</code><br><code>Runtime/Circuit/*.cs</code><br><code>Runtime/Exploration/*.cs</code><br><code>Game/EmberGrove/Assets/Runtime/Exploration/CircuitDefinitionBuilder.cs</code><br><code>Tools/ContentStudio/UnityBoundary.cs</code></td><td>1</td><td>—</td></tr>
 <tr><td><code>Tools/CircuitFieldSetupChecks/CircuitFieldSetupChecks.csproj</code></td><td>Microsoft.NET.Sdk</td><td>—</td><td><code>Runtime/Functional/*.cs</code><br><code>Runtime/Core/*.cs</code><br><code>Runtime/Progression/*.cs</code><br><code>Runtime/Content/ExpeditionContent.cs</code><br><code>Runtime/Content/WorldContent.cs</code><br><code>Tools/ContentStudio/UnityBoundary.cs</code><br><code>Temp/CircuitFieldSetupChecks/ActualSetup.cs</code> (not tracked)</td><td>1</td><td>—</td></tr>
-<tr><td><code>Tools/CircuitPersistenceChecks/CircuitPersistenceChecks.csproj</code></td><td>Microsoft.NET.Sdk</td><td><code>CIRCUIT_PERSISTENCE_PORTABLE</code></td><td><code>Runtime/Functional/Result.cs</code><br><code>Runtime/Core/*.cs</code><br><code>Runtime/Circuit/*.cs</code><br><code>Game/EmberGrove/Assets/Runtime/Exploration/CircuitPersistence.cs</code><br><code>Game/EmberGrove/Assets/Tests/CircuitPersistenceVerification.cs</code></td><td>1</td><td>—</td></tr>
+<tr><td><code>Tools/CircuitPersistenceChecks/CircuitPersistenceChecks.csproj</code></td><td>Microsoft.NET.Sdk</td><td><code>CIRCUIT_PERSISTENCE_PORTABLE</code></td><td><code>Runtime/Functional/Result.cs</code><br><code>Runtime/Core/*.cs</code><br><code>Runtime/Circuit/*.cs</code><br><code>Game/EmberGrove/Assets/Runtime/Exploration/CircuitPersistence.cs</code><br><code>Game/EmberGrove/Assets/Runtime/Exploration/CircuitProgress.cs</code><br><code>Game/EmberGrove/Assets/Tests/CircuitPersistenceVerification.cs</code></td><td>1</td><td>—</td></tr>
 <tr><td><code>Tools/CircuitWorldChecks/CircuitWorldChecks.csproj</code></td><td>Microsoft.NET.Sdk</td><td>—</td><td><code>Runtime/Functional/Result.cs</code><br><code>Runtime/Core/*.cs</code><br><code>Runtime/Circuit/*.cs</code><br><code>Runtime/Exploration/*.cs</code><br><code>Game/EmberGrove/Assets/Runtime/Exploration/CircuitWorldLayout.cs</code></td><td>1</td><td>—</td></tr>
 <tr><td><code>Tools/CodeMetrics/CodeMetrics.csproj</code></td><td>Microsoft.NET.Sdk</td><td>—</td><td>—</td><td>1</td><td>—</td></tr>
 <tr><td><code>Tools/ContentStudio/ContentStudio.csproj</code></td><td>Microsoft.NET.Sdk</td><td><code>CARDFORGE_HEADLESS</code>, <code>STUDIO_DESKTOP (conditional)</code></td><td><code>Runtime/Functional/*.cs</code><br><code>Runtime/Core/*.cs</code><br><code>Runtime/Progression/*.cs</code><br><code>Runtime/Circuit/*.cs</code><br><code>Runtime/Content/ContentPackFiles.cs</code><br><code>Runtime/Content/ExpeditionContent.cs</code><br><code>Runtime/Content/WorldContent.cs</code></td><td>3</td><td>—</td></tr>
@@ -178,6 +178,9 @@ flowchart LR
   p_Tools_CircuitContentChecks_CircuitContentChecks_csproj --&gt;|&quot;*.cs&quot;| f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Core
   p_Tools_CircuitContentChecks_CircuitContentChecks_csproj --&gt;|&quot;*.cs&quot;| f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Progression
   p_Tools_CircuitContentChecks_CircuitContentChecks_csproj --&gt;|&quot;ExpeditionContent.cs, WorldContent.cs&quot;| f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Content
+  p_Tools_CircuitContentChecks_CircuitContentChecks_csproj --&gt;|&quot;*.cs&quot;| f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Circuit
+  p_Tools_CircuitContentChecks_CircuitContentChecks_csproj --&gt;|&quot;*.cs&quot;| f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Exploration
+  p_Tools_CircuitContentChecks_CircuitContentChecks_csproj --&gt;|&quot;CircuitDefinitionBuilder.cs&quot;| f_Game_EmberGrove_Assets_Runtime_Exploration
   p_Tools_CircuitContentChecks_CircuitContentChecks_csproj --&gt;|&quot;UnityBoundary.cs&quot;| f_Tools_ContentStudio
   p_Tools_CircuitFieldSetupChecks_CircuitFieldSetupChecks_csproj --&gt;|&quot;*.cs&quot;| f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Functional
   p_Tools_CircuitFieldSetupChecks_CircuitFieldSetupChecks_csproj --&gt;|&quot;*.cs&quot;| f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Core
@@ -188,7 +191,7 @@ flowchart LR
   p_Tools_CircuitPersistenceChecks_CircuitPersistenceChecks_csproj --&gt;|&quot;Result.cs&quot;| f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Functional
   p_Tools_CircuitPersistenceChecks_CircuitPersistenceChecks_csproj --&gt;|&quot;*.cs&quot;| f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Core
   p_Tools_CircuitPersistenceChecks_CircuitPersistenceChecks_csproj --&gt;|&quot;*.cs&quot;| f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Circuit
-  p_Tools_CircuitPersistenceChecks_CircuitPersistenceChecks_csproj --&gt;|&quot;CircuitPersistence.cs&quot;| f_Game_EmberGrove_Assets_Runtime_Exploration
+  p_Tools_CircuitPersistenceChecks_CircuitPersistenceChecks_csproj --&gt;|&quot;CircuitPersistence.cs, CircuitProgress.cs&quot;| f_Game_EmberGrove_Assets_Runtime_Exploration
   p_Tools_CircuitPersistenceChecks_CircuitPersistenceChecks_csproj --&gt;|&quot;CircuitPersistenceVerification.cs&quot;| f_Game_EmberGrove_Assets_Tests
   p_Tools_CircuitWorldChecks_CircuitWorldChecks_csproj --&gt;|&quot;Result.cs&quot;| f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Functional
   p_Tools_CircuitWorldChecks_CircuitWorldChecks_csproj --&gt;|&quot;*.cs&quot;| f_Toolkit_Packages_com_catsplat_cardforge_Runtime_Core
@@ -1984,7 +1987,7 @@ classDiagram
 </pre></div>
 <p class="caption">29 types; 12 referenced types from elsewhere, tagged external and named with where they live; 6 more referenced types not drawn. Folders: <code>Game/EmberGrove/Assets/Runtime</code>, <code>Game/EmberGrove/Assets/Tests/Runtime</code>.</p>
 
-<h3 id="game-embergrove-exploration">EmberGrove.Exploration — Assembly-CSharp</h3>
+<h3 id="game-embergrove-exploration-1">EmberGrove.Exploration (1 of 2) — Assembly-CSharp</h3>
 <div class="diagram"><pre class="mermaid">
 classDiagram
   class c_AuthoredCircuitDistrict[&quot;AuthoredCircuitDistrict&quot;]
@@ -1998,6 +2001,85 @@ classDiagram
   c_AuthoredCircuitRoom : +string Kind
   c_AuthoredCircuitRoom : +IsometricSectorVisuals.AuthoredVenue Binding
   c_AuthoredCircuitRoom : +Validate(float)
+  class c_CircuitContentLoader[&quot;CircuitContentLoader&quot;]
+  c_CircuitContentLoader : +IReadOnlyList~string~ SidecarFiles$
+  class c_CircuitGuide[&quot;CircuitGuide&quot;]
+  c_CircuitGuide : +int Version
+  c_CircuitGuide : +CardGuide[] Cards
+  c_CircuitGuide : +ArchetypeGuide[] Archetypes
+  class c_CardGuide[&quot;CardGuide&quot;]
+  c_CardGuide : +string Id
+  c_CardGuide : +string Lesson
+  c_CardGuide : +string Strength
+  c_CardGuide : +string Weakness
+  c_CardGuide : +int UnlockOrder
+  class c_ArchetypeGuide[&quot;ArchetypeGuide&quot;]
+  c_ArchetypeGuide : +string Id
+  c_ArchetypeGuide : +string Summary
+  c_ArchetypeGuide : +string Weakness
+  c_ArchetypeGuide : +string EncounterId
+  c_ArchetypeGuide : +string BossEncounterId
+  c_ArchetypeGuide : +string[] StarterCardIds
+  class c_CircuitPlaces[&quot;CircuitPlaces&quot;]
+  c_CircuitPlaces : +string Title
+  c_CircuitPlaces : +string[] Names
+  c_CircuitPlaces : +SectorDefinition[] Layouts
+  c_CircuitPlaces : +CircuitPresentation Presentation
+  c_CircuitPlaces : +LobbyDefinition Lobby
+  class c_CircuitPresentation[&quot;CircuitPresentation&quot;]
+  c_CircuitPresentation : +string SkyColor
+  c_CircuitPresentation : +string HorizonColor
+  c_CircuitPresentation : +string GroundBounceColor
+  c_CircuitPresentation : +string SunColor
+  c_CircuitPresentation : +string HazeColor
+  c_CircuitPresentation : +float SunIntensity
+  c_CircuitPresentation : +float ShadowStrength
+  c_CircuitPresentation : +float HazeStart
+  c_CircuitPresentation : +float HazeEnd
+  c_CircuitPresentation : +float CameraHeight
+  c_CircuitPresentation : … 1 more
+  class c_CircuitJourney[&quot;CircuitJourney&quot;]
+  c_CircuitJourney : +int Version
+  c_CircuitJourney : +CircuitLearningPolicy Learning
+  c_CircuitJourney : +JourneyFraming Framing
+  c_CircuitJourney : +JourneyLesson[] Lessons
+  c_CircuitJourney : +JourneyPerk[] SoloPerks
+  c_CircuitJourney : +JourneyIntroduction Introduction
+  class c_JourneyIntroduction[&quot;JourneyIntroduction&quot;]
+  c_JourneyIntroduction : +string Title
+  c_JourneyIntroduction : +string Explore
+  c_JourneyIntroduction : +string Collect
+  c_JourneyIntroduction : +string Play
+  c_JourneyIntroduction : +string PracticeButton
+  c_JourneyIntroduction : +string ExploreButton
+  class c_JourneyFraming[&quot;JourneyFraming&quot;]
+  c_JourneyFraming : +string Welcome
+  c_JourneyFraming : +string TournamentEntry
+  c_JourneyFraming : +string TournamentRisk
+  c_JourneyFraming : +string DayEnd
+  c_JourneyFraming : +string AdvancedUnlocked
+  class c_JourneyLesson[&quot;JourneyLesson&quot;]
+  c_JourneyLesson : +string Id
+  c_JourneyLesson : +string Body
+  c_JourneyLesson : +string Archetype
+  c_JourneyLesson : +string Summary
+  c_JourneyLesson : +string Picture
+  class c_JourneyPerk[&quot;JourneyPerk&quot;]
+  c_JourneyPerk : +string Id
+  c_JourneyPerk : +string Description
+  c_JourneyPerk : +string Tradeoff
+  c_JourneyPerk : +int OpeningMomentumBonus
+  c_JourneyPerk : +int OpeningScoutDepth
+  class c_CircuitDefinitionBuilder[&quot;CircuitDefinitionBuilder&quot;]
+  &lt;&lt;static&gt;&gt; c_CircuitDefinitionBuilder
+  c_CircuitDefinitionBuilder : +string CircuitId$
+  c_CircuitDefinitionBuilder : +string FirstStarterId$
+  c_CircuitDefinitionBuilder : +CardTier(int) int$
+  c_CircuitDefinitionBuilder : +RivalTier(int) int$
+  c_CircuitDefinitionBuilder : +Validate(CircuitGuide, CircuitDialogue, …)$
+  c_CircuitDefinitionBuilder : +PrepareLessons(LessonLibrary, ContentPack, …) LessonLibrary$
+  c_CircuitDefinitionBuilder : +Build(CircuitGuide, CircuitJourney, …) CircuitDefinition$
+  c_CircuitDefinitionBuilder : +CheckRivals(CircuitDefinition, ContentPack)$
   class c_CircuitSave[&quot;CircuitSave&quot;]
   c_CircuitSave : +int Version
   c_CircuitSave : +CircuitState State
@@ -2011,6 +2093,38 @@ classDiagram
   c_CircuitSave : +int FocusStage
   c_CircuitSave : … 3 more
   class c_CircuitPersistence[&quot;CircuitPersistence&quot;]
+  class c_CircuitLearningPolicy[&quot;CircuitLearningPolicy · CardForge.Circuit&quot;]
+  &lt;&lt;external&gt;&gt; c_CircuitLearningPolicy
+  class c_CircuitState[&quot;CircuitState · CardForge.Circuit&quot;]
+  &lt;&lt;external&gt;&gt; c_CircuitState
+  class c_LessonLibrary[&quot;LessonLibrary · EmberGrove.Expedition&quot;]
+  &lt;&lt;external&gt;&gt; c_LessonLibrary
+  class c_SectorDefinition[&quot;SectorDefinition · CardForge.Exploration&quot;]
+  &lt;&lt;external&gt;&gt; c_SectorDefinition
+  class c_LobbyDefinition[&quot;LobbyDefinition · CardForge.Exploration&quot;]
+  &lt;&lt;external&gt;&gt; c_LobbyDefinition
+  c_CircuitContentLoader --&gt; c_CircuitGuide : Guide
+  c_CircuitContentLoader --&gt; c_CircuitPlaces : Places
+  c_CircuitContentLoader --&gt; c_CircuitJourney : Journey
+  c_CircuitContentLoader --&gt; c_LessonLibrary : Lessons
+  c_CircuitGuide --&gt; &quot;*&quot; c_CardGuide : Cards
+  c_CircuitGuide --&gt; &quot;*&quot; c_ArchetypeGuide : Archetypes
+  c_CircuitPlaces --&gt; c_CircuitPresentation : Presentation
+  c_CircuitPlaces --&gt; &quot;*&quot; c_SectorDefinition : Layouts
+  c_CircuitPlaces --&gt; c_LobbyDefinition : Lobby
+  c_CircuitJourney --&gt; c_JourneyIntroduction : Introduction
+  c_CircuitJourney --&gt; c_JourneyFraming : Framing
+  c_CircuitJourney --&gt; &quot;*&quot; c_JourneyLesson : Lessons
+  c_CircuitJourney --&gt; &quot;*&quot; c_JourneyPerk : SoloPerks
+  c_CircuitJourney --&gt; c_CircuitLearningPolicy : Learning
+  c_CircuitSave --&gt; c_CircuitState : State
+</pre></div>
+<p class="caption">16 types; 5 referenced types from elsewhere, tagged external and named with where they live. Folders: <code>Game/EmberGrove/Assets/Runtime/Exploration</code>.</p>
+
+<h3 id="game-embergrove-exploration-2">EmberGrove.Exploration (2 of 2) — Assembly-CSharp</h3>
+<div class="diagram"><pre class="mermaid">
+classDiagram
+  class c_CircuitProgress[&quot;CircuitProgress&quot;]
   class c_CircuitWorldLayout[&quot;CircuitWorldLayout&quot;]
   &lt;&lt;static&gt;&gt; c_CircuitWorldLayout
   c_CircuitWorldLayout : +int DistrictStride$
@@ -2041,7 +2155,7 @@ classDiagram
   c_IsometricSectorVisuals : 312 members over 6 files
   class c_IsometricSlice[&quot;IsometricSlice&quot;]
   &lt;&lt;partial&gt;&gt; c_IsometricSlice
-  c_IsometricSlice : 998 members over 19 files
+  c_IsometricSlice : 985 members over 19 files
   class c_TravellerPreferenceText[&quot;TravellerPreferenceText&quot;]
   &lt;&lt;MonoBehaviour&gt;&gt; c_TravellerPreferenceText
   c_TravellerPreferenceText : +Apply(TMP_Text, float)
@@ -2094,6 +2208,8 @@ classDiagram
   class c_CircuitSliceChecks[&quot;CircuitSliceChecks&quot;]
   &lt;&lt;partial&gt;&gt; c_CircuitSliceChecks
   c_CircuitSliceChecks : 721 members over 10 files
+  class c_AuthoredCircuitRoom[&quot;AuthoredCircuitRoom · same namespace&quot;]
+  &lt;&lt;external&gt;&gt; c_AuthoredCircuitRoom
   class c_PlayerSettings[&quot;PlayerSettings · EmberGrove.Expedition&quot;]
   &lt;&lt;external&gt;&gt; c_PlayerSettings
   class c_WorldTableContext[&quot;WorldTableContext · EmberGrove.Expedition&quot;]
@@ -2102,46 +2218,44 @@ classDiagram
   &lt;&lt;external&gt;&gt; c_CircuitDefinition
   class c_CircuitDialogue[&quot;CircuitDialogue · CardForge.Circuit&quot;]
   &lt;&lt;external&gt;&gt; c_CircuitDialogue
-  class c_CircuitOpeningDefinition[&quot;CircuitOpeningDefinition · CardForge.Circuit&quot;]
-  &lt;&lt;external&gt;&gt; c_CircuitOpeningDefinition
   class c_CircuitEventDefinition[&quot;CircuitEventDefinition · CardForge.Circuit&quot;]
   &lt;&lt;external&gt;&gt; c_CircuitEventDefinition
   class c_CircuitEpisodeDefinition[&quot;CircuitEpisodeDefinition · CardForge.Circuit&quot;]
   &lt;&lt;external&gt;&gt; c_CircuitEpisodeDefinition
+  class c_CircuitTaskStatus[&quot;CircuitTaskStatus · CardForge.Circuit&quot;]
+  &lt;&lt;external&gt;&gt; c_CircuitTaskStatus
   class c_CircuitDuelOutcome[&quot;CircuitDuelOutcome · CardForge.Circuit&quot;]
   &lt;&lt;external&gt;&gt; c_CircuitDuelOutcome
-  class c_CircuitLocation[&quot;CircuitLocation · CardForge.Circuit&quot;]
-  &lt;&lt;external&gt;&gt; c_CircuitLocation
   class c_CircuitState[&quot;CircuitState · CardForge.Circuit&quot;]
   &lt;&lt;external&gt;&gt; c_CircuitState
   class c_LessonDefinition[&quot;LessonDefinition · EmberGrove.Expedition&quot;]
   &lt;&lt;external&gt;&gt; c_LessonDefinition
   class c_ExpeditionNetworkSession[&quot;ExpeditionNetworkSession · EmberGrove.Expedition.Networking&quot;]
   &lt;&lt;external&gt;&gt; c_ExpeditionNetworkSession
-  c_CircuitSave --&gt; c_CircuitState : State
+  c_CircuitProgress --&gt; c_CircuitDefinition : Definition, taskDefinition
+  c_CircuitProgress --&gt; &quot;*&quot; c_CircuitTaskStatus : tasks, SelectedTask
+  c_CircuitProgress --&gt; c_CircuitState : State, taskState
   c_IsometricCombatBridge --&gt; c_PlayerSettings : ResultSettings
   c_IsometricCombatBridge --&gt; c_WorldTableContext : Table
   c_IsometricCombatBridge --&gt; c_CircuitDuelOutcome : Outcome
   c_IsometricCombatBridge --&gt; c_LessonDefinition : Lesson
   c_IsometricCombatBridge --&gt; c_ExpeditionNetworkSession : LobbySession
-  c_IsometricSectorVisuals --&gt; &quot;*&quot; c_AuthoredCircuitDistrict : ReusableDistricts
   c_IsometricSectorVisuals --&gt; &quot;*&quot; c_AuthoredCircuitRoom : boundRooms
   c_IsometricSlice --&gt; c_AuthoredCircuitRoom : lobbyRoom
-  c_IsometricSlice --&gt; c_CircuitPersistence : circuitPersistence
+  c_IsometricSlice --&gt; c_CircuitProgress : progress, json
   c_IsometricSlice --&gt; c_IsometricCombatBridge : combat, Combat
   c_IsometricSlice --&gt; c_IsometricSectorVisuals : visuals
   c_IsometricSlice --&gt; c_LodgeWaybookBinding : waybookBinding
   c_IsometricSlice --&gt; &quot;*&quot; c_TravellerButtonMotion : preferenceButtons
   c_IsometricSlice --&gt; c_PlayerSettings : worldPreferences
   c_IsometricSlice --&gt; c_WorldTableContext : activeWorldTable
-  c_IsometricSlice --&gt; c_CircuitDefinition : circuitDefinition, adventureTaskDefinition
+  c_IsometricSlice --&gt; c_CircuitDefinition : circuitDefinition
   c_IsometricSlice --&gt; c_CircuitDialogue : circuitDialogue, LoadedCircuitDialogue
-  c_IsometricSlice --&gt; c_CircuitOpeningDefinition : ClubOpening
   c_IsometricSlice --&gt; c_CircuitEventDefinition : CurrentAdventureEvent
   c_IsometricSlice --&gt; c_CircuitEpisodeDefinition : CurrentEpisode
+  c_IsometricSlice --&gt; c_CircuitTaskStatus : SelectedAdventureTask, NextAdventureTask
   c_IsometricSlice --&gt; c_CircuitDuelOutcome : adventureEpisodeOutcome
-  c_IsometricSlice --&gt; c_CircuitLocation : NextCircuitPlayLocation, CircuitLocation
-  c_IsometricSlice --&gt; c_CircuitState : circuit, adventureTaskState
+  c_IsometricSlice --&gt; c_CircuitState : circuit
   c_IsometricSlice --&gt; &quot;*&quot; c_LessonDefinition : SelectedLesson, CategoryLessons, …
   c_IsometricSlice --&gt; c_ExpeditionNetworkSession : lobbySession
   c_TravellerPictureGraphic --&gt; c_TravellerPicture : Kind
@@ -2149,7 +2263,7 @@ classDiagram
   c_CircuitSliceChecks --&gt; c_IsometricSlice : slice
   c_CircuitSliceChecks --&gt; c_WorldTableContext : livingTableContext
 </pre></div>
-<p class="caption">19 types; 12 referenced types from elsewhere, tagged external and named with where they live; 15 more referenced types not drawn. Folders: <code>Game/EmberGrove/Assets/Runtime/Exploration</code>, <code>Game/EmberGrove/Assets/Tests</code>, <code>Game/EmberGrove/Assets/Tests/Runtime</code>.</p>
+<p class="caption">16 types; 12 referenced types from elsewhere, tagged external and named with where they live; 24 more referenced types not drawn. Folders: <code>Game/EmberGrove/Assets/Runtime/Exploration</code>, <code>Game/EmberGrove/Assets/Tests</code>, <code>Game/EmberGrove/Assets/Tests/Runtime</code>.</p>
 
 <h3 id="game-embergrove-playtesting">EmberGrove.Playtesting — Assembly-CSharp</h3>
 <div class="diagram"><pre class="mermaid">
@@ -2242,7 +2356,7 @@ classDiagram
 <div class="scrollx"><table>
 <tr><th>Class</th><th>Assembly</th><th class="num">Files</th><th class="num">Members</th><th class="num">Methods</th></tr>
 <tr><td><a href="#partial-assembly-csharp-embergrove-expedition-expeditionview">ExpeditionView</a></td><td><code>Assembly-CSharp</code></td><td class="num">23</td><td class="num">698</td><td class="num">540</td></tr>
-<tr><td><a href="#partial-assembly-csharp-embergrove-exploration-isometricslice">IsometricSlice</a></td><td><code>Assembly-CSharp</code></td><td class="num">19</td><td class="num">998</td><td class="num">680</td></tr>
+<tr><td><a href="#partial-assembly-csharp-embergrove-exploration-isometricslice">IsometricSlice</a></td><td><code>Assembly-CSharp</code></td><td class="num">19</td><td class="num">985</td><td class="num">668</td></tr>
 <tr><td><a href="#partial-assembly-csharp-embergrove-expedition-expeditionapp">ExpeditionApp</a></td><td><code>Assembly-CSharp</code></td><td class="num">10</td><td class="num">365</td><td class="num">194</td></tr>
 <tr><td><a href="#partial-assembly-csharp-embergrove-exploration-circuitslicechecks">CircuitSliceChecks</a></td><td><code>Assembly-CSharp</code></td><td class="num">10</td><td class="num">721</td><td class="num">682</td></tr>
 <tr><td><a href="#partial-assembly-csharp-embergrove-exploration-isometricsectorvisuals">IsometricSectorVisuals</a></td><td><code>Assembly-CSharp</code></td><td class="num">6</td><td class="num">312</td><td class="num">234</td></tr>
@@ -2283,14 +2397,14 @@ flowchart LR
 <h3 id="partial-assembly-csharp-embergrove-exploration-isometricslice">IsometricSlice — Assembly-CSharp</h3>
 <div class="diagram"><pre class="mermaid">
 flowchart LR
-  c[&quot;IsometricSlice&lt;br/&gt;19 files&lt;br/&gt;998 members&quot;]
+  c[&quot;IsometricSlice&lt;br/&gt;19 files&lt;br/&gt;985 members&quot;]
   c --&gt; f_Game_EmberGrove_Assets_Runtime_Exploration_IsometricSlice_Audio_cs[&quot;IsometricSlice.Audio.cs&lt;br/&gt;28 methods, 30 fields and properties&quot;]
-  c --&gt; f_Game_EmberGrove_Assets_Runtime_Exploration_IsometricSlice_Circuit_cs[&quot;IsometricSlice.Circuit.cs&lt;br/&gt;89 methods, 47 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Runtime_Exploration_IsometricSlice_Circuit_cs[&quot;IsometricSlice.Circuit.cs&lt;br/&gt;84 methods, 46 fields and properties&quot;]
   c --&gt; f_Game_EmberGrove_Assets_Runtime_Exploration_IsometricSlice_CircuitUi_cs[&quot;IsometricSlice.CircuitUi.cs&lt;br/&gt;106 methods, 10 fields and properties&quot;]
   c --&gt; f_Game_EmberGrove_Assets_Runtime_Exploration_IsometricSlice_DeckBuilder_cs[&quot;IsometricSlice.DeckBuilder.cs&lt;br/&gt;124 methods, 41 fields and properties&quot;]
   c --&gt; f_Game_EmberGrove_Assets_Runtime_Exploration_IsometricSlice_Hud_cs[&quot;IsometricSlice.Hud.cs&lt;br/&gt;38 methods, 25 fields and properties&quot;]
-  c --&gt; f_Game_EmberGrove_Assets_Runtime_Exploration_IsometricSlice_Learning_cs[&quot;IsometricSlice.Learning.cs&lt;br/&gt;15 methods, 2 fields and properties&quot;]
-  c --&gt; f_Game_EmberGrove_Assets_Runtime_Exploration_IsometricSlice_Lessons_cs[&quot;IsometricSlice.Lessons.cs&lt;br/&gt;23 methods, 10 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Runtime_Exploration_IsometricSlice_Learning_cs[&quot;IsometricSlice.Learning.cs&lt;br/&gt;9 methods, 2 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Runtime_Exploration_IsometricSlice_Lessons_cs[&quot;IsometricSlice.Lessons.cs&lt;br/&gt;22 methods, 10 fields and properties&quot;]
   c --&gt; f_Game_EmberGrove_Assets_Runtime_Exploration_IsometricSlice_Onboarding_cs[&quot;IsometricSlice.Onboarding.cs&lt;br/&gt;38 methods, 17 fields and properties&quot;]
   c --&gt; f_Game_EmberGrove_Assets_Runtime_Exploration_IsometricSlice_Preferences_cs[&quot;IsometricSlice.Preferences.cs&lt;br/&gt;4 methods, 5 fields and properties&quot;]
   c --&gt; f_Game_EmberGrove_Assets_Runtime_Exploration_IsometricSlice_Presentation_cs[&quot;IsometricSlice.Presentation.cs&lt;br/&gt;10 methods, 8 fields and properties&quot;]
