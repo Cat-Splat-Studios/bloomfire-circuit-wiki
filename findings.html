@@ -40,7 +40,7 @@
   <div class="tldr"><h4>In 60 seconds</h4><ul>
     <li><b>24 findings in five groups.</b> Architecture, coupling, duplication, dead code and tooling. Each has evidence checked against <code>main</code>, why it matters, two or three fix options with a rough size, and its roadmap item if there is one. This page suggests a priority but decides nothing.</li>
     <li><b>Methods are small now, classes are not.</b> Every member is below cyclomatic complexity 10 (<a href="complexity.html">Complexity</a>). That metric measures branches inside one member. It does not measure how many members a class has, and <code>IsometricSlice</code> still holds hundreds of methods and fields in one MonoBehaviour (snapshot in <a href="#architecture">§03</a>).</li>
-    <li><b>Two findings are marked high.</b> <a href="#f01">F01</a>, <code>IsometricSlice</code>'s size, and <a href="#f08">F08</a>, the rehearsals reaching private members by string name. F08 makes every extraction riskier, because a rename still compiles and fails only in a player run.</li>
+    <li><b>One finding is marked high, and one is done.</b> <a href="#f01">F01</a> is <code>IsometricSlice</code>'s size. <a href="#f08">F08</a>, the rehearsals reaching private members by string name, was fixed first because it made every extraction riskier: now a rename fails to compile instead of failing in a player run.</li>
     <li><b>Much of the menu duplication already has a plan.</b> Cleanup steps G and H and the UI Toolkit migration cover the two menu stacks, the hosted windows and Settings. Those findings link the plan rather than decide it again.</li>
     <li><b>Some fixes are small.</b> Dead loaders, an unused component, a class that a script cuts out of a source file by counting braces, and a duplicated set of data types each take a day or less (size S).</li>
   </ul></div>
@@ -58,7 +58,7 @@
         <tr><td><a href="#f05">F05</a></td><td><code>ExpeditionNetworkSession</code> carries every transport in one class</td><td><span class="badge medium">medium</span></td><td>Architecture</td><td>S–L</td></tr>
         <tr><td><a href="#f06">F06</a></td><td><code>CircuitRules</code> is one static class across three files</td><td><span class="badge low">low</span></td><td>Architecture</td><td>S–M</td></tr>
         <tr><td><a href="#f07">F07</a></td><td>Namespaces do not follow assemblies</td><td><span class="badge low">low</span></td><td>Architecture</td><td>S–M</td></tr>
-        <tr><td><a href="#f08">F08</a></td><td>Rehearsals and tools reach private members by string</td><td><span class="badge high">high</span></td><td>Coupling</td><td>S–L</td></tr>
+        <tr><td><a href="#f08">F08</a></td><td>Rehearsals and tools reach private members by string</td><td><span class="badge done">done</span></td><td>Coupling</td><td>M</td></tr>
         <tr><td><a href="#f09">F09</a></td><td>Production code calls into the rehearsal classes</td><td><span class="badge medium">medium</span></td><td>Coupling</td><td>S–M</td></tr>
         <tr><td><a href="#f10">F10</a></td><td>The world and the hosted session reach into each other</td><td><span class="badge low">low</span></td><td>Coupling</td><td>S–M</td></tr>
         <tr><td><a href="#f11">F11</a></td><td>Code in files named for other types</td><td><span class="badge low">low</span></td><td>Coupling</td><td>S</td></tr>
@@ -83,7 +83,7 @@
     <p class="lead">Some fixes make others cheaper, and some findings shrink when a roadmap step lands. This is not an order; it shows what each choice touches.</p>
     <div class="diagram"><pre class="mermaid">
 flowchart LR
-  F08["F08 string-keyed reflection"]
+  F08["F08 string-keyed reflection, done"]
   F01["F01 IsometricSlice"]
   F02["F02 ExpeditionView"]
   F04["F04 implicit screen state"]
@@ -133,11 +133,11 @@ flowchart LR
     <p class="caption">Methods are the method, constructor and operator declarations directly on the type, summed over every partial part; nested types' members and local functions are not counted. Lines are the lines inside the type's declarations, in thousands. How these were counted is in <a href="#method">§09</a>.</p>
 
     <h3 id="f01">F01 · <code>IsometricSlice</code> holds the whole world in one MonoBehaviour <span class="badge high">high</span></h3>
-    <p class="dim"><b>Why this priority:</b> it is the largest production class in the game, the menu migration's lodge-list, deck-builder and map slices all start inside it, and most of the rehearsals' string-keyed reflection points at it.</p>
+    <p class="dim"><b>Why this priority:</b> it is the largest production class in the game, the menu migration's lodge-list, deck-builder and map slices all start inside it, and most of what the rehearsals reach is on it.</p>
     <p><b>Evidence.</b></p>
     <ul>
       <li>19 partial files in <code>Game/EmberGrove/Assets/Runtime/Exploration</code>: <code>IsometricSlice.cs</code> plus Audio, Circuit, CircuitUi, DeckBuilder, Hud, Learning, Lessons, Onboarding, Preferences, Presentation, Progress, Settings, Table, Title, Versus, Waybook, WaybookMenu and World.</li>
-      <li>One MonoBehaviour; its member counts are in the table above. The journal alone has a private <code>CircuitPage</code> enum with one value per page and a back stack of pages.</li>
+      <li>One MonoBehaviour; its member counts are in the table above. The journal alone has a <code>CircuitPage</code> enum with one value per page and a back stack of pages.</li>
       <li>It boots the scene, reads the Circuit sidecars and builds the <code>CircuitDefinition</code> (<a href="#f14">F14</a>), and owns the <code>circuit</code> field (<code>CircuitState</code>) with <code>ApplyCircuit</code>, <code>SaveCircuit</code> and <code>CaptureCircuitSave</code>. It also walks the traveller, draws the HUD and every lodge window, and runs the deck builder, lessons, onboarding, the Versus table lobby and the hand-off to Settings.</li>
     </ul>
     <p><b>Why it matters.</b> The partial files name topics but enforce nothing: any of the 19 files can read and write any of its instance fields, so a deck-builder change can break the title page. Nothing in the class can be tested without the scene and a player run. The roadmap's later migration slices move the lodge lists, the deck builder, and the map, tasks, dialogue and onboarding, and each of those starts by untangling its screen from this class.</p>
@@ -145,7 +145,7 @@ flowchart LR
       <thead><tr><th>Option</th><th>Size</th><th>Trade-offs</th></tr></thead>
       <tbody>
         <tr><td>Extract one screen per migration slice. Each slice moves its screen's state and rules into a plain C# model that the new view binds to. The roadmap already plans the deck builder as "its model, then a redesigned view".</td><td>M per slice</td><td>Fits work already planned. The class shrinks only as slices land, and the boot, world and save core stays.</td></tr>
-        <tr><td>Extract the non-UI core first. A plain class takes <code>circuit</code>, <code>ApplyCircuit</code>, <code>SaveCircuit</code>, <code>CaptureCircuitSave</code> and the duel commit (<code>CommitFinishedCircuitDuel</code>), and a separate loader takes the sidecars (<a href="#f14">F14</a>). The MonoBehaviour keeps references to both.</td><td>L</td><td>The save and duel path becomes testable in the fast portable suites. Every moved member that a rehearsal names by string must be renamed there by hand, so <a href="#f08">F08</a> first makes this cheaper.</td></tr>
+        <tr><td>Extract the non-UI core first. A plain class takes <code>circuit</code>, <code>ApplyCircuit</code>, <code>SaveCircuit</code>, <code>CaptureCircuitSave</code> and the duel commit (<code>CommitFinishedCircuitDuel</code>), and a separate loader takes the sidecars (<a href="#f14">F14</a>). The MonoBehaviour keeps references to both.</td><td>L</td><td>The save and duel path becomes testable in the fast portable suites. Rehearsals that reach the moved members must follow them; since <a href="#f08">F08</a> they reach them directly, so the compiler lists every call site.</td></tr>
         <tr><td>Freeze it. Add no new partial files or fields, and build new features in new classes.</td><td>S</td><td>Stops the growth. Removes nothing.</td></tr>
       </tbody>
     </table></div>
@@ -244,7 +244,7 @@ flowchart TD
     <div class="scrollx"><table>
       <thead><tr><th>Option</th><th>Size</th><th>Trade-offs</th></tr></thead>
       <tbody>
-        <tr><td>One enum for the open window, set through one method that checks the allowed changes. <code>Busy</code> and <code>Handoff</code> stay separate facts. The view switches on the enum.</td><td>M</td><td>Impossible combinations disappear. Every writer changes, and rehearsals that set these flags by string must change with them (<a href="#f08">F08</a>).</td></tr>
+        <tr><td>One enum for the open window, set through one method that checks the allowed changes. <code>Busy</code> and <code>Handoff</code> stay separate facts. The view switches on the enum.</td><td>M</td><td>Impossible combinations disappear. Every writer changes, and so do the rehearsals that set these flags, such as <code>app.Paused</code>; since <a href="#f08">F08</a> they set them directly, so the compiler lists every one.</td></tr>
         <tr><td>Keep the flags, and add one computed property that states today's order once. <code>CanAct</code>, <code>UpdateRivalScreenOpen</code> and <code>Render</code> all read it.</td><td>S</td><td>The order is written in one place. Impossible combinations can still be represented.</td></tr>
         <tr><td>Wait for the migration's input gate, build it with its own window stack, and retire each flag as its window moves.</td><td>follows the roadmap</td><td>No separate work. The flags stay for windows that remain on uGUI.</td></tr>
       </tbody>
@@ -257,7 +257,7 @@ flowchart TD
     <ul>
       <li>One class in the toolkit's Networking assembly; its size is in the table above. Its entry points are LAN (<code>HostLan</code>, <code>JoinLan</code>), relay (<code>HostRelay</code>, <code>JoinRelay</code>, <code>HostNamedRelay</code>, <code>JoinNamedRelay</code>), trusted authority (<code>QuickmatchTrusted</code>, <code>CreateTrusted</code>, <code>JoinTrusted</code>), the table lobby (<code>JoinLobbyTrusted</code>, <code>SubmitLobby</code>), and <code>Submit</code> and <code>Poll</code> for all of them.</li>
       <li>The same file also holds <code>NetworkLink</code>, <code>TcpNetworkLink</code>, <code>WebSocketNetworkLink</code> and the relay-readiness types.</li>
-      <li><code>Tools/ExpeditionNetworkChecks</code> compiles this toolkit file by path. <code>ExpeditionHarness.Network.cs</code> reaches its internal <code>RelayReadiness</code> and <code>ListRelayRoomsCoreAsync</code> by reflection.</li>
+      <li><code>Tools/ExpeditionNetworkChecks</code> compiles this toolkit file by path. <code>ExpeditionHarness.Network.cs</code> sets its public <code>RelayReadiness</code> and calls the <code>ListRelayRoomsAsync</code> overload that takes a readiness handler and a policy.</li>
     </ul>
     <p><b>Why it matters.</b> A player host, a forwarding relay and a trusted service share one set of state and lifecycle fields. Network work still ahead in the roadmap, such as platform integration and verified identity, would add another path into the same class.</p>
     <div class="scrollx"><table>
@@ -312,7 +312,7 @@ flowchart TD
   </section>
 
   <section id="coupling"><h2><span class="num">04</span>Coupling</h2>
-    <p class="lead">Dependencies that run the wrong way or bypass the compiler: production code calling test code, a hosted session finding the world globally, and rehearsals and tools reaching private members by name.</p>
+    <p class="lead">Dependencies that run the wrong way or bypass the compiler: production code calling test code, a hosted session finding the world globally, and a check that cuts a method out of a source file.</p>
     <div class="diagram"><pre class="mermaid">
 flowchart LR
   subgraph GAME["Assembly-CSharp"]
@@ -340,32 +340,34 @@ flowchart LR
   ISB --&gt;|CheckAndroidNetworkLaunch| EH
   EA --&gt;|FindAnyObjectByType| IS
   IS --&gt;|"glyph family, MenuNavigationRows"| EV
-  CSC -.-&gt;|"hundreds of member names as strings"| IS
+  CSC --&gt;|"internal members, called directly"| IS
   FS -.-&gt;|"cuts FairMatchSetup by counting braces"| SESS
   PT -.-&gt;|"compiles by file path"| GPURE
-  NT -.-&gt;|"private fields by reflection"| AUTH
+  NT --&gt;|"internal members, from source or InternalsVisibleTo"| AUTH
 </pre></div>
     <p class="caption">Solid arrows are compiled calls the compiler checks. Dotted arrows are links it cannot see: names in strings, files by path, or text cut from a source file.</p>
 
-    <h3 id="f08">F08 · Rehearsals and tools reach private members by string <span class="badge high">high</span></h3>
-    <p class="dim"><b>Why this priority:</b> any rename or extraction still compiles and then fails minutes later in a player run, so this raises the cost of <a href="#f01">F01</a>, <a href="#f02">F02</a>, <a href="#f04">F04</a> and <a href="#f21">F21</a>.</p>
-    <p><b>Evidence.</b></p>
+    <h3 id="f08">F08 · Rehearsals and tools reach private members by string <span class="badge done">done</span></h3>
+    <p class="dim"><b>Done 2026-11-07,</b> with the first option below: the rehearsals and tools now reach these members directly, so a rename or an extraction fails to compile instead of failing minutes later in a player run. That lowers the cost of <a href="#f01">F01</a>, <a href="#f02">F02</a>, <a href="#f04">F04</a> and <a href="#f21">F21</a>.</p>
+    <p><b>What it was.</b> About 1,060 accesses named a member in a string, about 850 of them through <code>CircuitSliceChecks</code>' helpers <code>Get</code>, <code>Get&lt;T&gt;</code>, <code>Set</code>, <code>SetProperty</code> and <code>Invoke</code>, mostly on the <code>IsometricSlice</code> instance. Pages opened through <code>Enum.Parse</code> on the private <code>CircuitPage</code> type, rehearsals wrote <code>ExpeditionApp</code>'s compiler-generated backing fields such as <code>&lt;State&gt;k__BackingField</code>, the card presentation check found <code>CurrentCardWorkshop</code> by its type name, and <code>Tools/ExpeditionNetworkChecks</code> and <code>Tools/ExpeditionPerformance/WorldFactChecks.cs</code> read <code>ExpeditionAuthority</code> and the relay's internals by name.</p>
+    <p><b>What changed.</b></p>
     <ul>
-      <li>In <code>Game/EmberGrove/Assets/Tests</code>, about 800 accesses name a member in a string literal, covering about 180 distinct names. They go through <code>CircuitSliceChecks</code>' helpers <code>Get</code>, <code>Get&lt;T&gt;</code>, <code>Set</code>, <code>SetProperty</code> and <code>Invoke</code>, or through <code>GetField</code>, <code>GetProperty</code>, <code>GetMethod</code> and <code>GetNestedType</code> directly. Most target the <code>IsometricSlice</code> instance. Pages open through <code>Enum.Parse</code> on the private <code>CircuitPage</code> type. Every one of those names still appears in the production source on <code>main</code>. More accesses set the compiler-generated backing fields of <code>ExpeditionApp</code> auto-properties, such as <code>&lt;State&gt;k__BackingField</code>, which exist only while the property has no body.</li>
-      <li>The rehearsal finds <code>EmberGrove.Editor.CurrentCardWorkshop</code> in the editor assembly by its type name.</li>
-      <li><code>Tools/ExpeditionNetworkChecks</code> reads <code>ExpeditionAuthority</code>'s private <code>state</code>, finds the relay's <code>RelayAdmission</code> type by name and reads its maps <code>addresses</code> and <code>failures</code>, and calls <code>RelayApplication.NormalizeSourceRevision</code>. <code>Tools/ExpeditionPerformance/WorldFactChecks.cs</code> reads <code>ExpeditionAuthority</code>'s <code>state</code>, <code>lastCommand</code> and <code>lastEvents</code>.</li>
-      <li><code>IsometricSliceBuild</code> looks up Unity's <code>UnityEditor.Android.AndroidExternalToolsSettings</code> by name across the loaded assemblies and reads <code>jdkRootPath</code>, <code>ndkRootPath</code>, <code>sdkRootPath</code> and <code>gradlePath</code>. It throws a clear message if the API is missing.</li>
+      <li>The about 220 members those accesses reach (fields, methods, properties, setters and nested types) are <code>internal</code> instead of <code>private</code>, or have an <code>internal set</code>, and the tests use them directly. Where a member already had a read accessor, the tests use that instead. The five helpers are gone. Where several fields shared one declaration, only the fields the tests use moved to a declaration of their own.</li>
+      <li>Pages, deck-builder sheets, input kinds and practice steps are enum constants such as <code>CircuitPage.Deck</code>, not strings compared with <code>ToString()</code>.</li>
+      <li>The Card Workshop proof moved to <code>Assets/Tests/Editor/CardWorkshopChecks.cs</code>, which compiles into the editor assembly and so can call <code>CurrentCardWorkshop</code>. It registers itself with the runtime half at editor load.</li>
+      <li>The network rehearsal sets its short relay-readiness timing through public toolkit members: <code>RelayReadinessPolicy</code>, <code>ExpeditionNetworkSession.RelayReadiness</code> and a <code>ListRelayRoomsAsync</code> overload that takes a readiness handler and a policy, in the same way the session's constructor already takes a readiness handler. The toolkit's other internals stay closed to the game. <code>Tools/ExpeditionRelay</code> gives <code>ExpeditionNetworkChecks</code> <code>InternalsVisibleTo</code>, and <code>WorldFactChecks</code> compiles the toolkit source it reads.</li>
+      <li>In the shipping player, the game assembly's compiled code is unchanged except for two read-only accessors on <code>DuelUi.MenuColour</code>, which the palette check reads instead of its private fields. The networking assembly differs only by the public relay-readiness members above.</li>
     </ul>
-    <p><b>Why it matters.</b> Neither the compiler nor the IDE's rename can see these names. A rehearsal stops at its first failed check (<a href="#f21">F21</a>), so each broken name costs a build and a run before the next one shows. The Unity lookup can break on an editor upgrade with no compile error.</p>
+    <p><b>Still by name, on purpose.</b> The palette check walks <code>DuelUi.MenuColour</code>'s colour fields by the names in the palette role table, because that table is content that names roles as text, and the check exists to prove the two agree. <code>IsometricSliceBuild</code> still finds Unity's <code>AndroidExternalToolsSettings</code> by name, because that type exists only when Android support is installed; it throws a clear message if the API is missing.</p>
+    <p><b>The cost.</b> <code>internal</code> is wider than <code>private</code>: any code in the same assembly can now use these members. Read an <code>internal</code> member on <code>IsometricSlice</code>, <code>ExpeditionApp</code> or <code>ExpeditionView</code> as "the rehearsals use this", not as an interface for other game code.</p>
     <div class="scrollx"><table>
       <thead><tr><th>Option</th><th>Size</th><th>Trade-offs</th></tr></thead>
       <tbody>
-        <tr><td>Make the members the rehearsals use <code>internal</code> and call them directly. The rehearsals already share Assembly-CSharp. For the .NET tools, <code>internal</code> is visible where a tool compiles the source itself; the relay project would need <code>InternalsVisibleTo</code>.</td><td>M</td><td>Renames become compile errors. Visibility widens inside the assembly, and the change is wide but mechanical.</td></tr>
+        <tr><td><b>Chosen.</b> Make the members the rehearsals use <code>internal</code> and call them directly. For the .NET tools, <code>internal</code> is visible where a tool compiles the source itself; the relay project needs <code>InternalsVisibleTo</code>.</td><td>M</td><td>Renames become compile errors. Visibility widens inside the assembly, and the change is wide but mechanical.</td></tr>
         <tr><td>Give each large class a narrow QA surface: one internal, QA-guarded accessor that exposes what the rehearsals need, and nothing else.</td><td>M–L</td><td>One place lists every seam. More code to keep.</td></tr>
         <tr><td>Keep the strings, and add a fast check that resolves every name the rehearsals use before a build is made.</td><td>S</td><td>A broken name shows in seconds rather than after a build. The coupling stays.</td></tr>
       </tbody>
     </table></div>
-    <p><b>Roadmap.</b> None.</p>
 
     <h3 id="f09">F09 · Production code calls into the rehearsal classes <span class="badge medium">medium</span></h3>
     <p class="dim"><b>Why this priority:</b> shipping players are guarded and checked, but the testing save and the rehearsal hand-offs live inside test classes, so the save path cannot be read or changed on its own.</p>
@@ -635,7 +637,7 @@ flowchart LR
       <li><code>Check</code> throws on the first false condition, so a run reports one failure. The player writes its report and quits with 0 or 1.</li>
       <li>Some stages need no scene but run in the player anyway. For example, <code>PureTournamentFixture</code> runs pure <code>CircuitRules</code> transitions on the live definition, which only the world can build (<a href="#f14">F14</a>).</li>
     </ul>
-    <p><b>Why it matters.</b> The feedback loop is long: a fix whose next failure sits in a later stage needs another full build and run. Any rename breaks it at run time (<a href="#f08">F08</a>).</p>
+    <p><b>Why it matters.</b> The feedback loop is long: a fix whose next failure sits in a later stage needs another full build and run. Since <a href="#f08">F08</a>, a rename fails to compile instead of failing in this run.</p>
     <div class="scrollx"><table>
       <thead><tr><th>Option</th><th>Size</th><th>Trade-offs</th></tr></thead>
       <tbody>
@@ -716,7 +718,7 @@ flowchart LR
         <tr><td>Three input-glyph resolvers</td><td>One family detector shared by both stacks; the family-to-prefix mapping and the sprite load are what is written three times</td><td>Corrected in <a href="#f13">F13</a></td></tr>
         <tr><td>The Circuit state is replaced only through <code>ApplyCircuit</code></td><td>The restore code and one task-selection path assign <code>circuit</code> directly. All production assignments are in <code>IsometricSlice.Circuit.cs</code>.</td><td>Corrected in <a href="#f01">F01</a></td></tr>
         <tr><td>Member counts (for example "about 590 methods" for <code>ExpeditionView</code>)</td><td>Those were regex estimates. This page uses Roslyn counts, which count only members declared directly on the type.</td><td>Replaced</td></tr>
-        <tr><td>"791 string-keyed accesses, 174 names"</td><td>A different matcher finds about 800 and about 180. The picture is the same, and every name resolves today.</td><td>Restated in <a href="#f08">F08</a></td></tr>
+        <tr><td>"791 string-keyed accesses, 174 names"</td><td>Re-counted on <code>main</code> before the fix: about 850 helper calls over about 190 member names, and about 1,060 member names in strings in all. The earlier matcher missed the calls written as <code>Rehearsal.Get</code>, <code>Rehearsal.Set</code>, <code>Rehearsal.SetProperty</code> and <code>Rehearsal.Invoke</code>. Every name resolved before the fix.</td><td>Re-counted in <a href="#f08">F08</a></td></tr>
         <tr><td><code>IsometricSliceBuild</code> has 8 nested types</td><td>7 nested types, plus <code>AndroidNetworkQaLinker</code> beside it in the same file</td><td>Corrected in <a href="#f22">F22</a></td></tr>
         <tr><td>Editor and test numbers measured at <code>2b99fd4</code></td><td><code>main</code> moved to <code>ca8d41e</code> (PRs #33 and #34) while this page was written; both batches touched only <code>Assets/Editor</code> and <code>Assets/Tests</code></td><td>Re-measured at <code>ca8d41e</code></td></tr>
       </tbody>
@@ -724,10 +726,10 @@ flowchart LR
   </section>
 
   <section id="method"><h2><span class="num">09</span>How this page was measured</h2>
-    <p class="lead">Everything here was read from git at <code>main</code> (<code>ca8d41e</code>, 2026-11-07), never from a working checkout. Re-measure before relying on any number.</p>
+    <p class="lead">Everything here was read from git at <code>main</code> (<code>ca8d41e</code>, 2026-11-07), never from a working checkout, except F08's "What changed", which describes the code after that fix. Re-measure before relying on any number.</p>
     <ul>
       <li><b>Member counts</b> come from a Roslyn syntax parse (Microsoft.CodeAnalysis.CSharp 4.13) of every <code>.cs</code> file under <code>Game/</code> and <code>Toolkit/</code>, with <code>UNITY_EDITOR</code>, <code>CIRCUIT_QA</code> and <code>EMBERGROVE_QA</code> defined so that QA code is included. Partial parts are summed by full type name. Methods include constructors and operators. Instance fields exclude <code>const</code> and <code>static</code> fields. Parsing with no defines drops the QA-only classes, removes one method and one field from <code>IsometricSlice</code>, and one method from <code>ExpeditionView</code>.</li>
-      <li><b>String-keyed reflection</b> counts calls to <code>Get</code>, <code>Set</code>, <code>SetProperty</code> and <code>Invoke</code> whose member argument is a string literal naming a plain identifier, plus <code>GetField</code>, <code>GetProperty</code>, <code>GetMethod</code> and <code>GetNestedType</code> with such a literal, across <code>Game/EmberGrove/Assets/Tests</code>. Compiler-generated backing-field names are left out of the count. Each name was then looked up in the Runtime, Editor and Toolkit sources.</li>
+      <li><b>String-keyed reflection</b>, counted on <code>main</code> before F08 was fixed, counts calls to <code>Get</code>, <code>Set</code>, <code>SetProperty</code> and <code>Invoke</code> (also written <code>Rehearsal.Get</code> and so on) whose member argument is a string literal, including the writes to <code>&lt;Name&gt;k__BackingField</code> fields, plus <code>GetField</code>, <code>GetProperty</code>, <code>GetMethod</code> and <code>GetNestedType</code> with such a literal, across <code>Game/EmberGrove/Assets/Tests</code>. The total of about 1,060 also counts enum names compared through <code>ToString()</code>, page names passed to <code>Page("…")</code> and <code>Enum.Parse</code>, the Card Workshop check's lookups, and the name lookups in <code>Tools/ExpeditionNetworkChecks/Program.cs</code> and <code>Tools/ExpeditionPerformance/WorldFactChecks.cs</code>. Each name was then looked up in the Runtime, Editor and Toolkit sources.</li>
       <li><b>References, guards and callers</b> were found with <code>git grep</code> on <code>main</code> and read in context. A "no caller" claim means <code>git grep</code> found no call site in the whole tracked tree, which includes the scene and prefab files.</li>
       <li><b>Complexity</b> is not measured here; <a href="complexity.html">Complexity</a> owns it.</li>
     </ul>
@@ -739,7 +741,7 @@ flowchart LR
     <li><code>Game/EmberGrove/Assets/Runtime/ExpeditionApp*.cs</code>, <code>WorldTableContext.cs</code> — the screen flags, sessions, <code>FairMatchSetup</code> and boss music (F03, F04, F11, F15)</li>
     <li><code>Game/EmberGrove/Assets/Runtime/Exploration/IsometricCombatBridge.cs</code> — session creation, <code>RuntimePreferences</code> and the public fields (F03, F10)</li>
     <li><code>Game/EmberGrove/Assets/Runtime/DuelUi.cs</code>, <code>PracticeNarration.cs</code>, <code>Exploration/TravellerPictures.cs</code> — colour statics, the picture resolver, <code>DuelHoverLift</code>, voice (F12, F16, F18)</li>
-    <li><code>Game/EmberGrove/Assets/Tests/Runtime/CircuitSliceChecks*.cs</code>, <code>ExpeditionHarness*.cs</code> — reflection helpers, the runner and the testing save (F08, F09, F21)</li>
+    <li><code>Game/EmberGrove/Assets/Tests/Runtime/CircuitSliceChecks*.cs</code>, <code>ExpeditionHarness*.cs</code> — the runner and the testing save (F08, F09, F21)</li>
     <li><code>Game/EmberGrove/Assets/Editor/IsometricSliceBuild.cs</code> — build jobs, Android reflection and the harness call (F08, F09, F22)</li>
     <li><code>Toolkit/Packages/com.catsplat.cardforge/Runtime/</code> — <code>Circuit/CircuitRules.cs</code> and its partials, <code>Networking/ExpeditionNetworkSession.cs</code>, <code>Content/ContentPackFiles.cs</code>, <code>Content/ExpeditionContent.cs</code>, <code>Content/WorldContent.cs</code>, <code>Progression/*.cs</code>, <code>Exploration/LandmarkRules.cs</code> and the asmdefs (F05–F07, F12, F15, F17–F19)</li>
     <li><code>Tools/*/*.csproj</code>, <code>Tools/CircuitFieldSetupChecks/Run-Checks.ps1</code>, <code>Tools/CircuitContentChecks/Program.cs</code>, <code>Tools/ExpeditionNetworkChecks/Program.cs</code>, <code>Tools/ExpeditionPerformance/WorldFactChecks.cs</code>, the UnityEngine stand-ins — tool coupling (F08, F14, F20)</li>

@@ -54,7 +54,7 @@
 <tr><td><code>CardForge.Samples</code></td><td><code>Toolkit/Packages/com.catsplat.cardforge/Samples~/MinimalTactics</code></td><td><code>CardForge.Functional</code>, <code>EmberGrove.Expedition</code>, <code>EmberGrove.Expedition.Progression</code>, <code>EmberGrove.Expedition.Networking</code></td><td>package sample, compiled only after a project imports it</td><td>no</td><td class="num">3</td><td class="num">3</td></tr>
 <tr><td><code>CardForge.Samples.Editor</code></td><td><code>Toolkit/Packages/com.catsplat.cardforge/Samples~/MinimalTactics/Editor</code></td><td><code>CardForge.Samples</code>, <code>CardForge.Linker.Editor</code></td><td>package sample, compiled only after a project imports it</td><td>yes</td><td class="num">1</td><td class="num">1</td></tr>
 <tr><td><code>Assembly-CSharp</code> (no .asmdef)</td><td><code>Game/EmberGrove/Assets</code></td><td><code>CardForge.Circuit</code>, <code>CardForge.Content</code>, <code>CardForge.Exploration</code>, <code>CardForge.Functional</code>, <code>EmberGrove.Expedition</code>, <code>EmberGrove.Expedition.Networking</code>, <code>EmberGrove.Expedition.Progression</code></td><td>game scripts outside Editor folders</td><td>yes</td><td class="num">87</td><td class="num">133</td></tr>
-<tr><td><code>Assembly-CSharp-Editor</code> (no .asmdef)</td><td><code>Game/EmberGrove/Assets</code></td><td><code>Assembly-CSharp</code>, <code>CardForge.Circuit</code>, <code>CardForge.Content</code>, <code>CardForge.Exploration</code>, <code>CardForge.Functional</code>, <code>CardForge.Linker.Editor</code>, <code>EmberGrove.Expedition</code>, <code>EmberGrove.Expedition.Networking</code>, <code>EmberGrove.Expedition.Progression</code></td><td>game scripts in Editor folders, Editor only</td><td>yes</td><td class="num">2</td><td class="num">10</td></tr>
+<tr><td><code>Assembly-CSharp-Editor</code> (no .asmdef)</td><td><code>Game/EmberGrove/Assets</code></td><td><code>Assembly-CSharp</code>, <code>CardForge.Circuit</code>, <code>CardForge.Content</code>, <code>CardForge.Exploration</code>, <code>CardForge.Functional</code>, <code>CardForge.Linker.Editor</code>, <code>EmberGrove.Expedition</code>, <code>EmberGrove.Expedition.Networking</code>, <code>EmberGrove.Expedition.Progression</code></td><td>game scripts in Editor folders, Editor only</td><td>yes</td><td class="num">3</td><td class="num">11</td></tr>
 </table></div>
 
 <h3 id="assemblies-package">The CardForge package</h3>
@@ -1390,7 +1390,7 @@ classDiagram
   c_ExpeditionNetworkSession : +string Error
   c_ExpeditionNetworkSession : +string RoomCode
   c_ExpeditionNetworkSession : +string RoomId
-  c_ExpeditionNetworkSession : … 33 more
+  c_ExpeditionNetworkSession : … 35 more
   class c_RelayReadinessPolicy[&quot;RelayReadinessPolicy&quot;]
   c_RelayReadinessPolicy : +int BudgetMilliseconds
   c_RelayReadinessPolicy : +int ProbeMilliseconds
@@ -2041,7 +2041,7 @@ classDiagram
   c_IsometricSectorVisuals : 312 members over 6 files
   class c_IsometricSlice[&quot;IsometricSlice&quot;]
   &lt;&lt;partial&gt;&gt; c_IsometricSlice
-  c_IsometricSlice : 994 members over 19 files
+  c_IsometricSlice : 998 members over 19 files
   class c_TravellerPreferenceText[&quot;TravellerPreferenceText&quot;]
   &lt;&lt;MonoBehaviour&gt;&gt; c_TravellerPreferenceText
   c_TravellerPreferenceText : +Apply(TMP_Text, float)
@@ -2093,7 +2093,7 @@ classDiagram
   c_CircuitPersistenceVerification : +RunBatch()$
   class c_CircuitSliceChecks[&quot;CircuitSliceChecks&quot;]
   &lt;&lt;partial&gt;&gt; c_CircuitSliceChecks
-  c_CircuitSliceChecks : 735 members over 10 files
+  c_CircuitSliceChecks : 721 members over 10 files
   class c_PlayerSettings[&quot;PlayerSettings · EmberGrove.Expedition&quot;]
   &lt;&lt;external&gt;&gt; c_PlayerSettings
   class c_WorldTableContext[&quot;WorldTableContext · EmberGrove.Expedition&quot;]
@@ -2225,6 +2225,8 @@ classDiagram
   class c_AndroidNetworkQaLinker[&quot;AndroidNetworkQaLinker&quot;]
   c_AndroidNetworkQaLinker : +int callbackOrder
   c_AndroidNetworkQaLinker : +GenerateAdditionalLinkXmlFile(…) string
+  class c_CardWorkshopChecks[&quot;CardWorkshopChecks&quot;]
+  &lt;&lt;static&gt;&gt; c_CardWorkshopChecks
   class c_WorldTablePresentation[&quot;WorldTablePresentation · Assembly-CSharp&quot;]
   &lt;&lt;external&gt;&gt; c_WorldTablePresentation
   class c_CardDefinition[&quot;CardDefinition · EmberGrove.Expedition&quot;]
@@ -2232,7 +2234,7 @@ classDiagram
   c_CurrentCardWorkshop --&gt; c_WorldTablePresentation : presentation
   c_CurrentCardWorkshop --&gt; &quot;*&quot; c_CardDefinition : cards
 </pre></div>
-<p class="caption">3 types; 2 referenced types from elsewhere, tagged external and named with where they live. Folders: <code>Game/EmberGrove/Assets/Editor</code>.</p>
+<p class="caption">4 types; 2 referenced types from elsewhere, tagged external and named with where they live. Folders: <code>Game/EmberGrove/Assets/Editor</code>, <code>Game/EmberGrove/Assets/Tests/Editor</code>.</p>
 
 </section>
 <section id="partials"><h2><span class="num">05</span>Partial-class maps</h2>
@@ -2240,9 +2242,9 @@ classDiagram
 <div class="scrollx"><table>
 <tr><th>Class</th><th>Assembly</th><th class="num">Files</th><th class="num">Members</th><th class="num">Methods</th></tr>
 <tr><td><a href="#partial-assembly-csharp-embergrove-expedition-expeditionview">ExpeditionView</a></td><td><code>Assembly-CSharp</code></td><td class="num">23</td><td class="num">698</td><td class="num">540</td></tr>
-<tr><td><a href="#partial-assembly-csharp-embergrove-exploration-isometricslice">IsometricSlice</a></td><td><code>Assembly-CSharp</code></td><td class="num">19</td><td class="num">994</td><td class="num">680</td></tr>
+<tr><td><a href="#partial-assembly-csharp-embergrove-exploration-isometricslice">IsometricSlice</a></td><td><code>Assembly-CSharp</code></td><td class="num">19</td><td class="num">998</td><td class="num">680</td></tr>
 <tr><td><a href="#partial-assembly-csharp-embergrove-expedition-expeditionapp">ExpeditionApp</a></td><td><code>Assembly-CSharp</code></td><td class="num">10</td><td class="num">365</td><td class="num">194</td></tr>
-<tr><td><a href="#partial-assembly-csharp-embergrove-exploration-circuitslicechecks">CircuitSliceChecks</a></td><td><code>Assembly-CSharp</code></td><td class="num">10</td><td class="num">735</td><td class="num">697</td></tr>
+<tr><td><a href="#partial-assembly-csharp-embergrove-exploration-circuitslicechecks">CircuitSliceChecks</a></td><td><code>Assembly-CSharp</code></td><td class="num">10</td><td class="num">721</td><td class="num">682</td></tr>
 <tr><td><a href="#partial-assembly-csharp-embergrove-exploration-isometricsectorvisuals">IsometricSectorVisuals</a></td><td><code>Assembly-CSharp</code></td><td class="num">6</td><td class="num">312</td><td class="num">234</td></tr>
 <tr><td><a href="#partial-cardforge-circuit-cardforge-circuit-circuitrules">CircuitRules</a></td><td><code>CardForge.Circuit</code></td><td class="num">3</td><td class="num">354</td><td class="num">345</td></tr>
 <tr><td><a href="#partial-assembly-csharp-embergrove-expedition-expeditionharness">ExpeditionHarness</a></td><td><code>Assembly-CSharp</code></td><td class="num">2</td><td class="num">124</td><td class="num">95</td></tr>
@@ -2281,15 +2283,15 @@ flowchart LR
 <h3 id="partial-assembly-csharp-embergrove-exploration-isometricslice">IsometricSlice — Assembly-CSharp</h3>
 <div class="diagram"><pre class="mermaid">
 flowchart LR
-  c[&quot;IsometricSlice&lt;br/&gt;19 files&lt;br/&gt;994 members&quot;]
-  c --&gt; f_Game_EmberGrove_Assets_Runtime_Exploration_IsometricSlice_Audio_cs[&quot;IsometricSlice.Audio.cs&lt;br/&gt;28 methods, 29 fields and properties&quot;]
+  c[&quot;IsometricSlice&lt;br/&gt;19 files&lt;br/&gt;998 members&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Runtime_Exploration_IsometricSlice_Audio_cs[&quot;IsometricSlice.Audio.cs&lt;br/&gt;28 methods, 30 fields and properties&quot;]
   c --&gt; f_Game_EmberGrove_Assets_Runtime_Exploration_IsometricSlice_Circuit_cs[&quot;IsometricSlice.Circuit.cs&lt;br/&gt;89 methods, 47 fields and properties&quot;]
   c --&gt; f_Game_EmberGrove_Assets_Runtime_Exploration_IsometricSlice_CircuitUi_cs[&quot;IsometricSlice.CircuitUi.cs&lt;br/&gt;106 methods, 10 fields and properties&quot;]
   c --&gt; f_Game_EmberGrove_Assets_Runtime_Exploration_IsometricSlice_DeckBuilder_cs[&quot;IsometricSlice.DeckBuilder.cs&lt;br/&gt;124 methods, 41 fields and properties&quot;]
   c --&gt; f_Game_EmberGrove_Assets_Runtime_Exploration_IsometricSlice_Hud_cs[&quot;IsometricSlice.Hud.cs&lt;br/&gt;38 methods, 25 fields and properties&quot;]
   c --&gt; f_Game_EmberGrove_Assets_Runtime_Exploration_IsometricSlice_Learning_cs[&quot;IsometricSlice.Learning.cs&lt;br/&gt;15 methods, 2 fields and properties&quot;]
   c --&gt; f_Game_EmberGrove_Assets_Runtime_Exploration_IsometricSlice_Lessons_cs[&quot;IsometricSlice.Lessons.cs&lt;br/&gt;23 methods, 10 fields and properties&quot;]
-  c --&gt; f_Game_EmberGrove_Assets_Runtime_Exploration_IsometricSlice_Onboarding_cs[&quot;IsometricSlice.Onboarding.cs&lt;br/&gt;38 methods, 15 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Runtime_Exploration_IsometricSlice_Onboarding_cs[&quot;IsometricSlice.Onboarding.cs&lt;br/&gt;38 methods, 17 fields and properties&quot;]
   c --&gt; f_Game_EmberGrove_Assets_Runtime_Exploration_IsometricSlice_Preferences_cs[&quot;IsometricSlice.Preferences.cs&lt;br/&gt;4 methods, 5 fields and properties&quot;]
   c --&gt; f_Game_EmberGrove_Assets_Runtime_Exploration_IsometricSlice_Presentation_cs[&quot;IsometricSlice.Presentation.cs&lt;br/&gt;10 methods, 8 fields and properties&quot;]
   c --&gt; f_Game_EmberGrove_Assets_Runtime_Exploration_IsometricSlice_Progress_cs[&quot;IsometricSlice.Progress.cs&lt;br/&gt;5 methods, 5 fields and properties&quot;]
@@ -2300,7 +2302,7 @@ flowchart LR
   c --&gt; f_Game_EmberGrove_Assets_Runtime_Exploration_IsometricSlice_Waybook_cs[&quot;IsometricSlice.Waybook.cs&lt;br/&gt;36 methods, 10 fields and properties&quot;]
   c --&gt; f_Game_EmberGrove_Assets_Runtime_Exploration_IsometricSlice_WaybookMenu_cs[&quot;IsometricSlice.WaybookMenu.cs&lt;br/&gt;34 methods, 19 fields and properties&quot;]
   c --&gt; f_Game_EmberGrove_Assets_Runtime_Exploration_IsometricSlice_World_cs[&quot;IsometricSlice.World.cs&lt;br/&gt;14 methods, 8 fields and properties&quot;]
-  c --&gt; f_Game_EmberGrove_Assets_Runtime_Exploration_IsometricSlice_cs[&quot;IsometricSlice.cs&lt;br/&gt;58 methods, 35 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Runtime_Exploration_IsometricSlice_cs[&quot;IsometricSlice.cs&lt;br/&gt;58 methods, 36 fields and properties&quot;]
 </pre></div>
 <p class="caption">First file's folder: <code>Game/EmberGrove/Assets/Runtime/Exploration</code>; a file elsewhere shows its folder.</p>
 
@@ -2324,17 +2326,17 @@ flowchart LR
 <h3 id="partial-assembly-csharp-embergrove-exploration-circuitslicechecks">CircuitSliceChecks — Assembly-CSharp</h3>
 <div class="diagram"><pre class="mermaid">
 flowchart LR
-  c[&quot;CircuitSliceChecks&lt;br/&gt;10 files&lt;br/&gt;735 members&quot;]
+  c[&quot;CircuitSliceChecks&lt;br/&gt;10 files&lt;br/&gt;721 members&quot;]
   c --&gt; f_Game_EmberGrove_Assets_Tests_Runtime_CircuitSliceChecks_Artwork_cs[&quot;CircuitSliceChecks.Artwork.cs&lt;br/&gt;37 methods, 0 fields and properties&quot;]
   c --&gt; f_Game_EmberGrove_Assets_Tests_Runtime_CircuitSliceChecks_BattlePolish_cs[&quot;CircuitSliceChecks.BattlePolish.cs&lt;br/&gt;101 methods, 0 fields and properties&quot;]
-  c --&gt; f_Game_EmberGrove_Assets_Tests_Runtime_CircuitSliceChecks_DeckBuilder_cs[&quot;CircuitSliceChecks.DeckBuilder.cs&lt;br/&gt;36 methods, 0 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Tests_Runtime_CircuitSliceChecks_DeckBuilder_cs[&quot;CircuitSliceChecks.DeckBuilder.cs&lt;br/&gt;35 methods, 0 fields and properties&quot;]
   c --&gt; f_Game_EmberGrove_Assets_Tests_Runtime_CircuitSliceChecks_Lessons_cs[&quot;CircuitSliceChecks.Lessons.cs&lt;br/&gt;65 methods, 0 fields and properties&quot;]
   c --&gt; f_Game_EmberGrove_Assets_Tests_Runtime_CircuitSliceChecks_MenuRules_cs[&quot;CircuitSliceChecks.MenuRules.cs&lt;br/&gt;8 methods, 0 fields and properties&quot;]
-  c --&gt; f_Game_EmberGrove_Assets_Tests_Runtime_CircuitSliceChecks_Saves_cs[&quot;CircuitSliceChecks.Saves.cs&lt;br/&gt;22 methods, 12 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Tests_Runtime_CircuitSliceChecks_Saves_cs[&quot;CircuitSliceChecks.Saves.cs&lt;br/&gt;23 methods, 12 fields and properties&quot;]
   c --&gt; f_Game_EmberGrove_Assets_Tests_Runtime_CircuitSliceChecks_Story_cs[&quot;CircuitSliceChecks.Story.cs&lt;br/&gt;53 methods, 0 fields and properties&quot;]
-  c --&gt; f_Game_EmberGrove_Assets_Tests_Runtime_CircuitSliceChecks_Versus_cs[&quot;CircuitSliceChecks.Versus.cs&lt;br/&gt;62 methods, 0 fields and properties&quot;]
-  c --&gt; f_Game_EmberGrove_Assets_Tests_Runtime_CircuitSliceChecks_WorldTable_cs[&quot;CircuitSliceChecks.WorldTable.cs&lt;br/&gt;121 methods, 6 fields and properties&quot;]
-  c --&gt; f_Game_EmberGrove_Assets_Tests_Runtime_CircuitSliceChecks_cs[&quot;CircuitSliceChecks.cs&lt;br/&gt;192 methods, 20 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Tests_Runtime_CircuitSliceChecks_Versus_cs[&quot;CircuitSliceChecks.Versus.cs&lt;br/&gt;61 methods, 0 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Tests_Runtime_CircuitSliceChecks_WorldTable_cs[&quot;CircuitSliceChecks.WorldTable.cs&lt;br/&gt;112 methods, 7 fields and properties&quot;]
+  c --&gt; f_Game_EmberGrove_Assets_Tests_Runtime_CircuitSliceChecks_cs[&quot;CircuitSliceChecks.cs&lt;br/&gt;187 methods, 20 fields and properties&quot;]
 </pre></div>
 <p class="caption">First file's folder: <code>Game/EmberGrove/Assets/Tests/Runtime</code>; a file elsewhere shows its folder.</p>
 
